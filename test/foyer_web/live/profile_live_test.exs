@@ -227,11 +227,14 @@ defmodule FoyerWeb.ProfileLiveTest do
       :ok
     end
 
+    # F.Profile.24 — label says "bonus points" not "full balance explanation"
     test "renders 'How you earned bonus points' when points_earned non-empty", %{conn: conn} do
       user = ProfileScenarios.user_maya()
       {:ok, view, _html} = mount_isolated_profile(conn, user)
 
       assert has_element?(view, "#points-earned")
+      # F.Profile.24 — label is "bonus points" only, does not claim to
+      # reconcile with points_balance
       assert render(view) =~ "How you earned bonus points"
     end
 
@@ -319,6 +322,26 @@ defmodule FoyerWeb.ProfileLiveTest do
   # ---------------------------------------------------------------------------
   # F.Profile.20 — Empty recognitions state
   # ---------------------------------------------------------------------------
+
+  # F.Profile.16 — mobile layout: stats row, sections, bottom nav present
+  # Layout structure is tested via element presence; CSS responsive behavior
+  # is covered at the browser level and not asserted here.
+  describe "F.Profile.16 — mobile layout structure" do
+    setup do
+      stub_with(Foyer.ProfileMock, ProfileScenarios.LineStaff)
+      :ok
+    end
+
+    test "renders stats row, received section, points section, and profile card", %{conn: conn} do
+      user = ProfileScenarios.user_maya()
+      {:ok, view, _html} = mount_isolated_profile(conn, user)
+
+      assert has_element?(view, "#profile-stats")
+      assert has_element?(view, "#recognitions-received")
+      assert has_element?(view, "#points")
+      assert has_element?(view, "#profile-card")
+    end
+  end
 
   describe "F.Profile.20 — empty received state" do
     setup do
