@@ -1,28 +1,50 @@
-defmodule Foyer.AccountsScenarios.WithPeople.Static do
-  @moduledoc false
+defmodule Foyer.AccountsScenarios.WithPeople do
+  @moduledoc """
+  Accounts world with a fixed roster of three users for isolated LiveView tests.
+
+  User IDs are stable (1, 2, 3) so tests can assert on `#people-row-<id>`.
+  The user with id 1 is on-shift; id 2 is off-shift; id 3 is on-shift. Tests
+  use the shifts scenario to control on-shift state.
+  """
+  @behaviour Foyer.AccountsPort
 
   alias Foyer.Accounts.User
+  alias Foyer.Channels.Channel
+  alias Foyer.Channels.Membership
+
+  @floor_4 %Channel{
+    id: 101,
+    name: "Housekeeping · Floor 4",
+    slug: "housekeeping-floor-4",
+    kind: :department
+  }
+  @all_hk %Channel{id: 102, name: "All Housekeeping", slug: "all-housekeeping", kind: :department}
 
   @people [
     %User{
       id: 1,
-      name: "Charlotte Voss",
-      initials: "CV",
-      role: :manager,
-      department: "Housekeeping",
-      title: "Dir. of Housekeeping",
-      languages: ["EN"],
-      points_balance: 0
-    },
-    %User{
-      id: 2,
       name: "Maya Okafor",
       initials: "MO",
       role: :staff,
       department: "Housekeeping",
-      title: "Senior Housekeeper",
+      title: "Senior Housekeeper · Floor 4",
       languages: ["EN"],
-      points_balance: 245
+      points_balance: 245,
+      memberships: [
+        %Membership{id: 1, user_id: 1, channel_id: 101, channel: @floor_4},
+        %Membership{id: 2, user_id: 1, channel_id: 102, channel: @all_hk}
+      ]
+    },
+    %User{
+      id: 2,
+      name: "Hugo Brandt",
+      initials: "HB",
+      role: :staff,
+      department: "Engineering",
+      title: "Engineering",
+      languages: ["EN"],
+      points_balance: 100,
+      memberships: []
     },
     %User{
       id: 3,
@@ -30,32 +52,30 @@ defmodule Foyer.AccountsScenarios.WithPeople.Static do
       initials: "AB",
       role: :staff,
       department: "Housekeeping",
-      title: "Housekeeper",
+      title: "Housekeeper · Fl. 4",
       languages: ["EN"],
-      points_balance: 60
+      points_balance: 60,
+      memberships: [
+        %Membership{id: 3, user_id: 3, channel_id: 101, channel: @floor_4}
+      ]
     }
   ]
 
-  @spec people() :: [User.t()]
-  def people, do: @people
-end
-
-defmodule Foyer.AccountsScenarios.WithPeople do
-  @moduledoc """
-  Accounts world that returns a small, fixed roster from `list_people/1`. Other
-  callbacks raise or return nil — isolated LiveView tests for Recognitions
-  never exercise them at mount time.
-  """
-  @behaviour Foyer.AccountsPort
-
-  alias Foyer.Accounts.User
-  alias Foyer.AccountsScenarios.WithPeople.Static
+  @impl true
+  def list_pickable_users, do: @people
 
   @impl true
-  def list_pickable_users, do: Static.people()
+  def list_people(opts \\ []) do
+    case Keyword.get(opts, :channel_id) do
+      nil -> @people
+      channel_id when is_integer(channel_id) -> filter_by_channel(@people, channel_id)
+      channel_id when is_binary(channel_id) -> list_people(channel_id: String.to_integer(channel_id))
+    end
+  end
 
-  @impl true
-  def list_people(_opts \\ []), do: Static.people()
+  defp filter_by_channel(people, channel_id) do
+    Enum.filter(people, fn p -> Enum.any?(p.memberships, fn m -> m.channel_id == channel_id end) end)
+  end
 
   @impl true
   def get_user!(id) when is_integer(id) do
@@ -73,7 +93,7 @@ defmodule Foyer.AccountsScenarios.WithPeople do
   end
 
   @impl true
-  def get_user(id) when is_integer(id), do: Enum.find(Static.people(), fn p -> p.id == id end)
+  def get_user(id) when is_integer(id), do: Enum.find(@people, fn p -> p.id == id end)
 
   def get_user(id) when is_binary(id) do
     case Integer.parse(id) do
@@ -84,7 +104,6 @@ defmodule Foyer.AccountsScenarios.WithPeople do
 
   def get_user(_), do: nil
 
-  @doc "The fixed sample roster this scenario returns."
   @spec people() :: [User.t()]
-  def people, do: Static.people()
+  def people, do: @people
 end

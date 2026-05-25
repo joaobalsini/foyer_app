@@ -68,7 +68,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
     test "submitting with recipient = sender surfaces the self-recognition flash", %{conn: conn} do
       stub_with(Foyer.RecognitionsMock, RecognitionsScenarios.Empty)
 
-      # `id: 2` is Maya in `WithPeople` — so the select option for
+      # `id: 2` is Hugo in `WithPeople` — so the select option for
       # `recipient_id` includes "2" and form validation passes through to
       # `give/2`, which is what we want to assert on.
       scope = IsolatedHelpers.build_scope(id: 2, role: :staff, on_shift?: true)
