@@ -9,7 +9,10 @@ config :foyer,
   recognitions_context: Foyer.Recognitions,
   chat_context: Foyer.Chat,
   profile_context: Foyer.Profile,
-  today_context: Foyer.Today
+  today_context: Foyer.Today,
+  # F.Profile.25 — property code from application config. All v1 users share
+  # one property. A per-user property code is a v2 concern.
+  property_code: "LDN·MAY"
 
 # Database is configured at runtime via DATABASE_URL (see config/runtime.exs).
 # No credentials are stored here.

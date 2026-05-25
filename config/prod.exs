@@ -9,7 +9,10 @@ config :foyer,
   recognitions_context: Foyer.Recognitions,
   chat_context: Foyer.Chat,
   profile_context: Foyer.Profile,
-  today_context: Foyer.Today
+  today_context: Foyer.Today,
+  # F.Profile.25 — property code from application config. All v1 users share
+  # one property. A per-user property code is a v2 concern.
+  property_code: "LDN·MAY"
 
 # Note we also include the path to a cache manifest
 # containing the digested version of static files. This

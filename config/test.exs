@@ -11,7 +11,8 @@ config :foyer,
   recognitions_context: Foyer.RecognitionsMock,
   chat_context: Foyer.ChatMock,
   profile_context: Foyer.ProfileMock,
-  today_context: Foyer.TodayMock
+  today_context: Foyer.TodayMock,
+  property_code: "LDN·MAY"
 
 # Database is configured at runtime via TEST_DATABASE_URL (see config/runtime.exs).
 # No credentials are stored here.
