@@ -23,7 +23,7 @@ defmodule Foyer.Today do
       on_shift?: not is_nil(shift),
       handoff: Shifts.last_handoff_for(user),
       needs_ack: needs_ack,
-      recent_recognition: Recognitions.received_by(user) |> Enum.take(3),
+      recent_recognition: Recognitions.received_by(user, user) |> Enum.take(3),
       waiting_count: length(needs_ack)
     }
   end

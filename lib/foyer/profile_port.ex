@@ -7,5 +7,5 @@ defmodule Foyer.ProfilePort do
   alias Foyer.Accounts.User
   alias Foyer.Profile.Card
 
-  @callback profile_for(User.t()) :: Card.t()
+  @callback profile_for(target :: User.t(), viewer :: User.t()) :: Card.t()
 end

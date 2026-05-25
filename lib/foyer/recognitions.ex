@@ -28,11 +28,12 @@ defmodule Foyer.Recognitions do
   end
 
   @impl true
-  @spec received_by(User.t()) :: [Recognition.t()]
-  def received_by(%User{id: user_id}) do
+  @spec received_by(User.t(), User.t()) :: [Recognition.t()]
+  def received_by(%User{id: user_id}, %User{id: viewer_id}) do
     from(r in Recognition,
       where: r.recipient_id == ^user_id,
       where: is_nil(r.removed_at),
+      where: r.public == true or r.sender_id == ^viewer_id or r.recipient_id == ^viewer_id,
       order_by: [desc: r.inserted_at],
       preload: [:sender, :recipient]
     )
@@ -40,11 +41,12 @@ defmodule Foyer.Recognitions do
   end
 
   @impl true
-  @spec given_by(User.t()) :: [Recognition.t()]
-  def given_by(%User{id: user_id}) do
+  @spec given_by(User.t(), User.t()) :: [Recognition.t()]
+  def given_by(%User{id: user_id}, %User{id: viewer_id}) do
     from(r in Recognition,
       where: r.sender_id == ^user_id,
       where: is_nil(r.removed_at),
+      where: r.public == true or r.sender_id == ^viewer_id or r.recipient_id == ^viewer_id,
       order_by: [desc: r.inserted_at],
       preload: [:sender, :recipient]
     )

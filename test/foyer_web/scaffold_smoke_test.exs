@@ -477,5 +477,21 @@ defmodule FoyerWeb.ScaffoldSmokeTest do
       assert render(view) =~ "Hugo Brandt"
       assert has_element?(view, "#back-to-people")
     end
+
+    test "F.Recognitions.10 /people/:id hides private recognitions from third parties", ctx do
+      # private_recognition is Maya -> Aisha, public: false.
+      # Hugo (third party) viewing Aisha's profile must not see the body.
+      conn = sign_in(ctx.conn, ctx.hugo)
+      {:ok, _view, html} = live(conn, ~p"/people/#{ctx.aisha.id}")
+      refute html =~ "Handled the linen reset"
+    end
+
+    test "F.Recognitions.10 /people/:id shows private recognitions to recipient", ctx do
+      # Aisha (recipient) viewing her own page via /people/:id (or via /me).
+      # Recipient must see the private recognition body.
+      conn = sign_in(ctx.conn, ctx.aisha)
+      {:ok, _view, html} = live(conn, ~p"/people/#{ctx.aisha.id}")
+      assert html =~ "Handled the linen reset"
+    end
   end
 end

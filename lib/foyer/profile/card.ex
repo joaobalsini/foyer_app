@@ -1,6 +1,6 @@
 defmodule Foyer.Profile.Card do
   @moduledoc """
-  Read-model returned by `Foyer.Profile.profile_for/1`. The shape consumed by
+  Read-model returned by `Foyer.Profile.profile_for/2`. The shape consumed by
   `FoyerWeb.ProfileLive`. Typed DTO (per ARCHITECTURE.md "no bare maps").
   """
   use TypedStruct

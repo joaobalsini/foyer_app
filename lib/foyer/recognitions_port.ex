@@ -8,8 +8,8 @@ defmodule Foyer.RecognitionsPort do
   alias Foyer.Recognitions.Recognition
 
   @callback feed_public(opts :: keyword()) :: [Recognition.t()]
-  @callback received_by(User.t()) :: [Recognition.t()]
-  @callback given_by(User.t()) :: [Recognition.t()]
+  @callback received_by(target :: User.t(), viewer :: User.t()) :: [Recognition.t()]
+  @callback given_by(target :: User.t(), viewer :: User.t()) :: [Recognition.t()]
   @callback get_recognition!(integer() | String.t(), User.t()) :: Recognition.t()
   @callback compose_changeset(map()) :: Ecto.Changeset.t()
   @callback change_recognition(Recognition.t(), map()) :: Ecto.Changeset.t()

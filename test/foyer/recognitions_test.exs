@@ -139,6 +139,25 @@ defmodule Foyer.RecognitionsTest do
         Recognitions.get_recognition!(ctx.private_recognition.id, ctx.hugo)
       end
     end
+
+    test "F.Recognitions.10 received_by hides private recognitions from third-party viewers",
+         ctx do
+      # private_recognition is from Maya -> Aisha (public: false).
+      # Aisha (recipient) and Maya (sender) see it; Hugo (third party) does not.
+      ids = fn list -> Enum.map(list, & &1.id) end
+
+      assert ctx.private_recognition.id in ids.(Recognitions.received_by(ctx.aisha, ctx.aisha))
+      assert ctx.private_recognition.id in ids.(Recognitions.received_by(ctx.aisha, ctx.maya))
+      refute ctx.private_recognition.id in ids.(Recognitions.received_by(ctx.aisha, ctx.hugo))
+    end
+
+    test "F.Recognitions.10 given_by hides private recognitions from third-party viewers", ctx do
+      ids = fn list -> Enum.map(list, & &1.id) end
+
+      assert ctx.private_recognition.id in ids.(Recognitions.given_by(ctx.maya, ctx.maya))
+      assert ctx.private_recognition.id in ids.(Recognitions.given_by(ctx.maya, ctx.aisha))
+      refute ctx.private_recognition.id in ids.(Recognitions.given_by(ctx.maya, ctx.hugo))
+    end
   end
 
   defp age_recognition!(recognition, seconds) do

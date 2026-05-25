@@ -31,7 +31,7 @@ defmodule FoyerWeb.ProfileLive do
   @impl true
   def handle_params(_params, _uri, socket) do
     scope = socket.assigns.current_scope
-    card = FoyerWeb.LiveDeps.profile().profile_for(scope.user)
+    card = FoyerWeb.LiveDeps.profile().profile_for(scope.user, scope.user)
 
     now = DateTime.utc_now()
     month_start = %{now | day: 1, hour: 0, minute: 0, second: 0, microsecond: {0, 0}}
