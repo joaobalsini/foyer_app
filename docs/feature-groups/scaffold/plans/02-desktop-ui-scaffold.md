@@ -965,10 +965,10 @@ File: `lib/foyer_web/live/people_live.ex`
 
 ## 9. Smoke test additions
 
-The existing smoke test (`test/foyer_web/scaffold_smoke_test.exs`) asserts on
+The existing smoke test (`test/foyer_web/smoke_test.exs`) asserts on
 surface content. This plan adds a second test module:
 
-Path: `test/foyer_web/desktop_smoke_test.exs`
+Path: `test/foyer_web/smoke_test.exs`
 
 Tagged `:integration`, `async: true`, same fixture setup as the scaffold smoke
 test (imports `FoyerWeb.ScaffoldFixtures`, uses `stub_with` to bind real
@@ -1169,7 +1169,7 @@ Verify: `mix credo --strict` passes; `mix compile --warnings-as-errors` passes.
 Files: `lib/foyer_web/live/today_live.ex`.
 
 Apply shell wrapper changes from §8.1. Run `mix test
-test/foyer_web/scaffold_smoke_test.exs` — all existing Today tests must still
+test/foyer_web/smoke_test.exs` — all existing Today tests must still
 pass.
 
 **Step 4 — Update `HouseLive` template.**
@@ -1177,7 +1177,7 @@ pass.
 Files: `lib/foyer_web/live/house_live.ex`.
 
 Apply shell wrapper changes from §8.2. Run `mix test
-test/foyer_web/scaffold_smoke_test.exs`.
+test/foyer_web/smoke_test.exs`.
 
 **Step 5 — Update `AnnouncementLive` — compose and show.**
 
@@ -1191,7 +1191,7 @@ Files: `lib/foyer_web/live/announcement_live.ex`.
 - Wrap `:show` render in `.foyer-content-cols` with read-receipts column.
 - Add shell wrapper to all render clauses.
 
-Run `mix test test/foyer_web/scaffold_smoke_test.exs`.
+Run `mix test test/foyer_web/smoke_test.exs`.
 
 **Step 6 — Update `ChatLive` for desktop two-panel layout.**
 
@@ -1201,7 +1201,7 @@ Files: `lib/foyer_web/live/chat_live.ex`.
 - Update `handle_params/3` clauses to load `on_shift_ids` and `channels`.
 - Restructure `render/1` for the two-panel layout (§8.4).
 
-Run `mix test test/foyer_web/scaffold_smoke_test.exs`.
+Run `mix test test/foyer_web/smoke_test.exs`.
 
 **Step 7 — Update `RecognitionsLive` for desktop layout.**
 
@@ -1212,7 +1212,7 @@ Files: `lib/foyer_web/live/recognitions_live.ex`.
 - Wrap `:new` in `.foyer-content-cols`.
 - Add shell wrapper to all render clauses.
 
-Run `mix test test/foyer_web/scaffold_smoke_test.exs`.
+Run `mix test test/foyer_web/smoke_test.exs`.
 
 **Step 8 — Update `ProfileLive` template.**
 
@@ -1227,7 +1227,7 @@ Files: `lib/foyer_web/components/foyer_components.ex`.
 Wrap header + recognitions in `.foyer-content-cols` at `lg:` (§5.12). The
 component is used by both `ProfileLive` and `PeopleLive :show`.
 
-Run `mix test test/foyer_web/scaffold_smoke_test.exs`.
+Run `mix test test/foyer_web/smoke_test.exs`.
 
 **Step 10 — Update `PeopleLive` template.**
 
@@ -1235,13 +1235,13 @@ Files: `lib/foyer_web/live/people_live.ex`.
 
 Apply shell wrapper and the aside + list flex layout from §8.7 and §5.11.
 
-Run `mix test test/foyer_web/scaffold_smoke_test.exs`.
+Run `mix test test/foyer_web/smoke_test.exs`.
 
 **Step 11 — Write the desktop smoke test.**
 
-Files: `test/foyer_web/desktop_smoke_test.exs`.
+Files: `test/foyer_web/smoke_test.exs`.
 
-Write the test from §9.2. Run `mix test test/foyer_web/desktop_smoke_test.exs`.
+Write the test from §9.2. Run `mix test test/foyer_web/smoke_test.exs`.
 Fix any failures before proceeding.
 
 **Step 12 — Full test suite + static checks.**

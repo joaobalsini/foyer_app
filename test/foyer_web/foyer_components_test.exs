@@ -315,14 +315,25 @@ defmodule FoyerWeb.FoyerComponentsTest do
                 body: "Covered the late suite reset.",
                 values: ["craft"],
                 public: true,
+                bonus_points: 0,
                 inserted_at: ~U[2026-05-25 08:14:00Z]
               }
             ],
             given: [],
             points: 120,
-            on_shift?: true
+            on_shift?: true,
+            received_this_month: 1,
+            points_earned: []
           },
-          rewards: [%{title: "Staff dinner", cost: 80}]
+          viewer: :self,
+          rewards: [
+            %Foyer.Profile.RewardItem{
+              icon: "hero-gift",
+              title: "Staff dinner",
+              description: "Any Tuesday",
+              cost: 80
+            }
+          ]
         )
 
       assert html =~ "Aisha Bello"

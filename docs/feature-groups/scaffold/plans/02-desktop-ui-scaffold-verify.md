@@ -27,7 +27,7 @@ That's a real feature-group concern (House) per plan §5.3, not a scaffold one.
    `foyer-content-cols` used in profile_card, compose new/edit, show read-receipts,
    recognition new. Router unchanged as promised.
 
-2. **Guidelines followed:** ✔ `desktop_smoke_test.exs` tagged `:integration`,
+2. **Guidelines followed:** ✔ `smoke_test.exs` tagged `:integration`,
    `async: true`. Uses `stub_with` (not `Application.put_env`). Imports fixture
    helper. No F-numbers (scaffold has no F-clauses per `scaffold/spec.md`).
 
@@ -89,7 +89,7 @@ That's a real feature-group concern (House) per plan §5.3, not a scaffold one.
   new migration. The `ack_initials/1` helper stays as a defensive `_ -> "??"`
   fallback (cheap insurance against a future regression), but the primary
   `%{user: %{initials: initials}}` clause now matches every real ack.
-- **Test that pins it:** `test/foyer_web/desktop_smoke_test.exs` — new test
+- **Test that pins it:** `test/foyer_web/smoke_test.exs` — new test
   `"ack badges render the acking user's initials (not '??')"` inserts an
   announcement, has Maya ack it, opens it as Charlotte (the author), asserts
   the badge `#ack-badge-#{maya.id}` is present and the rendered HTML does not
@@ -97,7 +97,7 @@ That's a real feature-group concern (House) per plan §5.3, not a scaffold one.
 
 ### 2. Chat dual-load test asserted only on container ID (not on the data)
 
-- **File:** `test/foyer_web/desktop_smoke_test.exs:89-96` (was).
+- **File:** `test/foyer_web/smoke_test.exs:89-96` (was).
 - **Symptom:** The "direct load of chat room populates inbox panel" test asserted
   `has_element?(view, "#chat-panel-inbox")` and `has_element?(view, "#inbox")` —
   the stream container ID is rendered unconditionally, so the test would pass
@@ -116,7 +116,7 @@ That's a real feature-group concern (House) per plan §5.3, not a scaffold one.
   div, the form is in the `else` branch, so it is truly not rendered (not
   CSS-hidden). But there was no test pinning this.
 - **Change:** two new pinning tests in
-  `test/foyer_web/desktop_smoke_test.exs`:
+  `test/foyer_web/smoke_test.exs`:
   - `"staff visiting /announcements/new sees gated view, NO form"` asserts the
     `#compose-gated` element is present AND `#announcement-new-form` is absent
     AND no `button[type='submit']` is in the DOM. If a future edit replaces the
@@ -133,7 +133,7 @@ That's a real feature-group concern (House) per plan §5.3, not a scaffold one.
   token automatically. If a future edit drops `method="delete"`, the sign-out
   becomes an unauthenticated GET (a security regression), and nothing would
   fail.
-- **Change:** new test in `test/foyer_web/desktop_smoke_test.exs`,
+- **Change:** new test in `test/foyer_web/smoke_test.exs`,
   `"rail sign-out link carries a CSRF token"`, asserts the rendered HTML
   contains `<a … data-method="delete" data-csrf="…" data-to="/session" …
   id="rail-sign-out"`. Empirically verified: the live render emits all four
@@ -200,7 +200,7 @@ $ mix test                            # 39 tests, 0 failures, 0.5s
 preload-list contents and test additions).
 
 Test count went from 35 to 39 — added 4 new pinning tests in
-`desktop_smoke_test.exs` (the "dual-load" test was tightened in place, not
+`smoke_test.exs` (the "dual-load" test was tightened in place, not
 added): ack-badge initials, staff-gated compose, manager-allowed compose,
 sign-out CSRF. The desktop smoke file is now 12 tests (was 8). The
 "manager-allowed compose" case is fast (Charlotte already on-shift), no

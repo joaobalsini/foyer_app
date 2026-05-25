@@ -103,7 +103,7 @@ ticket.
 ### D. Testing
 
 - ✓ Smoke test runs `async: true` —
-  `test/foyer_web/scaffold_smoke_test.exs`
+  `test/foyer_web/smoke_test.exs`
 - ✓ `setup :verify_on_exit!` and `set_mox_from_context` present in setup
 - ✓ Exercises `start_shift`, `end_shift`, `acknowledge_announcement`
 - ✓ Unauthorized-read assertion present (`leadership_only_announcement` from
@@ -117,7 +117,7 @@ ticket.
 $ mix format --check-formatted    # pass (no output)
 $ mix credo --strict              # 241 mods/funs, found no issues.
 $ mix test                        # 23 tests, 0 failures
-$ mix test test/foyer_web/scaffold_smoke_test.exs
+$ mix test test/foyer_web/smoke_test.exs
                                   # 19 tests, 0 failures
 $ mix dialyzer                    # Total errors: 0, Skipped: 0
 $ mix precommit                   # 23 tests, 0 failures

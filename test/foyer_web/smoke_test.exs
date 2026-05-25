@@ -13,6 +13,8 @@ defmodule FoyerWeb.SmokeTest do
   import Mox
   import FoyerWeb.ScaffoldFixtures
 
+  alias Foyer.House.Announcement
+
   @moduletag :integration
 
   setup :verify_on_exit!
@@ -57,6 +59,11 @@ defmodule FoyerWeb.SmokeTest do
                build_conn()
                |> sign_in(ctx.jamal)
                |> live(~p"/recognitions")
+
+      assert {:error, {:redirect, %{to: "/today"}}} =
+               build_conn()
+               |> sign_in(ctx.jamal)
+               |> live(~p"/me")
     end
   end
 
@@ -124,6 +131,9 @@ defmodule FoyerWeb.SmokeTest do
       assert has_element?(view, "#today")
       assert has_element?(view, "#on-shift-staff")
       assert has_element?(view, "#bottom-nav-today")
+      assert render(view) =~ "Maya"
+      assert render(view) =~ "Housekeeping"
+      assert render(view) =~ "Suite 412"
     end
 
     test "manager today mounts", ctx do
@@ -131,19 +141,38 @@ defmodule FoyerWeb.SmokeTest do
 
       assert has_element?(view, "#manager-today")
       assert has_element?(view, "#compose-cta")
+      assert render(view) =~ "Charlotte"
     end
 
-    test "off-shift today mounts", ctx do
+    test "off-shift today mounts and starts a shift", ctx do
       {:ok, view, _html} = ctx.conn |> sign_in(ctx.jamal) |> live(~p"/today")
 
       assert has_element?(view, "#off-shift")
       assert has_element?(view, "#start-shift-btn")
+      assert has_element?(view, "#bottom-nav-house[disabled]")
+      assert has_element?(view, "#bottom-nav-chat[disabled]")
+
+      view |> element("#start-shift-btn") |> render_click()
+
+      {:ok, _house_view, _html} =
+        build_conn()
+        |> sign_in(ctx.jamal)
+        |> live(~p"/house")
     end
 
-    test "end shift route mounts", ctx do
+    test "end shift route submits handoff and gates house afterward", ctx do
       {:ok, view, _html} = ctx.conn |> sign_in(ctx.maya) |> live(~p"/today/end-shift")
 
       assert has_element?(view, "#end-shift-form")
+
+      view
+      |> form("#end-shift-form", shift: %{handoff_note: "All clear in 412."})
+      |> render_submit()
+
+      assert {:error, {:redirect, %{to: "/today"}}} =
+               build_conn()
+               |> sign_in(ctx.maya)
+               |> live(~p"/house")
     end
   end
 
@@ -153,12 +182,22 @@ defmodule FoyerWeb.SmokeTest do
 
       assert has_element?(view, "#house")
       assert has_element?(view, "#recognize-cta")
+      assert render(view) =~ "Suite 412"
+      assert render(view) =~ "Pinned"
     end
 
     test "F.Announcements.2 — manager announcement compose mounts", ctx do
       {:ok, view, _html} = ctx.conn |> sign_in(ctx.charlotte) |> live(~p"/announcements/new")
 
       assert has_element?(view, "#announcement-new-form")
+      assert render(view) =~ "New announcement"
+    end
+
+    test "F.Announcements.2 — staff announcement compose redirects to house", ctx do
+      assert {:error, {:live_redirect, %{to: "/house"}}} =
+               ctx.conn
+               |> sign_in(ctx.maya)
+               |> live(~p"/announcements/new")
     end
 
     test "F.Announcements.7 / F.Announcements.9 — announcement detail mounts", ctx do
@@ -169,6 +208,11 @@ defmodule FoyerWeb.SmokeTest do
 
       assert has_element?(view, "#announcement")
       assert has_element?(view, "#back-to-house")
+      assert has_element?(view, "button", "I've read & understood")
+
+      view |> element("button", "I've read & understood") |> render_click()
+
+      assert render(view) =~ "Acknowledged"
     end
 
     test "F.Announcements.3 — announcement edit mounts for author", ctx do
@@ -178,6 +222,26 @@ defmodule FoyerWeb.SmokeTest do
         |> live(~p"/announcements/#{ctx.suite_412.id}/edit")
 
       assert has_element?(view, "#announcement-edit-form")
+      assert render(view) =~ "Edit announcement"
+    end
+
+    test "F.Announcements.7 — users cannot open inaccessible announcements", ctx do
+      assert {:error, {:live_redirect, %{to: "/house"}}} =
+               ctx.conn
+               |> sign_in(ctx.maya)
+               |> live(~p"/announcements/#{ctx.leadership_only_announcement.id}")
+    end
+
+    test "announcement ack badges render acking user initials", ctx do
+      announcement_id = create_acked_announcement(ctx)
+
+      {:ok, view, _html} =
+        ctx.conn
+        |> sign_in(ctx.charlotte)
+        |> live(~p"/announcements/#{announcement_id}")
+
+      assert has_element?(view, "#ack-badge-#{ctx.maya.id}")
+      refute render(view) =~ ">?? ✓"
     end
   end
 
@@ -187,6 +251,7 @@ defmodule FoyerWeb.SmokeTest do
 
       assert has_element?(view, "#chat")
       assert has_element?(view, "#chat-panel-inbox")
+      assert render(view) =~ "Charlotte Voss"
     end
 
     test "F.Chat.6 / F.Chat.7 / F.Chat.10 — chat room mounts", ctx do
@@ -195,6 +260,8 @@ defmodule FoyerWeb.SmokeTest do
 
       assert has_element?(view, "#chat-panel-room")
       assert has_element?(view, "#messages")
+      refute has_element?(view, "#off-shift-banner")
+      assert render(view) =~ "Morning Maya"
     end
 
     test "F.Chat.10 / F.Chat.11 — new message picker mounts", ctx do
@@ -202,6 +269,7 @@ defmodule FoyerWeb.SmokeTest do
 
       assert has_element?(view, "#new-message")
       assert has_element?(view, "#new-msg-tab-people")
+      assert render(view) =~ "Hugo Brandt"
     end
 
     test "F.Chat.10 — channel deep link routes through the new message entrypoint", ctx do
@@ -228,6 +296,7 @@ defmodule FoyerWeb.SmokeTest do
       {:ok, view, _html} = ctx.conn |> sign_in(ctx.maya) |> live(~p"/recognitions/new")
 
       assert has_element?(view, "#recognize-form")
+      assert render(view) =~ "Give recognition"
     end
 
     test "F.Recognitions.10 — recognition detail mounts", ctx do
@@ -237,6 +306,7 @@ defmodule FoyerWeb.SmokeTest do
         |> live(~p"/recognitions/#{ctx.maya_recognition.id}")
 
       assert has_element?(view, "#recognition-detail")
+      assert render(view) =~ "Quietly handled a 02:14 guest issue"
     end
 
     test "F.Recognitions.9 — recognition edit mounts for author", ctx do
@@ -246,26 +316,68 @@ defmodule FoyerWeb.SmokeTest do
         |> live(~p"/recognitions/#{ctx.hugo_recognition.id}/edit")
 
       assert has_element?(view, "#recognition-edit-form")
+      assert render(view) =~ "Edit recognition"
     end
   end
 
   describe "profile and people routes" do
-    test "me mounts", ctx do
+    test "F.Profile.1 / F.Profile.11 / F.Profile.25 — me mounts with profile content", ctx do
       {:ok, view, _html} = ctx.conn |> sign_in(ctx.maya) |> live(~p"/me")
 
       assert has_element?(view, "[id^='profile-']")
+      assert has_element?(view, "#stats-recognitions-this-month")
+      assert has_element?(view, "#stats-ack-on-time")
+      assert render(view) =~ "Maya Okafor"
+      assert render(view) =~ "Foyer points"
+      assert render(view) =~ "LDN·MAY"
     end
 
     test "people index mounts", ctx do
       {:ok, view, _html} = ctx.conn |> sign_in(ctx.charlotte) |> live(~p"/people")
 
       assert has_element?(view, "#people")
+      assert render(view) =~ "Maya Okafor"
+      assert render(view) =~ "Sebastien Roy"
     end
 
     test "people profile mounts", ctx do
       {:ok, view, _html} = ctx.conn |> sign_in(ctx.maya) |> live(~p"/people/#{ctx.hugo.id}")
 
       assert has_element?(view, "#back-to-people")
+      assert render(view) =~ "Hugo Brandt"
     end
+
+    test "F.Profile.6 / F.Profile.8 — colleague profile hides private recognitions and given list",
+         ctx do
+      {:ok, view, _html} =
+        ctx.conn
+        |> sign_in(ctx.maya)
+        |> live(~p"/people/#{ctx.aisha.id}")
+
+      refute has_element?(view, "#recognitions-given")
+      refute render(view) =~ ctx.private_recognition.body
+    end
+  end
+
+  defp create_acked_announcement(ctx) do
+    floor_4 =
+      Foyer.Channels.list_for_user(ctx.charlotte)
+      |> Enum.find(fn channel -> channel.slug == "housekeeping-floor-4" end)
+
+    {:ok, announcement} =
+      %Announcement{}
+      |> Announcement.changeset(%{
+        author_id: ctx.charlotte.id,
+        channel_id: floor_4.id,
+        title: "Ack-required test announcement",
+        body: "Please confirm.",
+        requires_ack: true,
+        published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+      })
+      |> Foyer.Repo.insert()
+
+    {:ok, _ack} = Foyer.House.acknowledge(announcement, ctx.maya)
+
+    announcement.id
   end
 end

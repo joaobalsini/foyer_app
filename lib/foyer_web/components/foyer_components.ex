@@ -748,78 +748,242 @@ defmodule FoyerWeb.FoyerComponents do
 
   # ---------------------------------------------------------------------------
   # Profile card — shared between `ProfileLive :me` and `PeopleLive :show`.
+  #
+  # `viewer` controls what sections render:
+  #   :self  — own profile (/me): shows Given section, points breakdown, rewards
+  #            catalog, and settings links.
+  #   :other — colleague profile (/people/:id): shows only Received (public) and
+  #            points balance. Given section, breakdown, rewards, and settings
+  #            are suppressed. Data filtering is already enforced by
+  #            `Foyer.Profile.profile_for/2` at the context boundary.
   # ---------------------------------------------------------------------------
 
   attr :card, Foyer.Profile.Card, required: true
+  attr :viewer, :atom, default: :other, values: [:self, :other]
   attr :rewards, :list, default: []
 
   def profile_card(assigns) do
+    # F.Profile.25 — property code from application config. All v1 users share
+    # one property; per-user property codes are a v2 concern.
+    assigns =
+      assign(assigns, :property_code, Application.get_env(:foyer, :property_code, "LDN·MAY"))
+
     ~H"""
-    <div class="foyer-content-cols">
-      <%!-- Left column: header + stats --%>
-      <div class="flex flex-col gap-4">
-        <header class="flex items-center gap-3">
-          <.avatar initials={@card.user.initials} size={:lg} />
-          <div>
-            <h1 class="foyer-serif text-3xl">{@card.user.name}</h1>
-            <div class="foyer-mono">{@card.user.title}</div>
-            <div class="text-sm">
-              Languages · {Enum.join(@card.user.languages || [], ", ")}
+    <div class="flex flex-col gap-4" id="profile-card">
+      <%!-- Identity header (F.Profile.1, F.Profile.2, F.Profile.3) --%>
+      <header class="flex items-start gap-3 pt-2">
+        <.avatar initials={@card.user.initials} size={:lg} />
+        <div class="flex flex-col gap-1">
+          <h1 class="foyer-serif text-3xl">{@card.user.name}</h1>
+          <div class="foyer-mono">{@card.user.title}</div>
+          <div class="foyer-mono">
+            {@property_code} · Member since {member_since(@card.user)}
+          </div>
+          <%= if @card.user.languages && @card.user.languages != [] do %>
+            <div class="foyer-mono">
+              {Enum.join(@card.user.languages, " · ")}
             </div>
-            <span :if={@card.on_shift?} class="foyer-tag moss">
-              <span class="foyer-pulse"></span>On shift
-            </span>
-          </div>
-        </header>
+          <% end %>
+          <%!-- F.Profile.2 — on-shift tag with animated pulse --%>
+          <%!-- F.Profile.3 — absent when off-shift --%>
+          <span :if={@card.on_shift?} class="foyer-tag moss self-start">
+            <span class="foyer-pulse"></span>On shift
+          </span>
+        </div>
+      </header>
 
-        <section class="grid grid-cols-2 gap-2" id="profile-stats">
-          <div class="rounded-lg border p-3" style="border-color: var(--foyer-rule);">
-            <div class="foyer-mono">Recognitions this month</div>
-            <div class="foyer-serif text-2xl">{length(@card.received)}</div>
+      <%!-- Stats row (F.Profile.9, F.Profile.10) --%>
+      <section class="grid grid-cols-2 gap-2" id="profile-stats">
+        <div class="rounded-lg border p-3" style="border-color: var(--foyer-rule);">
+          <div class="foyer-mono">Recognitions this month</div>
+          <div
+            class="foyer-serif text-2xl"
+            id="stats-recognitions-this-month"
+          >
+            {@card.received_this_month}
           </div>
-          <div class="rounded-lg border p-3" style="border-color: var(--foyer-rule);">
-            <div class="foyer-mono">Ack on time</div>
-            <div class="foyer-serif text-2xl">—</div>
-          </div>
-        </section>
-      </div>
+        </div>
+        <div class="rounded-lg border p-3" style="border-color: var(--foyer-rule);">
+          <%!-- F.Profile.10 — ack-on-time placeholder; analytics not yet implemented --%>
+          <div class="foyer-mono">Ack on time</div>
+          <div class="foyer-serif text-2xl" id="stats-ack-on-time">—</div>
+        </div>
+      </section>
 
-      <%!-- Right column: recognitions + points + rewards (at lg:, stacks below at md: and mobile) --%>
-      <div class="flex flex-col gap-4">
-        <section id="recognitions-received">
-          <div class="foyer-mono">Received</div>
-          <div class="flex flex-col gap-2 mt-2">
-            <.recognition_card :for={r <- @card.received} recognition={r} />
+      <%!-- Received recognitions (F.Profile.4, F.Profile.5, F.Profile.6, F.Profile.20) --%>
+      <section id="recognitions-received">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="foyer-mono">Recognition received</div>
+          <%= if @card.received != [] do %>
+            <span class="foyer-tag outline">{length(@card.received)}</span>
+          <% end %>
+        </div>
+        <%= if @card.received == [] do %>
+          <%!-- F.Profile.20 — empty state --%>
+          <p class="foyer-mono text-center py-4" id="recognitions-received-empty">
+            No recognitions yet
+          </p>
+        <% else %>
+          <div class="flex flex-col gap-2">
+            <.profile_recognition_card
+              :for={r <- @card.received}
+              recognition={r}
+              show_recipient={false}
+            />
           </div>
-        </section>
+        <% end %>
+      </section>
 
+      <%!-- Given recognitions — own profile only (F.Profile.7, F.Profile.8) --%>
+      <%= if @viewer == :self do %>
         <section id="recognitions-given">
-          <div class="foyer-mono">Given</div>
-          <div class="flex flex-col gap-2 mt-2">
-            <.recognition_card :for={r <- @card.given} recognition={r} />
+          <div class="flex items-center gap-2 mb-2">
+            <div class="foyer-mono">Given</div>
+            <%= if @card.given != [] do %>
+              <span class="foyer-tag outline">{length(@card.given)}</span>
+            <% end %>
           </div>
+          <%= if @card.given == [] do %>
+            <p class="foyer-mono text-center py-4" id="recognitions-given-empty">
+              No recognitions given yet
+            </p>
+          <% else %>
+            <div class="flex flex-col gap-2">
+              <.profile_recognition_card
+                :for={r <- @card.given}
+                recognition={r}
+                show_recipient={true}
+              />
+            </div>
+          <% end %>
         </section>
+      <% end %>
 
-        <section id="points">
-          <div class="foyer-mono">Foyer points</div>
-          <div class="foyer-serif text-3xl">{@card.points}</div>
-        </section>
+      <%!-- Foyer points balance (F.Profile.11) --%>
+      <section id="points">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="foyer-tag outline">
+            <.icon name="hero-star" class="size-3" />Foyer points · balance
+          </span>
+        </div>
+        <div class="foyer-serif text-3xl">{@card.points}</div>
+        <p class="foyer-mono mt-1">
+          Earned through recognition. Trade for time, meals, the spa, or pass it on as a donation.
+        </p>
 
-        <section :if={@rewards != []} id="rewards">
-          <div class="foyer-mono">Rewards</div>
-          <div class="grid grid-cols-2 gap-2 mt-2">
+        <%!-- Points earned breakdown — own profile only (F.Profile.12, F.Profile.24) --%>
+        <%= if @viewer == :self and @card.points_earned != [] do %>
+          <div class="mt-3" id="points-earned">
+            <div class="foyer-mono mb-2">How you earned bonus points</div>
+            <div class="flex flex-col gap-2">
+              <div
+                :for={r <- @card.points_earned}
+                class="flex items-center gap-2 rounded-lg border p-2"
+                style="border-color: var(--foyer-rule);"
+              >
+                <.avatar initials={(r.sender && r.sender.initials) || "?"} size={:sm} />
+                <span class="flex-1 text-sm">{truncate(r.body)}</span>
+                <span class="foyer-tag forest">+{r.bonus_points} pts</span>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      </section>
+
+      <%!-- Rewards catalog — own profile only (F.Profile.13, F.Profile.14, F.Profile.15) --%>
+      <%= if @viewer == :self and @rewards != [] do %>
+        <section id="rewards">
+          <div class="foyer-mono mb-2">Trade your points</div>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
             <div
-              :for={r <- @rewards}
-              class="rounded-lg border p-3"
+              :for={item <- @rewards}
+              class={[
+                "rounded-lg border p-3 flex flex-col gap-1",
+                item.cost > @card.points && "opacity-50"
+              ]}
               style="border-color: var(--foyer-rule);"
             >
-              <div class="foyer-serif">{r.title}</div>
-              <div class="foyer-mono">{r.cost} pts</div>
+              <.icon name={item.icon} class="size-5" />
+              <div class="foyer-mono">{item.cost} pts</div>
+              <div class="foyer-serif">{item.title}</div>
+              <div class="text-xs" style="color: var(--foyer-ink-soft);">{item.description}</div>
+              <%!-- F.Profile.14 — no redeem button; "Coming soon" label only --%>
+              <div class="foyer-mono mt-1">Coming soon</div>
             </div>
           </div>
+          <p class="foyer-mono mt-2" style="color: var(--foyer-ink-soft);">
+            Redemptions are confirmed by your department head within 24 hours.
+          </p>
         </section>
-      </div>
+      <% end %>
+
+      <%!-- Settings links — own profile only, inert (F.Profile.14, v2 nit) --%>
+      <%= if @viewer == :self do %>
+        <section id="profile-settings">
+          <div class="foyer-mono mb-2">Settings</div>
+          <div class="flex flex-col gap-1">
+            <button type="button" aria-disabled="true" class="foyer-btn ghost">
+              Notifications &amp; alerts <span class="foyer-mono ml-auto">Coming soon</span>
+            </button>
+            <button type="button" aria-disabled="true" class="foyer-btn ghost">
+              Languages &amp; translation <span class="foyer-mono ml-auto">Coming soon</span>
+            </button>
+            <button type="button" aria-disabled="true" class="foyer-btn ghost">
+              Shift availability <span class="foyer-mono ml-auto">Coming soon</span>
+            </button>
+          </div>
+        </section>
+      <% end %>
     </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # Profile recognition card — used inside profile_card only. Renders a single
+  # recognition with house value tags, bonus points badge, and relative timestamp.
+  # (F.Profile.21, F.Profile.22)
+  # ---------------------------------------------------------------------------
+
+  attr :recognition, Foyer.Recognitions.Recognition, required: true
+  attr :show_recipient, :boolean, default: false
+
+  defp profile_recognition_card(assigns) do
+    ~H"""
+    <article
+      class="rounded-lg border p-3 flex flex-col gap-2"
+      style="border-color: var(--foyer-rule);"
+      id={"recognition-#{@recognition.id}"}
+    >
+      <%= if @show_recipient and @recognition.recipient do %>
+        <div class="foyer-mono">
+          For {@recognition.recipient.name}
+        </div>
+      <% end %>
+      <p class="foyer-serif text-lg">{@recognition.body}</p>
+      <%!-- House value tags (F.Profile.21) --%>
+      <%= if @recognition.values && @recognition.values != [] do %>
+        <div class="flex flex-wrap gap-1">
+          <span :for={v <- @recognition.values} class="foyer-tag outline">
+            {String.upcase(v)}
+          </span>
+        </div>
+      <% end %>
+      <div class="flex items-center gap-2">
+        <.avatar :if={@recognition.sender} initials={@recognition.sender.initials} size={:sm} />
+        <span class="text-sm">{@recognition.sender && @recognition.sender.name}</span>
+        <%!-- Bonus points badge (F.Profile.22) --%>
+        <%= if @recognition.bonus_points && @recognition.bonus_points > 0 do %>
+          <span class="foyer-tag forest ml-auto">+{@recognition.bonus_points} pts</span>
+        <% end %>
+        <span class={[
+          "foyer-mono",
+          @recognition.bonus_points && @recognition.bonus_points > 0 && "ml-0",
+          (@recognition.bonus_points == nil or @recognition.bonus_points == 0) && "ml-auto"
+        ]}>
+          {relative_date(@recognition.inserted_at)}
+        </span>
+      </div>
+    </article>
     """
   end
 
@@ -882,6 +1046,10 @@ defmodule FoyerWeb.FoyerComponents do
   # Format helpers
   # ---------------------------------------------------------------------------
 
+  @spec member_since(Foyer.Accounts.User.t()) :: integer() | String.t()
+  defp member_since(%{inserted_at: %DateTime{year: year}}), do: year
+  defp member_since(_), do: "—"
+
   @spec format_time(DateTime.t() | nil) :: String.t()
   def format_time(nil), do: ""
 
@@ -902,6 +1070,22 @@ defmodule FoyerWeb.FoyerComponents do
       0 -> "Today"
       1 -> "Yesterday"
       _ -> Calendar.strftime(date, "%a %-d %b")
+    end
+  end
+
+  @spec relative_date(DateTime.t() | nil) :: String.t()
+  defp relative_date(nil), do: ""
+
+  defp relative_date(%DateTime{} = dt) do
+    today = Date.utc_today()
+    date = DateTime.to_date(dt)
+    diff = Date.diff(today, date)
+
+    cond do
+      diff == 0 -> "Today"
+      diff == 1 -> "Yesterday"
+      diff < 7 -> Calendar.strftime(date, "%a %-d %b")
+      true -> Calendar.strftime(date, "%-d %b %Y")
     end
   end
 
