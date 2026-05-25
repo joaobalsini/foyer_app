@@ -14,7 +14,10 @@ defmodule Foyer.RecognitionsPort do
   @callback compose_changeset(map()) :: Ecto.Changeset.t()
   @callback change_recognition(Recognition.t(), map()) :: Ecto.Changeset.t()
   @callback give(User.t(), map()) ::
-              {:ok, Recognition.t()} | {:error, Ecto.Changeset.t() | :not_implemented}
+              {:ok, Recognition.t()} | {:error, Ecto.Changeset.t() | atom()}
   @callback update_recognition(Recognition.t(), User.t(), map()) ::
-              {:ok, Recognition.t()} | {:error, Ecto.Changeset.t() | :not_implemented}
+              {:ok, Recognition.t()} | {:error, Ecto.Changeset.t() | atom()}
+  @callback remove_recognition(Recognition.t(), User.t()) ::
+              {:ok, Recognition.t()} | {:error, Ecto.Changeset.t() | atom()}
+  @callback within_grace_window?(Recognition.t()) :: boolean()
 end

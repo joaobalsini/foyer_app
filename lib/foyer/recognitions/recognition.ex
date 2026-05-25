@@ -16,10 +16,12 @@ defmodule Foyer.Recognitions.Recognition do
           values: [String.t()] | nil,
           bonus_points: integer() | nil,
           public: boolean() | nil,
+          removed_at: DateTime.t() | nil,
+          removed_by_id: integer() | nil,
           inserted_at: DateTime.t() | nil
         }
 
-  @house_values ~w(care craft discretion initiative warmth excellence team)
+  @house_values ~w(care craft warmth discretion initiative excellence)
 
   schema "recognitions" do
     belongs_to :sender, Foyer.Accounts.User
@@ -28,6 +30,8 @@ defmodule Foyer.Recognitions.Recognition do
     field :values, {:array, :string}, default: []
     field :bonus_points, :integer, default: 0
     field :public, :boolean, default: true
+    field :removed_at, :utc_datetime
+    belongs_to :removed_by, Foyer.Accounts.User
 
     timestamps(type: :utc_datetime, updated_at: false)
   end
@@ -38,10 +42,27 @@ defmodule Foyer.Recognitions.Recognition do
   @spec changeset(t(), map()) :: Ecto.Changeset.t()
   def changeset(recognition, attrs) do
     recognition
-    |> cast(attrs, [:sender_id, :recipient_id, :body, :values, :bonus_points, :public])
-    |> validate_required([:sender_id, :recipient_id, :body])
+    |> cast(attrs, [
+      :sender_id,
+      :recipient_id,
+      :body,
+      :values,
+      :bonus_points,
+      :public,
+      :removed_at,
+      :removed_by_id
+    ])
+    |> validate_required([:sender_id, :recipient_id, :body, :values])
+    |> validate_values_present()
     |> validate_subset(:values, @house_values)
     |> validate_number(:bonus_points, greater_than_or_equal_to: 0, less_than_or_equal_to: 100)
     |> check_constraint(:bonus_points, name: :bonus_points_non_negative)
+  end
+
+  defp validate_values_present(changeset) do
+    case get_field(changeset, :values) do
+      values when is_list(values) and values != [] -> changeset
+      _ -> add_error(changeset, :values, "choose at least one value")
+    end
   end
 end
