@@ -2141,7 +2141,7 @@ file (no `defmodule` — seeds run as a script).
 
 ## 10. Smoke test
 
-Path: `test/foyer_web/scaffold_smoke_test.exs`. Tagged `:integration` because
+Path: `test/foyer_web/smoke_test.exs`. Tagged `:integration` because
 it hits the real Repo with seeded data. `async: false` is **required** because
 the test uses the shared sandbox and asserts on seeded rows owned by another
 process (the seed script runs through `mix test` alias).
@@ -2610,7 +2610,7 @@ fixes the issue before moving on.
 | 15 | Delete `lib/foyer_web/controllers/page_controller.ex` and `lib/foyer_web/controllers/page_html.ex` (no longer referenced). | (deletes) | `mix compile --warnings-as-errors` |
 | 16 | Rewrite `priv/repo/seeds.exs` (§9). | `priv/repo/seeds.exs` | `mix ecto.reset` succeeds (now that schemas + seeds align), `iex -S mix` → `Foyer.Repo.aggregate(Foyer.Accounts.User, :count)` returns 14 |
 | 17 | Create `test/support/scaffold_fixtures.ex` (§11.5). Add `sign_in/2` to `test/support/conn_case.ex` `using` block. Update `test/test_helper.exs` per §11.1. | `test/support/scaffold_fixtures.ex`, `test/support/conn_case.ex`, `test/test_helper.exs` | `mix compile --warnings-as-errors` |
-| 18 | Write `test/foyer_web/scaffold_smoke_test.exs` (§10). | `test/foyer_web/scaffold_smoke_test.exs` | `mix test test/foyer_web/scaffold_smoke_test.exs` (all green) |
+| 18 | Write `test/foyer_web/smoke_test.exs` (§10). | `test/foyer_web/smoke_test.exs` | `mix test test/foyer_web/smoke_test.exs` (all green) |
 | 19 | Run Dialyzer. PLT build is ~1 min on first run; everything compiled-and-LiveView-wired by this point so type contracts are stable. | (none) | `mix dialyzer` (clean) |
 | 20 | **Manual instruction (do NOT run from the agent's automated step list — long-running)**: `mix phx.server`, walk the bottom-nav as Maya, switch to Jamal (off-shift), confirm redirect. The implementer should run this themselves and shut it down before the next automated step. | (none) | manual smoke walk |
 | 21 | Final: `mix precommit`. | (none) | `mix precommit` (all green) |

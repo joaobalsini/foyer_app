@@ -2,14 +2,12 @@
 
 Status: revised after Codex review (v2)
 Spec: [`../spec.md`](../spec.md)
-Review: [`01-profile-review.md`](./01-profile-review.md)
 
 ---
 
 ## Revision log
 
-**v2 — addressed Codex review of 2026-05-25.** Key changes (see review doc for full
-rationale):
+**v2 — addressed Codex review of 2026-05-25.** Key changes:
 
 - **§4.1 / §4.2 (top blocker):** `ProfilePort.profile_for/1` replaced with
   `profile_for/2 (subject, viewer)` and a new `own_profile_for/1`. Private-recognition
@@ -552,7 +550,7 @@ The F.Profile.6 test asserts on the rendered HTML, not on the `Card` struct — 
 verifies the full stack from `profile_for/2` through the component. Assert by element
 ID (e.g. `#recognition-<id>` absent) rather than broad text matching.
 
-### 8.5 Route smoke tests — `test/foyer_web/scaffold_smoke_test.exs` (additions)
+### 8.5 Route smoke tests — `test/foyer_web/smoke_test.exs` (additions)
 
 Add assertions to the existing smoke test (or a new `profile_smoke_test.exs`):
 
