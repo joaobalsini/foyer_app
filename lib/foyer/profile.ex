@@ -81,18 +81,19 @@ defmodule Foyer.Profile do
   """
   @impl true
   @spec profile_for(User.t(), User.t()) :: Card.t()
-  def profile_for(%User{id: id} = subject, %User{id: id}) do
+  def profile_for(%User{id: id} = subject, %User{id: id} = viewer) do
     # Same user — own-profile view. All recognitions visible.
-    build_card(subject, :self)
+    build_card(subject, viewer)
   end
 
-  def profile_for(%User{} = subject, %User{}) do
-    # Colleague view — strip private recognitions and given list at the boundary.
-    subject
-    |> build_card(:other)
-    |> then(fn card ->
-      %{card | received: Enum.filter(card.received, & &1.public), given: []}
-    end)
+  def profile_for(%User{} = subject, %User{} = viewer) do
+    # Colleague view. Privacy boundary (F.Profile.6, F.Profile.23):
+    # Strip private recognitions at the context boundary — the recipient is the
+    # only one who sees private recognitions (own-profile path above handles
+    # that case). received_by/2 may include private ones where viewer is the
+    # sender, so we enforce the rule here. The given list is cleared (F.Profile.8).
+    card = build_card(subject, viewer)
+    %{card | received: Enum.filter(card.received, & &1.public), given: []}
   end
 
   @doc """
@@ -101,7 +102,7 @@ defmodule Foyer.Profile do
   """
   @impl true
   @spec own_profile_for(User.t()) :: Card.t()
-  def own_profile_for(%User{} = user), do: build_card(user, :self)
+  def own_profile_for(%User{} = user), do: build_card(user, user)
 
   @doc """
   Returns the static rewards catalog. Module constant — no DB query.
@@ -115,18 +116,20 @@ defmodule Foyer.Profile do
   # Private helpers
   # ---------------------------------------------------------------------------
 
-  @spec build_card(User.t(), :self | :other) :: Card.t()
-  defp build_card(%User{} = user, _viewer_kind) do
-    received = Recognitions.received_by(user)
-    given = Recognitions.given_by(user)
+  @spec build_card(User.t(), User.t()) :: Card.t()
+  defp build_card(%User{} = subject, %User{} = viewer) do
+    # Pass viewer so Recognitions returns the correct visibility-filtered set.
+    # For own-profile, subject == viewer so all records (incl. private) come through.
+    received = Recognitions.received_by(subject, viewer)
+    given = Recognitions.given_by(subject, viewer)
     today = Date.utc_today()
 
     %Card{
-      user: user,
+      user: subject,
       received: received,
       given: given,
-      points: user.points_balance || 0,
-      on_shift?: not is_nil(Shifts.current_shift_for(user)),
+      points: subject.points_balance || 0,
+      on_shift?: not is_nil(Shifts.current_shift_for(subject)),
       received_this_month: count_this_month(received, today),
       points_earned: Enum.filter(received, &(is_integer(&1.bonus_points) and &1.bonus_points > 0))
     }

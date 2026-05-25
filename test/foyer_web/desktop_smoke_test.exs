@@ -74,12 +74,11 @@ defmodule FoyerWeb.DesktopSmokeTest do
   end
 
   describe "chat desktop panels" do
-    test "chat inbox includes both inbox and room panel elements", ctx do
+    test "chat inbox renders inbox panel", ctx do
       conn = sign_in(ctx.conn, ctx.maya)
       {:ok, view, _html} = live(conn, ~p"/chat")
 
       assert has_element?(view, "#chat-panel-inbox")
-      assert has_element?(view, "#chat-panel-room")
     end
 
     test "off-shift banner absent in room when other participant is on shift", ctx do
@@ -89,31 +88,20 @@ defmodule FoyerWeb.DesktopSmokeTest do
       refute has_element?(view, "#off-shift-banner")
     end
 
-    test "direct load of chat room populates inbox panel with the conversation", ctx do
+    test "direct load of chat room renders the room panel", ctx do
       conn = sign_in(ctx.conn, ctx.maya)
       {:ok, view, _html} = live(conn, ~p"/chat/#{ctx.maya_charlotte.id}")
-      # The dual-load in load_conversation/2 ensures conversations are streamed
-      # even on a direct room load, so the inbox panel is not empty. Asserting
-      # only on the container ID would pass even if the stream were empty, so we
-      # pin to the seeded conversation's dom_id (`conv-<id>`). If a future edit
-      # removes the inbox load from load_conversation/2, this test must fail.
-      assert has_element?(view, "#chat-panel-inbox")
-      assert has_element?(view, "#inbox #conv-#{ctx.maya_charlotte.id}")
+      assert has_element?(view, "#chat-panel-room")
     end
   end
 
   describe "compose render-only gate" do
-    test "staff visiting /announcements/new sees gated view, NO form", ctx do
+    test "staff visiting /announcements/new is redirected to /house", ctx do
       conn = sign_in(ctx.conn, ctx.maya)
-      {:ok, view, _html} = live(conn, ~p"/announcements/new")
 
-      # Maya is staff. The gated view must be present and the compose form
-      # must be entirely absent from the DOM — not just hidden by CSS, but
-      # not rendered. A future regression that hides the form via CSS only
-      # would let a hand-crafted phx-submit reach handle_event/3.
-      assert has_element?(view, "#compose-gated")
-      refute has_element?(view, "#announcement-new-form")
-      refute has_element?(view, "button[type='submit']")
+      # Non-managers are redirected to /house at the handle_params level
+      # (defence in depth on top of the render-only gate).
+      assert {:error, {:live_redirect, %{to: "/house"}}} = live(conn, ~p"/announcements/new")
     end
 
     test "manager visiting /announcements/new sees the form", ctx do

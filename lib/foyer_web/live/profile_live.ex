@@ -40,7 +40,11 @@ defmodule FoyerWeb.ProfileLive do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
       <main class="foyer-shell">
-        <FoyerComponents.desktop_rail active={:me} current_scope={@current_scope} />
+        <FoyerComponents.desktop_rail
+          active={:me}
+          current_scope={@current_scope}
+          chat_unread_count={@chat_unread_count}
+        />
         <div class="foyer-content">
           <div class="foyer-scroll md:max-w-xl md:mx-auto" id="profile">
             <FoyerComponents.profile_card

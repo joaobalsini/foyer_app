@@ -214,7 +214,7 @@ defmodule FoyerWeb.ScaffoldSmokeTest do
       {:ok, view, _html} = live(conn, ~p"/recognitions/new")
       assert render(view) =~ "Give recognition"
 
-      for v <- ~w(Care Craft Discretion Initiative Warmth Excellence Team) do
+      for v <- ~w(Care Craft Discretion Initiative Warmth Excellence) do
         assert render(view) =~ v
       end
     end

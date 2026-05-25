@@ -26,6 +26,7 @@ defmodule FoyerWeb.IsolatedPeopleLive do
       socket
       |> assign(:current_scope, scope)
       |> assign(:live_action, live_action)
+      |> assign(:chat_unread_count, 0)
 
     {:ok, socket} = PeopleLive.mount(%{}, %{}, socket)
 
