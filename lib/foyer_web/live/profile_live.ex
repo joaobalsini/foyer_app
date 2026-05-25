@@ -58,7 +58,11 @@ defmodule FoyerWeb.ProfileLive do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
       <main class="foyer-shell">
-        <FoyerComponents.desktop_rail active={:me} current_scope={@current_scope} />
+        <FoyerComponents.desktop_rail
+          active={:me}
+          current_scope={@current_scope}
+          chat_unread_count={@chat_unread_count}
+        />
         <div class="foyer-content">
           <FoyerComponents.desktop_topbar current_scope={@current_scope} page_title={@page_title} />
           <div class="foyer-scroll" id={"profile-#{if @card, do: @card.user.initials, else: "me"}"}>
@@ -147,7 +151,11 @@ defmodule FoyerWeb.ProfileLive do
                 </ul>
               </section>
             </div>
-            <FoyerComponents.bottom_nav active={:me} current_scope={@current_scope} />
+            <FoyerComponents.bottom_nav
+              active={:me}
+              current_scope={@current_scope}
+              chat_unread_count={@chat_unread_count}
+            />
           </div>
         </div>
       </main>

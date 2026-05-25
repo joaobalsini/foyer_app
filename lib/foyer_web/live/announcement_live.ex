@@ -77,7 +77,7 @@ defmodule FoyerWeb.AnnouncementLive do
        |> assign(:acked?, acked_by?(a, scope.user.id))
        |> assign(:can_ack?, can_ack?(a, scope.user))
        |> assign(:can_pin?, can_pin?(a, scope.user))
-       |> assign(:receipts, load_receipts(a, scope.user))
+       |> assign(:receipts, load_receipts(a, scope))
        |> assign(:page_title, a.title)}
     rescue
       Ecto.NoResultsError ->
@@ -233,7 +233,7 @@ defmodule FoyerWeb.AnnouncementLive do
         {:noreply,
          socket
          |> assign(:announcement, updated)
-         |> assign(:receipts, load_receipts(updated, scope.user))
+         |> assign(:receipts, load_receipts(updated, scope))
          |> put_flash(:info, message)}
 
       {:error, :unauthorized} ->
@@ -264,7 +264,13 @@ defmodule FoyerWeb.AnnouncementLive do
 
   defp can_pin?(%Announcement{}, %{}), do: false
 
-  defp load_receipts(announcement, user) do
+  defp load_receipts(announcement, scope) do
+    if FoyerWeb.Scope.manager?(scope) do
+      do_load_receipts(announcement, scope.user)
+    end
+  end
+
+  defp do_load_receipts(announcement, user) do
     case FoyerWeb.LiveDeps.house().receipts_for(announcement, user) do
       {:ok, receipts} -> receipts
       {:error, _} -> nil
@@ -276,7 +282,11 @@ defmodule FoyerWeb.AnnouncementLive do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
       <main class="foyer-shell">
-        <FoyerComponents.desktop_rail active={:house} current_scope={@current_scope} />
+        <FoyerComponents.desktop_rail
+          active={:house}
+          current_scope={@current_scope}
+          chat_unread_count={@chat_unread_count}
+        />
         <div class="foyer-content">
           <div class="foyer-scroll" id="announcement">
             <.link navigate={~p"/house"} class="foyer-btn ghost sm self-start" id="back-to-house">
@@ -379,8 +389,8 @@ defmodule FoyerWeb.AnnouncementLive do
                   </div>
                 </div>
               <% @live_action == :show and @announcement -> %>
-                <div class="foyer-content-cols">
-                  <article class="flex flex-col gap-3">
+                <div class="announcement-detail">
+                  <article class="announcement-detail__article">
                     <div class="flex items-center gap-2">
                       <span :if={@announcement.pinned_at} class="foyer-tag claret">Pinned</span>
                       <span :if={@announcement.requires_ack} class="foyer-tag outline">
@@ -474,56 +484,52 @@ defmodule FoyerWeb.AnnouncementLive do
                     <% end %>
                   </article>
 
-                  <div class="hidden lg:block" id="read-receipts-col">
-                    <div class="foyer-mono mb-2">Read receipts</div>
-                    <div class="flex flex-col gap-2">
-                      <div class="foyer-mono">
-                        {length(@announcement.acks)} confirmed / {length(@announcement.reads)} read
-                      </div>
-                      <div class="flex flex-wrap gap-2">
-                        <span
-                          :for={ack <- @announcement.acks}
-                          class="foyer-tag moss"
-                          id={"ack-badge-#{ack.user_id}"}
-                        >
-                          {ack_initials(ack)} ✓
-                        </span>
-                      </div>
-                      <%= if @receipts do %>
-                        <section
-                          id="announcement-receipts"
-                          class="rounded-lg border p-3 flex flex-col gap-2"
-                          style="border-color: var(--foyer-rule);"
-                        >
-                          <div class="foyer-mono">Receipts</div>
-                          <.receipt_group
-                            id="receipts-acknowledged"
-                            label="Acknowledged"
-                            users={@receipts.acknowledged}
-                          />
-                          <.receipt_group
-                            id="receipts-read"
-                            label="Read without acknowledgement"
-                            users={@receipts.read_without_acknowledgement}
-                          />
-                          <.receipt_group
-                            id="receipts-unread"
-                            label="Unread"
-                            users={@receipts.unread}
-                          />
-                          <.receipt_group
-                            id="receipts-off-shift"
-                            label="Off shift"
-                            users={@receipts.off_shift}
-                          />
-                        </section>
-                      <% end %>
+                  <section
+                    :if={@receipts}
+                    id="read-receipts-col"
+                    class="announcement-detail__receipts"
+                  >
+                    <div class="foyer-mono">Read receipts</div>
+                    <div class="flex flex-wrap gap-2">
+                      <span
+                        :for={ack <- @announcement.acks}
+                        class="foyer-tag moss"
+                        id={"ack-badge-#{ack.user_id}"}
+                      >
+                        {ack_initials(ack)} ✓
+                      </span>
                     </div>
-                  </div>
+                    <section id="announcement-receipts" class="flex flex-col gap-3">
+                      <.receipt_group
+                        id="receipts-acknowledged"
+                        label="Acknowledged"
+                        users={@receipts.acknowledged}
+                      />
+                      <.receipt_group
+                        id="receipts-read"
+                        label="Read without acknowledgement"
+                        users={@receipts.read_without_acknowledgement}
+                      />
+                      <.receipt_group
+                        id="receipts-unread"
+                        label="Unread"
+                        users={@receipts.unread}
+                      />
+                      <.receipt_group
+                        id="receipts-off-shift"
+                        label="Off shift"
+                        users={@receipts.off_shift}
+                      />
+                    </section>
+                  </section>
                 </div>
             <% end %>
 
-            <FoyerComponents.bottom_nav active={:house} current_scope={@current_scope} />
+            <FoyerComponents.bottom_nav
+              active={:house}
+              current_scope={@current_scope}
+              chat_unread_count={@chat_unread_count}
+            />
           </div>
         </div>
       </main>

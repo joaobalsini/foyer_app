@@ -84,7 +84,11 @@ defmodule FoyerWeb.HouseLive do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
       <main class="foyer-shell">
-        <FoyerComponents.desktop_rail active={:house} current_scope={@current_scope} />
+        <FoyerComponents.desktop_rail
+          active={:house}
+          current_scope={@current_scope}
+          chat_unread_count={@chat_unread_count}
+        />
         <div class="foyer-content">
           <FoyerComponents.desktop_topbar current_scope={@current_scope} page_title={@page_title} />
           <div class="foyer-scroll" id="house">
@@ -140,7 +144,7 @@ defmodule FoyerWeb.HouseLive do
               >
                 <FoyerComponents.section_label label="Pinned" />
                 <div :for={entry <- @pinned}>
-                  <.feed_card entry={entry} />
+                  <.feed_card entry={entry} current_user_id={@current_scope.user.id} />
                 </div>
               </section>
 
@@ -151,12 +155,16 @@ defmodule FoyerWeb.HouseLive do
                     <div class="h-px flex-1 bg-[var(--foyer-rule)]"></div>
                   </div>
                   <div :for={entry <- items}>
-                    <.feed_card entry={entry} />
+                    <.feed_card entry={entry} current_user_id={@current_scope.user.id} />
                   </div>
                 </div>
               </div>
 
-              <FoyerComponents.bottom_nav active={:house} current_scope={@current_scope} />
+              <FoyerComponents.bottom_nav
+                active={:house}
+                current_scope={@current_scope}
+                chat_unread_count={@chat_unread_count}
+              />
             </div>
           </div>
         </div>
@@ -189,59 +197,20 @@ defmodule FoyerWeb.HouseLive do
     """
   end
 
-  attr :announcement, Foyer.House.Announcement, required: true
-
-  defp announcement_feed_card(assigns) do
-    # Audience count is not exposed by HousePort yet, so this shows ack count only.
-    ~H"""
-    <article
-      class="rounded-lg border p-4 flex flex-col gap-2"
-      style="border-color: var(--foyer-rule);"
-      id={"feed-ann-#{@announcement.id}"}
-    >
-      <div class="flex items-center gap-2 flex-wrap">
-        <FoyerComponents.status_pill :if={@announcement.pinned_at} kind={:pinned} />
-        <FoyerComponents.status_pill :if={@announcement.requires_ack} kind={:ack_required} />
-        <span class="foyer-mono ml-auto">
-          {@announcement.channel && @announcement.channel.name}
-        </span>
-      </div>
-      <h3 class="foyer-serif text-xl">{@announcement.title}</h3>
-      <p class="text-sm">{truncate(@announcement.body)}</p>
-      <div class="flex items-center gap-2 mt-1">
-        <FoyerComponents.avatar
-          :if={@announcement.author}
-          initials={@announcement.author.initials}
-          size={:sm}
-        />
-        <span class="text-sm">{@announcement.author && @announcement.author.name}</span>
-        <%= if @announcement.requires_ack do %>
-          <span class="foyer-mono text-xs ml-auto">
-            {length(@announcement.acks)}/{length(@announcement.reads) + length(@announcement.acks)} acknowledged
-          </span>
-        <% end %>
-        <.link
-          navigate={~p"/announcements/#{@announcement.id}"}
-          class="foyer-btn sm shrink-0"
-          id={"ann-card-link-#{@announcement.id}"}
-        >
-          View
-        </.link>
-      </div>
-    </article>
-    """
-  end
-
   defp feed_entry(:announcement, item),
     do: %{kind: :announcement, item: item, ts: item.published_at || item.inserted_at}
 
   defp feed_entry(:recognition, item), do: %{kind: :recognition, item: item, ts: item.inserted_at}
 
   attr :entry, :map, required: true
+  attr :current_user_id, :integer, required: true
 
   defp feed_card(%{entry: %{kind: :announcement}} = assigns) do
     ~H"""
-    <.announcement_feed_card announcement={@entry.item} />
+    <FoyerComponents.announcement_card
+      announcement={@entry.item}
+      current_user_id={@current_user_id}
+    />
     """
   end
 
@@ -265,11 +234,5 @@ defmodule FoyerWeb.HouseLive do
       diff < 7 -> Calendar.strftime(date, "%a %-d %b")
       true -> Calendar.strftime(date, "%-d %b %Y")
     end
-  end
-
-  defp truncate(nil), do: ""
-
-  defp truncate(text) when is_binary(text) do
-    if String.length(text) > 200, do: String.slice(text, 0, 200) <> "...", else: text
   end
 end

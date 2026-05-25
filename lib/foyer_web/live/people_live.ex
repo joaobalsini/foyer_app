@@ -119,7 +119,11 @@ defmodule FoyerWeb.PeopleLive do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
       <main class="foyer-shell">
-        <FoyerComponents.desktop_rail active={:people} current_scope={@current_scope} />
+        <FoyerComponents.desktop_rail
+          active={:people}
+          current_scope={@current_scope}
+          chat_unread_count={@chat_unread_count}
+        />
         <div class="foyer-content">
           <FoyerComponents.desktop_topbar current_scope={@current_scope} page_title={@page_title} />
           <div class="foyer-scroll" id="people">
@@ -187,7 +191,11 @@ defmodule FoyerWeb.PeopleLive do
                 </div>
             <% end %>
 
-            <FoyerComponents.bottom_nav active={:people} current_scope={@current_scope} />
+            <FoyerComponents.bottom_nav
+              active={:people}
+              current_scope={@current_scope}
+              chat_unread_count={@chat_unread_count}
+            />
           </div>
         </div>
       </main>

@@ -15,6 +15,8 @@ defmodule FoyerWeb.IsolatedHelpers do
   alias FoyerWeb.Scope
   alias Phoenix.LiveView.Lifecycle
 
+  require Phoenix.LiveViewTest
+
   defmodule OnMount do
     @moduledoc false
 
@@ -23,7 +25,10 @@ defmodule FoyerWeb.IsolatedHelpers do
     @spec on_mount(:default, map(), map(), Phoenix.LiveView.Socket.t()) ::
             {:cont, Phoenix.LiveView.Socket.t()}
     def on_mount(:default, _params, %{"current_scope" => %Scope{} = scope}, socket) do
-      {:cont, assign(socket, :current_scope, scope)}
+      {:cont,
+       socket
+       |> assign(:current_scope, scope)
+       |> assign(:chat_unread_count, 0)}
     end
   end
 
@@ -45,6 +50,38 @@ defmodule FoyerWeb.IsolatedHelpers do
       }
 
       Phoenix.LiveViewTest.live_isolated(conn, FoyerWeb.IsolatedChatLive, session: session)
+    end
+  end
+
+  @doc """
+  Mounts `FoyerWeb.RecognitionsLive` in isolation with the same route/session
+  plumbing used by the real authenticated on-shift routes.
+
+  `:action` and `:scope` are required. For `:show` / `:edit`, pass `:path`
+  and `:params` when the test needs a concrete recognition id.
+  """
+  defmacro mount_isolated_recognitions(conn, opts) do
+    quote bind_quoted: [conn: conn, opts: opts] do
+      scope = Keyword.fetch!(opts, :scope)
+      action = Keyword.fetch!(opts, :action)
+      params = Keyword.get(opts, :params, %{})
+      path = Keyword.get(opts, :path, FoyerWeb.IsolatedHelpers.recognitions_path_for(action))
+
+      conn =
+        conn
+        |> Map.put(:params, params)
+        |> FoyerWeb.IsolatedHelpers.prepare_conn(
+          FoyerWeb.RecognitionsLive,
+          :authenticated_on_shift,
+          path,
+          [{FoyerWeb.UserAuth, :ensure_on_shift}]
+        )
+
+      Phoenix.LiveViewTest.live_isolated(conn, FoyerWeb.RecognitionsLive,
+        session: FoyerWeb.IsolatedHelpers.session_for(scope),
+        action: action,
+        router: FoyerWeb.Router
+      )
     end
   end
 
@@ -79,6 +116,13 @@ defmodule FoyerWeb.IsolatedHelpers do
   defp default_path_for(:show, %{"id" => id}), do: "/announcements/#{id}"
   defp default_path_for(:edit, %{"id" => id}), do: "/announcements/#{id}/edit"
   defp default_path_for(_action, _params), do: "/"
+
+  @doc false
+  @spec recognitions_path_for(atom()) :: String.t()
+  def recognitions_path_for(:index), do: "/recognitions"
+  def recognitions_path_for(:new), do: "/recognitions/new"
+  def recognitions_path_for(:show), do: "/recognitions/1"
+  def recognitions_path_for(:edit), do: "/recognitions/1/edit"
 
   @doc """
   Builds a `%Scope{}` for a `%User{}` and on-shift state.

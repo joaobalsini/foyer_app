@@ -99,7 +99,11 @@ defmodule FoyerWeb.TodayLive do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
       <main class="foyer-shell">
-        <FoyerComponents.desktop_rail active={:today} current_scope={@current_scope} />
+        <FoyerComponents.desktop_rail
+          active={:today}
+          current_scope={@current_scope}
+          chat_unread_count={@chat_unread_count}
+        />
         <div class="foyer-content">
           <FoyerComponents.desktop_topbar current_scope={@current_scope} page_title={@page_title} />
           <div class="foyer-scroll" id="today">
@@ -184,6 +188,7 @@ defmodule FoyerWeb.TodayLive do
                 <FoyerComponents.announcement_card
                   :for={ann <- @briefing.needs_ack}
                   announcement={ann}
+                  current_user_id={@current_scope.user.id}
                 />
               </section>
 
@@ -239,6 +244,7 @@ defmodule FoyerWeb.TodayLive do
                 <FoyerComponents.announcement_card
                   :for={ann <- @briefing.needs_ack}
                   announcement={ann}
+                  current_user_id={@current_scope.user.id}
                 />
               </section>
 
@@ -299,7 +305,11 @@ defmodule FoyerWeb.TodayLive do
               </div>
             <% end %>
 
-            <FoyerComponents.bottom_nav active={:today} current_scope={@current_scope} />
+            <FoyerComponents.bottom_nav
+              active={:today}
+              current_scope={@current_scope}
+              chat_unread_count={@chat_unread_count}
+            />
           </div>
         </div>
       </main>

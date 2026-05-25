@@ -7,7 +7,7 @@ defmodule FoyerWeb.ChatLive do
   side-by-side at `md:+`. On mobile the active live_action picks one panel.
 
   PubSub subscriptions:
-    * `chat:inbox:<user_id>` on every connect (drives inbox unread state)
+    * `chat:inbox:<user_id>` from the auth hook (drives global unread state)
     * `chat:room:<conversation_id>` while viewing the room
   """
   use FoyerWeb, :live_view
@@ -16,11 +16,6 @@ defmodule FoyerWeb.ChatLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    if connected?(socket) do
-      scope = socket.assigns.current_scope
-      Phoenix.PubSub.subscribe(Foyer.PubSub, "chat:inbox:#{scope.user.id}")
-    end
-
     {:ok,
      socket
      |> stream_configure(:conversations, dom_id: &"conv-#{&1.id}")
@@ -31,6 +26,7 @@ defmodule FoyerWeb.ChatLive do
      |> assign(:channels, [])
      |> assign(:on_shift_user_ids, MapSet.new())
      |> assign(:conversation, nil)
+     |> assign(:picker_tab, :people)
      |> assign(:compose_form, to_form(%{"body" => ""}, as: :message))
      |> assign(:unread_count, 0)
      |> assign(:page_title, "Messages")}
@@ -48,20 +44,13 @@ defmodule FoyerWeb.ChatLive do
         {:noreply,
          socket
          |> assign(:channels, channels)
+         |> assign(:conversation, nil)
+         |> assign(:page_title, "Messages")
          |> assign(:unread_count, FoyerWeb.LiveDeps.chat().unread_count(scope.user))
          |> stream(:conversations, conversations, reset: true)}
 
       :new_message ->
-        people = FoyerWeb.LiveDeps.accounts().list_people([])
-        channels = FoyerWeb.LiveDeps.channels().list_for_user(scope.user)
-        on_shift_user_ids = FoyerWeb.LiveDeps.shifts().users_on_shift_ids()
-
-        {:noreply,
-         socket
-         |> assign(:people, people)
-         |> assign(:channels, channels)
-         |> assign(:on_shift_user_ids, on_shift_user_ids)
-         |> assign(:unread_count, FoyerWeb.LiveDeps.chat().unread_count(scope.user))}
+        apply_new_message_params(socket, params)
 
       :show ->
         load_conversation(socket, params["conversation_id"])
@@ -151,6 +140,10 @@ defmodule FoyerWeb.ChatLive do
     end
   end
 
+  def handle_event("set_new_message_tab", %{"tab" => tab}, socket) do
+    {:noreply, assign(socket, :picker_tab, picker_tab(tab))}
+  end
+
   @impl true
   def handle_info({:chat_message, message}, socket) do
     scope = socket.assigns.current_scope
@@ -190,170 +183,219 @@ defmodule FoyerWeb.ChatLive do
           active={:chat}
           current_scope={@current_scope}
           channels={@channels}
+          chat_unread_count={@unread_count}
         />
         <div class="foyer-content">
-          <div class="foyer-scroll md:flex md:flex-row md:gap-0 md:p-0" id="chat">
-            <%!-- Left panel: inbox + picker (always visible at md:+) --%>
-            <div
-              id="chat-panel-inbox"
-              class={[
-                "md:flex-shrink-0 md:w-72 md:border-r md:flex md:flex-col md:gap-0 md:overflow-y-auto",
-                @live_action == :show && "hidden md:flex"
-              ]}
-              style="border-color: var(--foyer-rule);"
-            >
-              <div class="p-4 flex items-start justify-between">
-                <div>
-                  <div class="foyer-mono">The Linden · Mayfair, London</div>
-                  <h1 class="foyer-serif text-3xl">Messages</h1>
-                </div>
-                <.link navigate={~p"/chat/new"} class="foyer-btn sm" id="new-message-cta">
-                  <.icon name="hero-pencil-square" class="size-4" /> New
-                </.link>
-              </div>
+          <FoyerComponents.desktop_topbar current_scope={@current_scope} page_title={@page_title} />
 
-              <div class="foyer-fieldset px-4">
-                <input
-                  type="search"
-                  class="foyer-input"
-                  placeholder="Search messages"
-                  id="chat-search"
-                  name="search"
-                />
-              </div>
+          <div id="chat" class="chat-surface">
+            <%= cond do %>
+              <% @live_action == :new_message -> %>
+                <section id="new-message" class="chat-picker">
+                  <.link navigate={~p"/chat"} class="chat-back-link" id="back-to-messages">
+                    <.icon name="hero-arrow-left" class="size-4" /> Back to messages
+                  </.link>
+                  <h1 class="foyer-serif text-4xl leading-tight">New message</h1>
 
-              <section class="p-4">
-                <div class="foyer-mono">Pinned and recent</div>
-                <div id="inbox" phx-update="stream" class="flex flex-col gap-2 mt-2">
-                  <div :for={{dom_id, c} <- @streams.conversations} id={dom_id}>
-                    <FoyerComponents.conversation_row
-                      conversation={c}
-                      current_user_id={@current_scope.user.id}
-                    />
-                  </div>
-                </div>
-              </section>
-
-              <%= if @live_action == :new_message do %>
-                <section id="new-message" class="p-4">
-                  <h2 class="foyer-serif text-2xl">New message</h2>
-                  <div class="flex gap-2 mt-2" role="tablist">
-                    <button type="button" class="foyer-btn sm" id="new-msg-tab-people">
+                  <div class="chat-tabs" role="tablist" aria-label="Message recipient type">
+                    <button
+                      type="button"
+                      class={["chat-tab", @picker_tab == :people && "is-active"]}
+                      id="new-msg-tab-people"
+                      phx-click="set_new_message_tab"
+                      phx-value-tab="people"
+                      aria-selected={@picker_tab == :people}
+                    >
                       People
                     </button>
-                    <button type="button" class="foyer-btn sm" id="new-msg-tab-channels">
+                    <button
+                      type="button"
+                      class={["chat-tab", @picker_tab == :channels && "is-active"]}
+                      id="new-msg-tab-channels"
+                      phx-click="set_new_message_tab"
+                      phx-value-tab="channels"
+                      aria-selected={@picker_tab == :channels}
+                    >
                       Channels
                     </button>
                   </div>
-                  <div class="foyer-mono mt-3">People</div>
-                  <ul class="flex flex-col gap-2 mt-2">
+
+                  <div :if={@picker_tab == :people} class="foyer-fieldset">
+                    <input
+                      type="search"
+                      class="foyer-input chat-search"
+                      placeholder="Search colleagues..."
+                      id="new-message-search"
+                      name="search"
+                    />
+                  </div>
+
+                  <ul :if={@picker_tab == :people} class="chat-picker-list" id="new-message-people">
                     <li :for={p <- @people}>
                       <button
                         type="button"
-                        class="foyer-btn w-full text-left"
+                        class="chat-picker-row"
                         id={"new-msg-person-#{p.id}"}
                         phx-click="open_direct"
                         phx-value-user_id={p.id}
                       >
                         <FoyerComponents.avatar initials={p.initials} size={:sm} />
-                        <span class="ml-2">{p.name}</span>
-                        <span
-                          :if={!MapSet.member?(@on_shift_user_ids, p.id)}
-                          class="foyer-tag outline ml-auto"
-                        >
-                          Off shift
+                        <span class="min-w-0">
+                          <span class="chat-picker-title">{p.name}</span>
+                          <span class="chat-picker-subtitle">{p.title}</span>
+                        </span>
+                        <span class={[
+                          "chat-shift-pill",
+                          MapSet.member?(@on_shift_user_ids, p.id) && "is-on"
+                        ]}>
+                          {if MapSet.member?(@on_shift_user_ids, p.id),
+                            do: "On shift",
+                            else: "Off shift"}
                         </span>
                       </button>
                     </li>
                   </ul>
-                  <div class="foyer-mono mt-3">Channels</div>
-                  <ul class="flex flex-col gap-2 mt-2">
+
+                  <ul
+                    :if={@picker_tab == :channels}
+                    class="chat-picker-list"
+                    id="new-message-channels"
+                  >
                     <li :for={c <- @channels}>
                       <button
                         type="button"
-                        class="foyer-btn w-full text-left"
+                        class="chat-picker-row"
                         id={"new-msg-channel-#{c.id}"}
                         phx-click="open_channel"
                         phx-value-channel_id={c.id}
                       >
-                        # {c.name}
+                        <span class="foyer-avatar sm">
+                          <.icon name="hero-user-group" class="size-4" />
+                        </span>
+                        <span class="min-w-0">
+                          <span class="chat-picker-title">{c.name}</span>
+                          <span class="chat-picker-subtitle">0 members</span>
+                        </span>
                       </button>
                     </li>
                   </ul>
                 </section>
-              <% end %>
+              <% @live_action == :show and @conversation -> %>
+                <section id="chat-panel-room" class="chat-room">
+                  <header class="chat-room-header">
+                    <.link navigate={~p"/chat"} class="chat-icon-link" id="back-to-inbox">
+                      <.icon name="hero-arrow-left" class="size-6" />
+                    </.link>
+                    <div class="min-w-0">
+                      <h1 class="foyer-serif text-2xl leading-none truncate">
+                        {conversation_title(@conversation, @current_scope.user.id)}
+                      </h1>
+                      <div
+                        :if={@conversation && @conversation.kind == :direct}
+                        class="chat-room-presence"
+                        id="chat-room-shift-state"
+                      >
+                        {conversation_shift_state(
+                          @conversation,
+                          @current_scope.user.id,
+                          @on_shift_user_ids
+                        )} · notifications paused
+                      </div>
+                    </div>
+                  </header>
 
-              <FoyerComponents.bottom_nav
-                active={:chat}
-                current_scope={@current_scope}
-                chat_unread_count={@unread_count}
-              />
-            </div>
+                  <div id="messages" phx-update="stream" class="chat-message-list">
+                    <div :for={{dom_id, msg} <- @streams.messages} id={dom_id}>
+                      <FoyerComponents.message_bubble
+                        message={msg}
+                        current_user_id={@current_scope.user.id}
+                      />
+                    </div>
+                  </div>
 
-            <%!-- Right panel: room (hidden on mobile unless :show; always shown at md:+) --%>
-            <div
-              id="chat-panel-room"
-              class={[
-                "flex-1 flex flex-col gap-2 p-4 min-w-0",
-                @live_action == :show && "flex",
-                @live_action != :show && "hidden md:flex"
-              ]}
-            >
-              <%= if @live_action == :show and @conversation do %>
-                <header class="flex items-center gap-2">
-                  <.link
-                    navigate={~p"/chat"}
-                    class="foyer-btn ghost sm md:hidden"
-                    id="back-to-inbox"
-                  >
-                    <.icon name="hero-arrow-left" class="size-4" /> Back
-                  </.link>
-                  <h1 class="foyer-serif text-2xl">
-                    {conversation_title(@conversation, @current_scope.user.id)}
-                  </h1>
-                </header>
+                  <div class="chat-compose-wrap">
+                    <div
+                      :if={
+                        @conversation.kind == :direct and
+                          conversation_shift_state(
+                            @conversation,
+                            @current_scope.user.id,
+                            @on_shift_user_ids
+                          ) == "Off shift"
+                      }
+                      class="chat-delivery-note"
+                    >
+                      <.icon name="hero-moon" class="size-5" />
+                      <span>
+                        <strong>{conversation_title(@conversation, @current_scope.user.id)}</strong>
+                        is off shift. We'll deliver this when they next clock in.
+                      </span>
+                    </div>
 
-                <div
-                  :if={@conversation && @conversation.kind == :direct}
-                  class="foyer-mono"
-                  id="chat-room-shift-state"
-                >
-                  {conversation_shift_state(
-                    @conversation,
-                    @current_scope.user.id,
-                    @on_shift_user_ids
-                  )}
-                </div>
+                    <.form
+                      for={@compose_form}
+                      id="chat-compose"
+                      phx-submit="send_message"
+                      class="chat-compose"
+                    >
+                      <.input
+                        field={@compose_form[:body]}
+                        type="text"
+                        placeholder="Write a message"
+                      />
+                      <button class="foyer-btn forest" type="submit" id="chat-compose-submit">
+                        Send
+                      </button>
+                    </.form>
+                  </div>
+                </section>
+              <% true -> %>
+                <section id="chat-panel-inbox" class="chat-inbox">
+                  <div class="chat-inbox-heading">
+                    <div>
+                      <div class="foyer-mono">The Linden · Mayfair, London</div>
+                      <h1 class="foyer-serif text-4xl leading-tight">Messages</h1>
+                    </div>
+                    <.link navigate={~p"/chat/new"} class="foyer-btn forest" id="new-message-cta">
+                      <.icon name="hero-plus" class="size-4" /> New
+                    </.link>
+                  </div>
 
-                <div id="messages" phx-update="stream" class="flex flex-col gap-2 flex-1">
-                  <div :for={{dom_id, msg} <- @streams.messages} id={dom_id}>
-                    <FoyerComponents.message_bubble
-                      message={msg}
-                      current_user_id={@current_scope.user.id}
+                  <div class="foyer-fieldset">
+                    <input
+                      type="search"
+                      class="foyer-input chat-search"
+                      placeholder="Search messages"
+                      id="chat-search"
+                      name="search"
                     />
                   </div>
-                </div>
 
-                <.form
-                  for={@compose_form}
-                  id="chat-compose"
-                  phx-submit="send_message"
-                  class="flex gap-2 mt-2"
-                >
-                  <.input field={@compose_form[:body]} type="text" placeholder="Write a message" />
-                  <button class="foyer-btn forest sm" type="submit">Send</button>
-                </.form>
-              <% else %>
-                <div class="flex items-center justify-center h-full text-center p-8">
-                  <div>
-                    <div class="foyer-serif text-xl">Select a conversation</div>
-                    <div class="foyer-mono mt-2">Choose from the list on the left</div>
+                  <div id="inbox" phx-update="stream" class="chat-inbox-list">
+                    <div id="inbox-empty" class="chat-empty hidden only:flex">
+                      <div class="foyer-serif text-xl">No messages here yet.</div>
+                      <p>
+                        Start a conversation with the <.link navigate={~p"/chat/new"}>New</.link>
+                        button.
+                      </p>
+                    </div>
+                    <div :for={{dom_id, c} <- @streams.conversations} id={dom_id}>
+                      <FoyerComponents.conversation_row
+                        conversation={c}
+                        current_user_id={@current_scope.user.id}
+                      />
+                    </div>
                   </div>
-                </div>
-              <% end %>
-            </div>
+                </section>
+            <% end %>
           </div>
         </div>
+
+        <FoyerComponents.bottom_nav
+          active={:chat}
+          current_scope={@current_scope}
+          chat_unread_count={@unread_count}
+        />
       </main>
     </Layouts.app>
     """
@@ -389,6 +431,49 @@ defmodule FoyerWeb.ChatLive do
   end
 
   defp conversation_shift_state(_, _, _), do: ""
+
+  defp apply_new_message_params(socket, %{"channel_id" => channel_id})
+       when is_binary(channel_id) and channel_id != "" do
+    scope = socket.assigns.current_scope
+
+    case FoyerWeb.LiveDeps.chat().open_channel(scope.user, channel_id) do
+      {:ok, conversation} ->
+        {:noreply, push_navigate(socket, to: ~p"/chat/#{conversation.id}")}
+
+      {:error, :unauthorized} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "That channel is not available to you.")
+         |> push_navigate(to: ~p"/chat")}
+
+      {:error, _changeset} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "Couldn't open that channel.")
+         |> push_navigate(to: ~p"/chat")}
+    end
+  end
+
+  defp apply_new_message_params(socket, params) do
+    scope = socket.assigns.current_scope
+    people = FoyerWeb.LiveDeps.accounts().list_people([])
+    channels = FoyerWeb.LiveDeps.channels().list_for_user(scope.user)
+    on_shift_user_ids = FoyerWeb.LiveDeps.shifts().users_on_shift_ids()
+
+    {:noreply,
+     socket
+     |> assign(:people, people)
+     |> assign(:channels, channels)
+     |> assign(:on_shift_user_ids, on_shift_user_ids)
+     |> assign(:conversation, nil)
+     |> assign(:picker_tab, picker_tab(params["tab"]))
+     |> assign(:page_title, "New message")
+     |> assign(:unread_count, FoyerWeb.LiveDeps.chat().unread_count(scope.user))}
+  end
+
+  defp picker_tab("channels"), do: :channels
+  defp picker_tab(:channels), do: :channels
+  defp picker_tab(_), do: :people
 
   defp refresh_inbox(socket) do
     scope = socket.assigns.current_scope
