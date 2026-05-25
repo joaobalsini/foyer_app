@@ -193,33 +193,40 @@ defmodule Foyer.House do
          :ok <- ensure_member(announcement.channel_id, manager.id) do
       recipients = receipt_recipients(announcement)
       recipient_ids = Enum.map(recipients, & &1.id)
-      on_shift_ids = on_shift_ids(recipient_ids)
-      acked_ids = receipt_ack_ids(announcement.id, recipient_ids)
-      read_ids = receipt_read_ids(announcement.id, recipient_ids)
+      on_shift = on_shift_ids(recipient_ids)
+      acked = receipt_ack_ids(announcement.id, recipient_ids)
+      read = receipt_read_ids(announcement.id, recipient_ids)
 
       grouped =
-        Enum.reduce(
-          recipients,
-          %{acknowledged: [], read_without_acknowledgement: [], unread: [], off_shift: []},
-          fn user, acc ->
-            cond do
-              not MapSet.member?(on_shift_ids, user.id) ->
-                Map.update!(acc, :off_shift, &[user | &1])
-
-              MapSet.member?(acked_ids, user.id) ->
-                Map.update!(acc, :acknowledged, &[user | &1])
-
-              MapSet.member?(read_ids, user.id) ->
-                Map.update!(acc, :read_without_acknowledgement, &[user | &1])
-
-              true ->
-                Map.update!(acc, :unread, &[user | &1])
-            end
-          end
-        )
+        recipients
+        |> Enum.reduce(empty_receipt_groups(), fn user, acc ->
+          bucket = receipt_bucket_for(user.id, on_shift, acked, read)
+          Map.update!(acc, bucket, &[user | &1])
+        end)
         |> Map.new(fn {key, users} -> {key, Enum.reverse(users)} end)
 
       {:ok, grouped}
+    end
+  end
+
+  defp empty_receipt_groups do
+    %{acknowledged: [], read_without_acknowledgement: [], unread: [], off_shift: []}
+  end
+
+  # Uses bare maps (not MapSet) as O(1) lookup tables. MapSet has an opaque
+  # internal representation that trips Dialyzer on Erlang/OTP 27+ when its
+  # values flow across function boundaries; a plain map keeps the type
+  # transparent and the lookup the same complexity. The map value (`true`) is
+  # unused — only key membership matters.
+  @spec receipt_bucket_for(integer(), %{integer() => true}, %{integer() => true}, %{
+          integer() => true
+        }) :: :off_shift | :acknowledged | :read_without_acknowledgement | :unread
+  defp receipt_bucket_for(user_id, on_shift, acked, read) do
+    cond do
+      not Map.has_key?(on_shift, user_id) -> :off_shift
+      Map.has_key?(acked, user_id) -> :acknowledged
+      Map.has_key?(read, user_id) -> :read_without_acknowledgement
+      true -> :unread
     end
   end
 
@@ -289,9 +296,8 @@ defmodule Foyer.House do
   defp ensure_not_removed(%Announcement{}), do: {:error, :removed}
 
   defp ensure_available_member(%Announcement{} = announcement, %User{id: user_id}) do
-    with :ok <- ensure_not_removed(announcement),
-         :ok <- ensure_member(announcement.channel_id, user_id) do
-      :ok
+    with :ok <- ensure_not_removed(announcement) do
+      ensure_member(announcement.channel_id, user_id)
     end
   end
 
@@ -338,7 +344,8 @@ defmodule Foyer.House do
     |> Repo.all()
   end
 
-  defp on_shift_ids([]), do: MapSet.new()
+  @spec on_shift_ids([integer()]) :: %{integer() => true}
+  defp on_shift_ids([]), do: %{}
 
   defp on_shift_ids(user_ids) do
     from(s in Shift,
@@ -346,10 +353,11 @@ defmodule Foyer.House do
       select: s.user_id
     )
     |> Repo.all()
-    |> MapSet.new()
+    |> Map.new(&{&1, true})
   end
 
-  defp receipt_ack_ids(_announcement_id, []), do: MapSet.new()
+  @spec receipt_ack_ids(integer(), [integer()]) :: %{integer() => true}
+  defp receipt_ack_ids(_announcement_id, []), do: %{}
 
   defp receipt_ack_ids(announcement_id, user_ids) do
     from(ack in AnnouncementAck,
@@ -357,10 +365,11 @@ defmodule Foyer.House do
       select: ack.user_id
     )
     |> Repo.all()
-    |> MapSet.new()
+    |> Map.new(&{&1, true})
   end
 
-  defp receipt_read_ids(_announcement_id, []), do: MapSet.new()
+  @spec receipt_read_ids(integer(), [integer()]) :: %{integer() => true}
+  defp receipt_read_ids(_announcement_id, []), do: %{}
 
   defp receipt_read_ids(announcement_id, user_ids) do
     from(read in AnnouncementRead,
@@ -368,6 +377,6 @@ defmodule Foyer.House do
       select: read.user_id
     )
     |> Repo.all()
-    |> MapSet.new()
+    |> Map.new(&{&1, true})
   end
 end

@@ -1,9 +1,8 @@
 defmodule Foyer.HousePort do
   @moduledoc """
-  Behaviour for `Foyer.House`. Read-side callbacks (feed, pinned, detail) are
-  fully implemented in the scaffold; `acknowledge/2`, `mark_read/2`, and
-  `compose_changeset/1` are implemented; `create_announcement/2` is stubbed
-  until the House feature group lands.
+  Behaviour for `Foyer.House`. All callbacks (read-side feed/pinned/detail,
+  acknowledge/mark_read, create/update/remove, pin/unpin, receipts,
+  needs_ack_from) are implemented by the House feature group.
   """
 
   alias Foyer.Accounts.User
