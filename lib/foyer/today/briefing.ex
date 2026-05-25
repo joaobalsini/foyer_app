@@ -16,7 +16,15 @@ defmodule Foyer.Today.Briefing do
     field :on_shift?, boolean()
     field :handoff, Shift.t() | nil
     field :needs_ack, [Announcement.t()]
-    field :recent_recognition, [Recognition.t()]
-    field :waiting_count, non_neg_integer()
+    field :recent_recognitions, [Recognition.t()]
+    field :own_announcements, [Announcement.t()]
+    field :waiting_announcements, non_neg_integer()
+    field :waiting_messages, non_neg_integer()
+    field :waiting_recognitions, non_neg_integer()
+    field :last_shift_ended_at, DateTime.t() | nil
   end
+
+  @spec waiting_total(t()) :: non_neg_integer()
+  def waiting_total(%__MODULE__{} = b),
+    do: b.waiting_announcements + b.waiting_messages + b.waiting_recognitions
 end

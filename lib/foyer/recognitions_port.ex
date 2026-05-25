@@ -10,6 +10,7 @@ defmodule Foyer.RecognitionsPort do
   @callback feed_public(opts :: keyword()) :: [Recognition.t()]
   @callback received_by(target :: User.t(), viewer :: User.t()) :: [Recognition.t()]
   @callback given_by(target :: User.t(), viewer :: User.t()) :: [Recognition.t()]
+  @callback private_received_since(User.t(), DateTime.t() | nil) :: non_neg_integer()
   @callback get_recognition!(integer() | String.t(), User.t()) :: Recognition.t()
   @callback compose_changeset(map()) :: Ecto.Changeset.t()
   @callback change_recognition(Recognition.t(), map()) :: Ecto.Changeset.t()

@@ -70,4 +70,16 @@ defmodule Foyer.Shifts do
     |> Shift.changeset(attrs)
     |> Repo.update()
   end
+
+  # Owned by feature/shifts; this branch carries a local copy until that branch lands on main.
+  @impl true
+  @spec last_ended_shift_for(User.t()) :: Shift.t() | nil
+  def last_ended_shift_for(%User{id: user_id}) do
+    from(s in Shift,
+      where: s.user_id == ^user_id and not is_nil(s.ended_at),
+      order_by: [desc: s.ended_at],
+      limit: 1
+    )
+    |> Repo.one()
+  end
 end

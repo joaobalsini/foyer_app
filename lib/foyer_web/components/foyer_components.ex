@@ -519,10 +519,13 @@ defmodule FoyerWeb.FoyerComponents do
 
   def announcement_card(assigns) do
     assigns =
-      assign(
-        assigns,
-        :ack_state,
-        announcement_ack_state(assigns.announcement, assigns.current_user_id)
+      assigns
+      |> assign(:ack_state, announcement_ack_state(assigns.announcement, assigns.current_user_id))
+      |> assign(:ack_count, association_count(assigns.announcement.acks))
+      |> assign(
+        :ack_denominator,
+        association_count(assigns.announcement.reads) +
+          association_count(assigns.announcement.acks)
       )
 
     ~H"""
@@ -561,9 +564,11 @@ defmodule FoyerWeb.FoyerComponents do
         <span class="announcement-card__author">
           {@announcement.author && @announcement.author.name}
         </span>
-        <span :if={@announcement.requires_ack} class="foyer-mono text-xs ml-auto">
-          {association_count(@announcement.acks)}/{association_count(@announcement.reads) +
-            association_count(@announcement.acks)} acknowledged
+        <span
+          :if={@announcement.requires_ack && @ack_denominator > 0}
+          class="foyer-mono text-xs ml-auto"
+        >
+          {@ack_count}/{@ack_denominator} acknowledged
         </span>
         <.link
           navigate={~p"/announcements/#{@announcement.id}"}

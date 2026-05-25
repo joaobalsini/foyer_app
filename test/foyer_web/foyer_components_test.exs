@@ -165,6 +165,18 @@ defmodule FoyerWeb.FoyerComponentsTest do
       assert html =~ "Needs your ack"
     end
 
+    test "does not render an impossible 0/0 acknowledgement count" do
+      html =
+        render_component(&FoyerComponents.announcement_card/1,
+          announcement: announcement(acks: [], reads: []),
+          current_user_id: 2
+        )
+
+      assert html =~ "Needs your ack"
+      refute html =~ "0/0 acknowledged"
+      refute html =~ "acknowledged"
+    end
+
     test "F.Announcements.7 — marks an acknowledgement-required announcement as acknowledged by the current user" do
       html =
         render_component(&FoyerComponents.announcement_card/1,
@@ -354,6 +366,7 @@ defmodule FoyerWeb.FoyerComponentsTest do
   defp announcement(opts) do
     author_id = Keyword.get(opts, :author_id, 1)
     acks = Keyword.get(opts, :acks, [])
+    reads = Keyword.get(opts, :reads, [%AnnouncementRead{user_id: 2}])
 
     %Announcement{
       id: 100,
@@ -364,7 +377,7 @@ defmodule FoyerWeb.FoyerComponentsTest do
       body: "Use the marked cleaning kit before entering.",
       requires_ack: true,
       acks: acks,
-      reads: [%AnnouncementRead{user_id: 2}]
+      reads: reads
     }
   end
 

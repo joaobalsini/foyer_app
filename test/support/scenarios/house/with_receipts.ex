@@ -79,6 +79,12 @@ defmodule Foyer.HouseScenarios.WithReceipts do
   @impl true
   def needs_ack_from(_user), do: []
 
+  @impl true
+  def authored_by(_user), do: [announcement_with_acks()]
+
+  @impl true
+  def unacked_since(_user, _since), do: 0
+
   defp announcement_with_acks do
     other = Fixtures.other_staff()
     me = Fixtures.staff()

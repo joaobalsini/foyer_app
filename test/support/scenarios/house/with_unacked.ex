@@ -87,4 +87,10 @@ defmodule Foyer.HouseScenarios.WithUnacked do
 
   @impl true
   def needs_ack_from(_user), do: [Fixtures.announcement()]
+
+  @impl true
+  def authored_by(_user), do: [Fixtures.announcement()]
+
+  @impl true
+  def unacked_since(_user, _since), do: 1
 end

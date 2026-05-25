@@ -25,6 +25,9 @@ defmodule Foyer.ShiftsScenarios.MayaCharlotteHugoOn do
   def last_handoff_for(_user), do: nil
 
   @impl true
+  def last_ended_shift_for(_user), do: nil
+
+  @impl true
   def start_shift(_user),
     do: {:error, %Ecto.Changeset{action: :insert, valid?: false, data: %Foyer.Shifts.Shift{}}}
 

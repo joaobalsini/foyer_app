@@ -21,6 +21,8 @@ defmodule FoyerWeb.IsolatedRouter do
 
   live_session :isolated_test,
     on_mount: {FoyerWeb.IsolatedHelpers.OnMount, :default} do
+    live "/today", FoyerWeb.TodayLive, :index
+    live "/today/end-shift", FoyerWeb.TodayLive, :end_shift
     live "/announcements/new", FoyerWeb.AnnouncementLive, :new
     live "/announcements/:id", FoyerWeb.AnnouncementLive, :show
     live "/announcements/:id/edit", FoyerWeb.AnnouncementLive, :edit

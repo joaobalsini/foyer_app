@@ -3,8 +3,9 @@ defmodule FoyerWeb.SmokeTest do
   Thin route wiring smoke tests.
 
   These tests prove the seeded app can mount each major surface through the real
-  router, session plugs, on-mount hooks, and Repo-backed ports. Feature behavior
-  belongs in focused LiveView or context tests.
+  router, session plugs, on-mount hooks, and Repo-backed ports. The Mox ports are
+  stubbed to the real contexts so this is an end-to-end DB-backed wiring suite;
+  feature behavior belongs in focused LiveView or context tests.
   """
   use FoyerWeb.ConnCase, async: true
 
@@ -32,15 +33,15 @@ defmodule FoyerWeb.SmokeTest do
 
   describe "public entry" do
     test "user picker mounts", %{conn: conn, maya: maya} do
-      {:ok, _view, html} = live(conn, ~p"/")
+      {:ok, view, _html} = live(conn, ~p"/")
 
-      assert html =~ "Pick a user"
-      assert html =~ maya.name
+      assert has_element?(view, "#user-picker")
+      assert has_element?(view, "#pick-btn-#{maya.id}")
     end
   end
 
   describe "route gates" do
-    test "F.Recognitions.1 / F.Chat.10 — off-shift users are redirected away from on-shift surfaces",
+    test "F.Today.2 / F.Recognitions.1 / F.Chat.10 — off-shift users are redirected away from on-shift surfaces",
          ctx do
       assert {:error, {:redirect, %{to: "/today"}}} =
                ctx.conn
@@ -121,14 +122,14 @@ defmodule FoyerWeb.SmokeTest do
       {:ok, view, _html} = ctx.conn |> sign_in(ctx.maya) |> live(~p"/today")
 
       assert has_element?(view, "#today")
-      assert has_element?(view, "#today-on-shift-staff")
+      assert has_element?(view, "#on-shift-staff")
       assert has_element?(view, "#bottom-nav-today")
     end
 
     test "manager today mounts", ctx do
       {:ok, view, _html} = ctx.conn |> sign_in(ctx.charlotte) |> live(~p"/today")
 
-      assert has_element?(view, "#today-on-shift-manager")
+      assert has_element?(view, "#manager-today")
       assert has_element?(view, "#compose-cta")
     end
 

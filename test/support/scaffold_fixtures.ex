@@ -1,7 +1,7 @@
 defmodule FoyerWeb.ScaffoldFixtures do
   @moduledoc """
-  Sandbox-owned fixtures for the scaffold smoke test. Inserts a trimmed-down
-  version of `priv/repo/seeds.exs` — just what the smoke test asserts against
+  Sandbox-owned fixtures for the route smoke tests. Inserts a trimmed-down
+  version of `priv/repo/seeds.exs` — just what the smoke tests assert against
   — so the test stays fast and async-safe.
 
   The full seeds (priv/repo/seeds.exs) are still authoritative for manual

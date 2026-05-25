@@ -28,4 +28,18 @@ defmodule Foyer.HousePort do
   @callback receipts_for(Announcement.t(), User.t()) :: {:ok, map()} | {:error, atom()}
   @callback within_grace_window?(Announcement.t()) :: boolean()
   @callback needs_ack_from(User.t()) :: [Announcement.t()]
+
+  @doc """
+  Returns published announcements (published_at IS NOT NULL) authored by the
+  given user, ordered published_at desc. Used by manager variant of Today
+  (F.Today.14).
+  """
+  @callback authored_by(User.t()) :: [Announcement.t()]
+
+  @doc """
+  Returns the count of announcements requiring acknowledgement
+  (requires_ack: true) from the user that were published after `since`
+  (or all-time if since is nil) and not yet acknowledged.
+  """
+  @callback unacked_since(User.t(), DateTime.t() | nil) :: non_neg_integer()
 end

@@ -441,4 +441,35 @@ defmodule Foyer.Chat do
     from(m in Membership, where: m.channel_id == ^channel_id, select: m.user_id)
     |> Repo.all()
   end
+
+  # Not part of ChatPort; used only by Foyer.Today to count messages received
+  # since the user's last shift ended (F.Today.16, F.Today.20).
+  @spec unread_since(User.t(), DateTime.t() | nil) :: non_neg_integer()
+  def unread_since(%User{id: user_id}, since) do
+    query =
+      from(msg in Message,
+        join: c in Conversation,
+        on: c.id == msg.conversation_id,
+        left_join: p in Participant,
+        on: p.conversation_id == c.id and p.user_id == ^user_id,
+        left_join: m in Membership,
+        on: m.channel_id == c.channel_id and m.user_id == ^user_id,
+        left_join: r in MessageRead,
+        on: r.message_id == msg.id and r.user_id == ^user_id,
+        where:
+          msg.author_id != ^user_id and
+            (not is_nil(p.id) or not is_nil(m.id)) and
+            is_nil(r.id),
+        select: count(msg.id)
+      )
+
+    query =
+      if is_nil(since) do
+        query
+      else
+        from([msg] in query, where: msg.inserted_at > ^since)
+      end
+
+    Repo.one!(query)
+  end
 end

@@ -37,6 +37,9 @@ defmodule Foyer.RecognitionsScenarios.WithReceived do
   def given_by(_target, _viewer), do: []
 
   @impl true
+  def private_received_since(_user, _since), do: 0
+
+  @impl true
   def get_recognition!(_id, _viewer), do: raise(Ecto.NoResultsError, queryable: Recognition)
 
   @impl true

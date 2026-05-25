@@ -271,4 +271,25 @@ defmodule Foyer.Recognitions do
   defp preload_recognition(%Recognition{} = recognition) do
     Repo.preload(recognition, [:sender, :recipient])
   end
+
+  # Used by Foyer.Today to count private recognitions received since the user's
+  # last shift ended (F.Today.16, F.Today.20).
+  @impl true
+  @spec private_received_since(User.t(), DateTime.t() | nil) :: non_neg_integer()
+  def private_received_since(%User{id: user_id}, since) do
+    query =
+      from(r in Recognition,
+        where: r.recipient_id == ^user_id and r.public == false,
+        select: count(r.id)
+      )
+
+    query =
+      if is_nil(since) do
+        query
+      else
+        from(r in query, where: r.inserted_at > ^since)
+      end
+
+    Repo.one!(query)
+  end
 end
