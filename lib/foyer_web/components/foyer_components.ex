@@ -21,6 +21,7 @@ defmodule FoyerWeb.FoyerComponents do
 
   attr :active, :atom, required: true, values: [:today, :house, :chat, :me, :people, :profile]
   attr :current_scope, FoyerWeb.Scope, required: true
+  attr :chat_unread_count, :integer, default: 0
 
   @doc """
   Fixed bottom navigation. Stable IDs (`#bottom-nav-today`, `#bottom-nav-house`,
@@ -59,7 +60,16 @@ defmodule FoyerWeb.FoyerComponents do
           aria-current={if @active == :chat, do: "page", else: nil}
         >
           <.icon name="hero-chat-bubble-left-right" class="size-5" />
-          <span>Chat</span>
+          <span class="relative">
+            Chat
+            <span
+              :if={@chat_unread_count > 0}
+              class="absolute -right-2 -top-1 size-2 rounded-full bg-[var(--foyer-claret)]"
+              id="bottom-nav-chat-unread-dot"
+              aria-label={"#{@chat_unread_count} unread chat messages"}
+            >
+            </span>
+          </span>
         </.link>
         <.link
           id="bottom-nav-me"
@@ -89,7 +99,16 @@ defmodule FoyerWeb.FoyerComponents do
           class="foyer-bottom-nav__item"
         >
           <.icon name="hero-chat-bubble-left-right" class="size-5" />
-          <span>Chat</span>
+          <span class="relative">
+            Chat
+            <span
+              :if={@chat_unread_count > 0}
+              class="absolute -right-2 -top-1 size-2 rounded-full bg-[var(--foyer-claret)]"
+              id="bottom-nav-chat-unread-dot"
+              aria-label={"#{@chat_unread_count} unread chat messages"}
+            >
+            </span>
+          </span>
         </button>
         <button
           id="bottom-nav-me"
@@ -601,6 +620,13 @@ defmodule FoyerWeb.FoyerComponents do
             <span class="foyer-mono block">{conversation_preview(@conversation)}</span>
           </span>
       <% end %>
+      <span
+        :if={@conversation.unread?}
+        class="size-2 rounded-full bg-[var(--foyer-claret)]"
+        id={"conversation-unread-#{@conversation.id}"}
+        aria-label={"#{@conversation.unread_count} unread"}
+      >
+      </span>
     </.link>
     """
   end
