@@ -99,7 +99,10 @@ defmodule FoyerWeb.ChatLive do
 
     case FoyerWeb.LiveDeps.chat().send_message(conversation, scope.user, attrs) do
       {:ok, _message} ->
-        {:noreply, assign(socket, :compose_form, to_form(%{"body" => ""}, as: :message))}
+        {:noreply,
+         socket
+         |> assign(:compose_form, to_form(%{"body" => ""}, as: :message))
+         |> push_event("clear-chat-compose", %{form_id: "chat-compose"})}
 
       {:error, :unauthorized} ->
         {:noreply, put_flash(socket, :error, "You are not a member of that conversation.")}

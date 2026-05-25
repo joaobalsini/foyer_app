@@ -141,6 +141,8 @@ defmodule FoyerWeb.ChatLiveTest do
       view
       |> form("#chat-compose", message: %{body: body})
       |> render_submit()
+
+      assert_push_event(view, "clear-chat-compose", %{form_id: "chat-compose"})
     end
   end
 
