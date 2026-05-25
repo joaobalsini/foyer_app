@@ -442,8 +442,8 @@ defmodule Foyer.Chat do
     |> Repo.all()
   end
 
-  # Owned by feature/chat; this branch carries a local copy until that branch lands on main.
-  @impl true
+  # Not part of ChatPort; used only by Foyer.Today to count messages received
+  # since the user's last shift ended (F.Today.16, F.Today.20).
   @spec unread_since(User.t(), DateTime.t() | nil) :: non_neg_integer()
   def unread_since(%User{id: user_id}, since) do
     query =
