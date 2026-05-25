@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+#
+# Foyer — project-local Postgres lifecycle helper.
+#
+# Manages a Postgres cluster that lives entirely inside `./.postgres`, so the
+# database for this project never collides with anything else on the host.
+# Reads PGDATA / PGLOG / PGPORT / PGUSER from the environment (set in
+# `.envrc`).
+#
+# Usage:
+#   bin/db start     # initdb if needed, then start if not running (idempotent)
+#   bin/db stop      # stop if running (idempotent)
+#   bin/db restart   # stop + start
+#   bin/db status    # show whether the cluster is running
+#   bin/db psql ...  # psql against the project cluster, forwarding extra args
+#   bin/db reset     # WIPE the data directory and re-init (asks first)
+#
+set -euo pipefail
+
+PGDATA="${PGDATA:-$PWD/.postgres/data}"
+PGLOG="${PGLOG:-$PWD/.postgres/postgres.log}"
+PGPORT="${PGPORT:-5432}"
+PGUSER="${PGUSER:-postgres}"
+PGSOCKETDIR="${PGSOCKETDIR:-$PWD/.postgres/run}"
+
+mkdir -p "$(dirname "$PGDATA")" "$PGSOCKETDIR"
+
+is_running() {
+  pg_ctl -D "$PGDATA" status >/dev/null 2>&1
+}
+
+ensure_initdb() {
+  if [ -d "$PGDATA" ] && [ -f "$PGDATA/PG_VERSION" ]; then
+    return 0
+  fi
+  echo "==> initdb into $PGDATA"
+  initdb \
+    --pgdata="$PGDATA" \
+    --username="$PGUSER" \
+    --auth-local=trust \
+    --auth-host=trust \
+    --encoding=UTF8 \
+    --no-locale >/dev/null
+}
+
+start() {
+  ensure_initdb
+  if is_running; then
+    echo "Postgres already running (PGDATA=$PGDATA)."
+    return 0
+  fi
+  echo "==> starting Postgres (PGDATA=$PGDATA, port=$PGPORT)"
+  pg_ctl \
+    -D "$PGDATA" \
+    -l "$PGLOG" \
+    -o "-p $PGPORT -k $PGSOCKETDIR -h localhost" \
+    -w start
+}
+
+stop() {
+  if ! is_running; then
+    echo "Postgres is not running."
+    return 0
+  fi
+  echo "==> stopping Postgres"
+  pg_ctl -D "$PGDATA" -m fast -w stop
+}
+
+status() {
+  if is_running; then
+    pg_ctl -D "$PGDATA" status
+  else
+    echo "Postgres is not running (PGDATA=$PGDATA)."
+    return 3
+  fi
+}
+
+case "${1:-status}" in
+  start) start ;;
+  stop) stop ;;
+  restart) stop || true; start ;;
+  status) status ;;
+  psql)
+    shift
+    exec psql -h "$PGSOCKETDIR" -p "$PGPORT" -U "$PGUSER" "$@"
+    ;;
+  reset)
+    if is_running; then stop; fi
+    read -r -p "Delete $PGDATA and re-initdb? [y/N] " ans
+    case "$ans" in
+      y|Y|yes|YES)
+        rm -rf "$PGDATA"
+        ensure_initdb
+        echo "Cluster reset. Run: bin/db start"
+        ;;
+      *) echo "Aborted." ;;
+    esac
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|restart|status|psql ...|reset}" >&2
+    exit 1
+    ;;
+esac

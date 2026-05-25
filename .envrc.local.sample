@@ -1,0 +1,41 @@
+# Foyer — per-developer direnv overrides.
+#
+# Copy this file to `.envrc.local` and adjust the values below for your local
+# machine. `.envrc.local` is gitignored, so anything you put here stays on
+# your laptop. `.envrc` already sources this file at the end, so any export
+# here will override the dummy default in `.envrc`.
+#
+#   cp .envrc.local.sample .envrc.local
+#   direnv allow
+#
+# ---------------------------------------------------------------------------
+# DATABASE_URL — the canonical way to point Foyer at a Postgres instance.
+# Format: ecto://USER:PASSWORD@HOST:PORT/DB_NAME
+#
+# If you use the bundled project-local Postgres (`bin/db start`), the default
+# below works as-is. If you run Postgres elsewhere (Docker, Homebrew, a
+# remote cluster), point this at it.
+# ---------------------------------------------------------------------------
+
+# export DATABASE_URL="ecto://postgres:postgres@localhost:5432/foyer_dev"
+
+# ---------------------------------------------------------------------------
+# TEST_DATABASE_URL — separate database for `MIX_ENV=test`. Keep it distinct
+# from DATABASE_URL so dev and test never share state.
+# ---------------------------------------------------------------------------
+
+# export TEST_DATABASE_URL="ecto://postgres:postgres@localhost:5432/foyer_test"
+
+# ---------------------------------------------------------------------------
+# SECRET_KEY_BASE — Phoenix session/signing secret. Must be at least 64 bytes.
+# Generate a fresh one with `mix phx.gen.secret` once you have the toolchain
+# active (`direnv allow` will have pulled it in via Nix).
+# ---------------------------------------------------------------------------
+
+# export SECRET_KEY_BASE="paste-the-output-of-mix-phx.gen.secret-here"
+
+# ---------------------------------------------------------------------------
+# Anything else you want different from `.envrc` defaults — port, host, etc.
+# ---------------------------------------------------------------------------
+
+# export PORT="4001"

@@ -16,9 +16,16 @@ Nix and direnv to manage the stack
 
 ## Architecture and development guidelines
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — LiveView/Phoenix architecture rules and development
-guidelines (fat contexts, port behaviours, `handle_params/3` over `mount/3`, typed boundaries, Elixir code
-style, environment configuration, editor tooling, …).
+Two layers — read both:
+
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — Foyer-specific architecture rules and development
+  guidelines (fat contexts, port behaviours, `handle_params/3` over `mount/3`, typed boundaries, Elixir
+  code style, environment configuration, editor tooling, …).
+- **[AGENTS.md](AGENTS.md)** — Framework-level guidelines shipped by Phoenix / LiveView (Phoenix v1.8
+  conventions, `Layouts.app` usage, `current_scope`, `<.input>` / `<.icon>` components, Tailwind v4
+  import syntax, `mix precommit`, Elixir/OTP idioms, …). Treat as authoritative for Phoenix and LiveView
+  patterns; when it conflicts with `docs/ARCHITECTURE.md`, the Foyer doc wins because it is the
+  project-specific layer on top.
 
 ## Feature groups
 
