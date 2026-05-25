@@ -86,6 +86,43 @@ defmodule FoyerWeb.IsolatedHelpers do
   end
 
   @doc """
+  Mount `FoyerWeb.ProfileLive` in isolation against the provided user.
+  Returns the same shape as `Phoenix.LiveViewTest.live_isolated/3`.
+  """
+  defmacro mount_isolated_profile(conn, user, opts \\ []) do
+    quote bind_quoted: [conn: conn, user: user, opts: opts] do
+      on_shift? = Keyword.get(opts, :on_shift?, true)
+
+      session = %{
+        "foyer_isolated_user" => user,
+        "foyer_isolated_on_shift?" => on_shift?
+      }
+
+      Phoenix.LiveViewTest.live_isolated(conn, FoyerWeb.IsolatedProfileLive, session: session)
+    end
+  end
+
+  @doc """
+  Mount `FoyerWeb.PeopleLive` in `:show` action in isolation against the
+  provided viewer and a subject_id. Returns the same shape as
+  `Phoenix.LiveViewTest.live_isolated/3`.
+  """
+  defmacro mount_isolated_people_show(conn, viewer, subject_id, opts \\ []) do
+    quote bind_quoted: [conn: conn, viewer: viewer, subject_id: subject_id, opts: opts] do
+      on_shift? = Keyword.get(opts, :on_shift?, true)
+
+      session = %{
+        "foyer_isolated_user" => viewer,
+        "foyer_isolated_on_shift?" => on_shift?,
+        "foyer_isolated_live_action" => :show,
+        "foyer_isolated_subject_id" => subject_id
+      }
+
+      Phoenix.LiveViewTest.live_isolated(conn, FoyerWeb.IsolatedPeopleLive, session: session)
+    end
+  end
+
+  @doc """
   Prepares a conn for `live_isolated/3` and produces the matching opts.
   """
   @spec prepare_isolated(Plug.Conn.t(), module(), Scope.t(), keyword()) ::

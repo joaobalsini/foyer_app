@@ -128,7 +128,7 @@ defmodule Foyer.Profile do
       points: user.points_balance || 0,
       on_shift?: not is_nil(Shifts.current_shift_for(user)),
       received_this_month: count_this_month(received, today),
-      points_earned: Enum.filter(received, &(&1.bonus_points > 0))
+      points_earned: Enum.filter(received, &(is_integer(&1.bonus_points) and &1.bonus_points > 0))
     }
   end
 
