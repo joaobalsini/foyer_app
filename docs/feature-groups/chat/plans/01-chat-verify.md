@@ -293,6 +293,54 @@ is only meaningful for direct conversations by design.
     the conditional render is dropped or the lookup uses the current
     user instead of the other participant.
 
+## Rebase
+
+Rebased `feature/chat` onto `origin/main` = `49cd39b "desktop version"`. New
+HEAD: `5c9beb7`. Three commits replayed (`52a508c` → `74aa996`, `5a55301` →
+`9ebc317`, `26493a4` → `5c9beb7`).
+
+**Conflict resolution:**
+
+- `lib/foyer_web/components/foyer_components.ex` — auto-merged by git (no
+  manual edit).
+- `lib/foyer_web/live/chat_live.ex` — manually merged. Kept the desktop
+  shell from `49cd39b` (`<Layouts.app>` → `<main class="foyer-shell">` +
+  `desktop_rail` + `foyer-content` two-panel layout with `chat-panel-inbox`
+  on the left and `chat-panel-room` on the right) AND the chat feature
+  behaviour from `52a508c` (PubSub handlers for `:chat_message`,
+  `:chat_inbox_updated`, `:chat_unread_updated`; `mark_read` in both
+  `load_conversation/2` and on incoming `:chat_message`;
+  `open_direct`/`open_channel` event handlers with proper error branches;
+  `unread_count` assign; picker `phx-click` wiring and `Off shift` tags;
+  `#chat-room-shift-state` header for direct rooms; F.Chat.11 helpers).
+  `load_conversation/2` keeps the desktop **dual-load** (`inbox_for/1` +
+  `list_for_user/1` + `users_on_shift_ids/0` so the inbox panel and rail
+  stay populated when a room is opened directly) plus the feature-side
+  side-effects (`mark_read/2`, `unread_count/1` refresh). The room PubSub
+  subscribe lifecycle in `load_conversation/2` is preserved. The desktop
+  `off_shift_conversation?/3` banner helper was dropped in favour of the
+  feature-side `#chat-room-shift-state` text — both signal the same thing
+  and the feature side is the one pinned by tests
+  (`chat_live_test.exs:58` and the F.Chat.11 pinning tests). Bottom nav
+  gains the `chat_unread_count={@unread_count}` attribute (desktop side
+  passed no count; feature side did). On-shift assign name unified to
+  `on_shift_user_ids` (feature side; the desktop branch's
+  `on_shift_ids` was not yet referenced by any test).
+
+No further conflicts on commits 2 (`9ebc317`) and 3 (`5c9beb7`).
+
+**Post-rebase check status:**
+
+- `mix deps.get` — clean.
+- `mix compile --warnings-as-errors` — clean.
+- `mix format --check-formatted` — clean.
+- `mix credo --strict` — 0 issues over 301 mods/funs.
+- `mix dialyzer` — 0 errors.
+- `mix test` — 50 tests, 0 failures, 0.6s (38 from chat + 12 from the
+  desktop scaffold's `desktop_smoke_test.exs` now in the tree).
+
+**Verdict after rebase:** Pass with follow-ups (unchanged from the pre-rebase verdict).
+
 ## Known follow-ups (not fixed in this pass)
 
 ### 1. `compose_changeset/1` callback exists in the port but is unused
