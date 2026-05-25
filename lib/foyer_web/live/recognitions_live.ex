@@ -522,6 +522,7 @@ defmodule FoyerWeb.RecognitionsLive do
                               name="recognition[values][]"
                               value={v}
                               checked={v in @preview_values}
+                              id={"value-#{v}"}
                               class="sr-only"
                             />
                             {String.capitalize(v)}
@@ -574,20 +575,16 @@ defmodule FoyerWeb.RecognitionsLive do
 
                       <fieldset
                         :if={Scope.manager?(@current_scope)}
-                        id="bonus-points"
+                        id="bonus-points-fieldset"
                         class="card-parchment p-4 space-y-3"
                       >
                         <legend class="foyer-mono">Bonus points</legend>
                         <p class="text-xs text-stone-500">
                           Foyer points roll up to staff rewards — time off, meals, charitable donations.
                         </p>
-                        <div class="flex gap-2 flex-wrap">
-                          <button
-                            :for={tier <- [25, 50, 100]}
-                            type="button"
-                            phx-click="set_bonus"
-                            phx-value-bonus={tier}
-                            data-bonus-tier={tier}
+                        <div class="flex gap-2 flex-wrap" id="bonus-tiers">
+                          <label
+                            :for={tier <- [0, 10, 25, 50, 100]}
                             class={[
                               "px-3 py-1 rounded-full text-sm font-medium border",
                               @preview_bonus_points == tier &&
@@ -596,22 +593,16 @@ defmodule FoyerWeb.RecognitionsLive do
                                 "bg-transparent text-stone-700 border-stone-300"
                             ]}
                           >
-                            +{tier}
-                          </button>
-                          <input
-                            type="hidden"
-                            name="recognition[bonus_points]"
-                            value={@preview_bonus_points || 0}
-                          />
-                          <button
-                            :if={@preview_bonus_points}
-                            type="button"
-                            phx-click="set_bonus"
-                            phx-value-bonus="clear"
-                            class="text-xs text-stone-500 underline"
-                          >
-                            clear
-                          </button>
+                            <input
+                              type="radio"
+                              name="recognition[bonus_points]"
+                              value={tier}
+                              checked={(@preview_bonus_points || 0) == tier}
+                              id={"bonus-#{tier}"}
+                              class="sr-only"
+                            />
+                            {if tier == 0, do: "0", else: "+#{tier}"}
+                          </label>
                         </div>
                       </fieldset>
 

@@ -129,10 +129,9 @@ defmodule FoyerWeb.RecognitionsLiveTest do
       scope = IsolatedHelpers.build_scope(role: :staff, on_shift?: true)
 
       expect(Foyer.RecognitionsMock, :give, fn _sender, attrs ->
-        # When no checkboxes are checked, HTML omits the values param
-        # entirely.
-        refute Map.has_key?(attrs, "values"),
-               "expected no values key when none are selected; got #{inspect(attrs)}"
+        # The hidden empty value lets Phoenix submit an empty checkbox group;
+        # the context normalizes it to [] before validation.
+        assert attrs["values"] == [""]
 
         # The context returns a changeset error. The LV's catch-all
         # `{:error, _changeset}` clause flashes a generic copy.
