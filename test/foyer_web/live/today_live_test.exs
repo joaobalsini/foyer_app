@@ -1,48 +1,26 @@
 defmodule FoyerWeb.TodayLiveTest do
-  # async: true — each test owns its DB sandbox transaction.
   use FoyerWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
   import Mox
 
-  alias Foyer.Accounts.User
-  alias Foyer.Repo
-  alias Foyer.Shifts.Shift, as: FoyerShift
+  alias FoyerWeb.IsolatedHelpers
 
   setup :verify_on_exit!
   setup :set_mox_from_context
 
-  # Stub all mocks that Today might need. Scenario tests only care about TodayMock.
-  # ChannelsMock needs list_for_user for end-shift form; stub with empty list.
   setup do
-    stub_with(Foyer.AccountsMock, Foyer.Accounts)
-    stub_with(Foyer.ShiftsMock, Foyer.Shifts)
+    stub(Foyer.ShiftsMock, :start_shift, fn user ->
+      {:ok, %Foyer.Shifts.Shift{user_id: user.id, started_at: DateTime.utc_now(:second)}}
+    end)
+
+    stub(Foyer.ShiftsMock, :end_shift, fn shift, attrs ->
+      ended_at = Map.get(attrs, "ended_at", DateTime.utc_now(:second))
+      {:ok, %{shift | ended_at: ended_at}}
+    end)
+
     stub(Foyer.ChannelsMock, :list_for_user, fn _user -> [] end)
     :ok
-  end
-
-  # Insert a minimal user for tests that need an authenticated session.
-  defp insert_user(attrs \\ %{}) do
-    defaults = %{
-      name: "Test User",
-      initials: "TU",
-      role: :staff,
-      department: "Housekeeping",
-      title: "Housekeeper"
-    }
-
-    {:ok, user} =
-      %User{}
-      |> User.changeset(Map.merge(defaults, attrs))
-      |> Repo.insert()
-
-    user
-  end
-
-  defp insert_manager(attrs \\ %{}) do
-    insert_user(
-      Map.merge(%{role: :manager, name: "Test Manager", initials: "TM", title: "Manager"}, attrs)
-    )
   end
 
   # ──────────────────────────────────────────────────────────
@@ -51,11 +29,8 @@ defmodule FoyerWeb.TodayLiveTest do
 
   describe "F.Today.1 — off-shift paused state banner" do
     test "renders off-shift tag, copy, Start shift button, and waiting line", %{conn: conn} do
-      stub_with(Foyer.TodayMock, Today.Scenarios.OffShift)
-      user = insert_user()
-      conn = sign_in(conn, user)
-
-      {:ok, view, _html} = live(conn, ~p"/today")
+      {:ok, view, _html} =
+        mount_today(conn, Today.Scenarios.OffShift, on_shift?: false)
 
       html = render(view)
       assert html =~ "Off shift · notifications paused"
@@ -79,11 +54,8 @@ defmodule FoyerWeb.TodayLiveTest do
     test "shows total waiting count and breakdown for announcements, messages, recognitions", %{
       conn: conn
     } do
-      stub_with(Foyer.TodayMock, Today.Scenarios.OffShiftWithWaiting)
-      user = insert_user()
-      conn = sign_in(conn, user)
-
-      {:ok, view, _html} = live(conn, ~p"/today")
+      {:ok, view, _html} =
+        mount_today(conn, Today.Scenarios.OffShiftWithWaiting, on_shift?: false)
 
       html = render(view)
       # Total = 3 + 2 + 1 = 6
@@ -100,16 +72,12 @@ defmodule FoyerWeb.TodayLiveTest do
 
   describe "F.Today.3 — start shift transition" do
     test "clicking Start shift fires start_shift event and redirects to /today", %{conn: conn} do
-      stub_with(Foyer.TodayMock, Today.Scenarios.OffShift)
-      user = insert_user()
-      conn = sign_in(conn, user)
+      {:ok, view, _html} =
+        mount_today(conn, Today.Scenarios.OffShift, on_shift?: false)
 
-      {:ok, view, _html} = live(conn, ~p"/today")
       assert has_element?(view, "#start-shift-btn")
 
       view |> element("#start-shift-btn") |> render_click()
-      # After start_shift, a push_navigate to /today is issued; Shifts.start_shift
-      # is called on the real user via ShiftsMock -> Foyer.Shifts.
       assert_redirected(view, ~p"/today")
     end
   end
@@ -122,16 +90,7 @@ defmodule FoyerWeb.TodayLiveTest do
     test "handoff card precedes needs-ack section which precedes recognition section", %{
       conn: conn
     } do
-      stub_with(Foyer.TodayMock, Today.Scenarios.OnShiftStaff)
-      user = insert_user()
-      # OnShiftStaff scenario returns on_shift?: true; UserAuth still needs a shift in DB.
-      {:ok, _} =
-        %FoyerShift{}
-        |> FoyerShift.changeset(%{user_id: user.id, started_at: DateTime.utc_now()})
-        |> Repo.insert()
-
-      conn = sign_in(conn, user)
-      {:ok, _view, html} = live(conn, ~p"/today")
+      {:ok, _view, html} = mount_today(conn, Today.Scenarios.OnShiftStaff)
 
       handoff_pos = html |> :binary.match("handoff-card") |> elem(0)
       needs_ack_pos = html |> :binary.match("needs-ack") |> elem(0)
@@ -148,16 +107,7 @@ defmodule FoyerWeb.TodayLiveTest do
 
   describe "F.Today.7 — all acknowledged: needs-ack section absent" do
     test "needs-ack section absent when all announcements are acknowledged", %{conn: conn} do
-      stub_with(Foyer.TodayMock, Today.Scenarios.OnShiftAllAcked)
-      user = insert_user()
-
-      {:ok, _} =
-        %FoyerShift{}
-        |> FoyerShift.changeset(%{user_id: user.id, started_at: DateTime.utc_now()})
-        |> Repo.insert()
-
-      conn = sign_in(conn, user)
-      {:ok, view, _html} = live(conn, ~p"/today")
+      {:ok, view, _html} = mount_today(conn, Today.Scenarios.OnShiftAllAcked)
 
       refute has_element?(view, "#needs-ack")
     end
@@ -169,16 +119,7 @@ defmodule FoyerWeb.TodayLiveTest do
 
   describe "F.Today.8 — handoff card content" do
     test "handoff card shows sender name, ended-at time, and handoff note", %{conn: conn} do
-      stub_with(Foyer.TodayMock, Today.Scenarios.OnShiftStaff)
-      user = insert_user()
-
-      {:ok, _} =
-        %FoyerShift{}
-        |> FoyerShift.changeset(%{user_id: user.id, started_at: DateTime.utc_now()})
-        |> Repo.insert()
-
-      conn = sign_in(conn, user)
-      {:ok, view, _html} = live(conn, ~p"/today")
+      {:ok, view, _html} = mount_today(conn, Today.Scenarios.OnShiftStaff)
 
       assert has_element?(view, "#handoff-card")
       html = render(view)
@@ -193,16 +134,7 @@ defmodule FoyerWeb.TodayLiveTest do
 
   describe "F.Today.9 — no handoff card when no relevant handoff" do
     test "handoff-card element absent when handoff is nil", %{conn: conn} do
-      stub_with(Foyer.TodayMock, Today.Scenarios.OnShiftNoHandoff)
-      user = insert_user()
-
-      {:ok, _} =
-        %FoyerShift{}
-        |> FoyerShift.changeset(%{user_id: user.id, started_at: DateTime.utc_now()})
-        |> Repo.insert()
-
-      conn = sign_in(conn, user)
-      {:ok, view, _html} = live(conn, ~p"/today")
+      {:ok, view, _html} = mount_today(conn, Today.Scenarios.OnShiftNoHandoff)
 
       refute has_element?(view, "#handoff-card")
     end
@@ -214,16 +146,11 @@ defmodule FoyerWeb.TodayLiveTest do
 
   describe "F.Today.10 / F.Today.11 — end-shift form" do
     test "end-shift form has textarea, channel picker, and skip link", %{conn: conn} do
-      stub_with(Foyer.TodayMock, Today.Scenarios.OnShiftStaff)
-      user = insert_user()
-
-      {:ok, _} =
-        %FoyerShift{}
-        |> FoyerShift.changeset(%{user_id: user.id, started_at: DateTime.utc_now()})
-        |> Repo.insert()
-
-      conn = sign_in(conn, user)
-      {:ok, view, _html} = live(conn, ~p"/today/end-shift")
+      {:ok, view, _html} =
+        mount_today(conn, Today.Scenarios.OnShiftStaff,
+          action: :end_shift,
+          path: "/today/end-shift"
+        )
 
       assert has_element?(view, "#end-shift-form")
       assert has_element?(view, "#handoff-channel-select")
@@ -231,16 +158,11 @@ defmodule FoyerWeb.TodayLiveTest do
     end
 
     test "F.Today.12 — skip clock out ends shift and redirects", %{conn: conn} do
-      stub_with(Foyer.TodayMock, Today.Scenarios.OnShiftStaff)
-      user = insert_user()
-
-      {:ok, _} =
-        %FoyerShift{}
-        |> FoyerShift.changeset(%{user_id: user.id, started_at: DateTime.utc_now()})
-        |> Repo.insert()
-
-      conn = sign_in(conn, user)
-      {:ok, view, _html} = live(conn, ~p"/today/end-shift")
+      {:ok, view, _html} =
+        mount_today(conn, Today.Scenarios.OnShiftStaff,
+          action: :end_shift,
+          path: "/today/end-shift"
+        )
 
       view |> element("#skip-clock-out") |> render_click()
       assert_redirected(view, ~p"/today?state=shift_complete")
@@ -253,16 +175,7 @@ defmodule FoyerWeb.TodayLiveTest do
 
   describe "F.Today.5 — needs-ack item links to announcement detail" do
     test "needs-ack link navigates to /announcements/:id", %{conn: conn} do
-      stub_with(Foyer.TodayMock, Today.Scenarios.OnShiftStaff)
-      user = insert_user()
-
-      {:ok, _} =
-        %FoyerShift{}
-        |> FoyerShift.changeset(%{user_id: user.id, started_at: DateTime.utc_now()})
-        |> Repo.insert()
-
-      conn = sign_in(conn, user)
-      {:ok, view, html} = live(conn, ~p"/today")
+      {:ok, view, html} = mount_today(conn, Today.Scenarios.OnShiftStaff)
 
       # The scenario has announcement id 10
       assert has_element?(view, "#needs-ack-10")
@@ -276,16 +189,8 @@ defmodule FoyerWeb.TodayLiveTest do
 
   describe "F.Today.13 — manager sees New announcement CTA" do
     test "compose-cta present for on-shift manager", %{conn: conn} do
-      stub_with(Foyer.TodayMock, Today.Scenarios.OnShiftManager)
-      user = insert_manager()
-
-      {:ok, _} =
-        %FoyerShift{}
-        |> FoyerShift.changeset(%{user_id: user.id, started_at: DateTime.utc_now()})
-        |> Repo.insert()
-
-      conn = sign_in(conn, user)
-      {:ok, view, _html} = live(conn, ~p"/today")
+      {:ok, view, _html} =
+        mount_today(conn, Today.Scenarios.OnShiftManager, role: :manager)
 
       assert has_element?(view, "#compose-cta")
     end
@@ -299,16 +204,8 @@ defmodule FoyerWeb.TodayLiveTest do
     test "manager-live-posts section present when manager has published announcements", %{
       conn: conn
     } do
-      stub_with(Foyer.TodayMock, Today.Scenarios.OnShiftManager)
-      user = insert_manager()
-
-      {:ok, _} =
-        %FoyerShift{}
-        |> FoyerShift.changeset(%{user_id: user.id, started_at: DateTime.utc_now()})
-        |> Repo.insert()
-
-      conn = sign_in(conn, user)
-      {:ok, view, _html} = live(conn, ~p"/today")
+      {:ok, view, _html} =
+        mount_today(conn, Today.Scenarios.OnShiftManager, role: :manager)
 
       assert has_element?(view, "#manager-live-posts")
       # Scenario has 2 live posts (IDs 11 and 12)
@@ -323,16 +220,7 @@ defmodule FoyerWeb.TodayLiveTest do
 
   describe "F.Today.17 — mobile-first rendering" do
     test "rendered HTML has no explicit fixed width exceeding 390px", %{conn: conn} do
-      stub_with(Foyer.TodayMock, Today.Scenarios.OnShiftStaff)
-      user = insert_user()
-
-      {:ok, _} =
-        %FoyerShift{}
-        |> FoyerShift.changeset(%{user_id: user.id, started_at: DateTime.utc_now()})
-        |> Repo.insert()
-
-      conn = sign_in(conn, user)
-      {:ok, _view, html} = live(conn, ~p"/today")
+      {:ok, _view, html} = mount_today(conn, Today.Scenarios.OnShiftStaff)
 
       # No inline style with width > 390px
       refute html =~ ~r/width:\s*[4-9]\d\d|width:\s*[1-9]\d{3}/
@@ -347,16 +235,7 @@ defmodule FoyerWeb.TodayLiveTest do
 
   describe "F.Today.18 — recent recognition cards" do
     test "recognition section shows sender name, body, and values", %{conn: conn} do
-      stub_with(Foyer.TodayMock, Today.Scenarios.OnShiftStaff)
-      user = insert_user()
-
-      {:ok, _} =
-        %FoyerShift{}
-        |> FoyerShift.changeset(%{user_id: user.id, started_at: DateTime.utc_now()})
-        |> Repo.insert()
-
-      conn = sign_in(conn, user)
-      {:ok, view, html} = live(conn, ~p"/today")
+      {:ok, view, html} = mount_today(conn, Today.Scenarios.OnShiftStaff)
 
       assert has_element?(view, "#recent-recognition")
       assert has_element?(view, "#recognition-1")
@@ -373,16 +252,7 @@ defmodule FoyerWeb.TodayLiveTest do
 
   describe "F.Today.19 — no recognition section when none received" do
     test "recent-recognition section absent when recognitions list is empty", %{conn: conn} do
-      stub_with(Foyer.TodayMock, Today.Scenarios.OnShiftAllAcked)
-      user = insert_user()
-
-      {:ok, _} =
-        %FoyerShift{}
-        |> FoyerShift.changeset(%{user_id: user.id, started_at: DateTime.utc_now()})
-        |> Repo.insert()
-
-      conn = sign_in(conn, user)
-      {:ok, view, _html} = live(conn, ~p"/today")
+      {:ok, view, _html} = mount_today(conn, Today.Scenarios.OnShiftAllAcked)
 
       refute has_element?(view, "#recent-recognition")
     end
@@ -394,11 +264,11 @@ defmodule FoyerWeb.TodayLiveTest do
 
   describe "shift-complete transient state (F.Today.10 / F.Today.12 redirect)" do
     test "renders shift-complete banner when state=shift_complete param is present", %{conn: conn} do
-      stub_with(Foyer.TodayMock, Today.Scenarios.AfterClockOut)
-      user = insert_user()
-      conn = sign_in(conn, user)
-
-      {:ok, view, _html} = live(conn, ~p"/today?state=shift_complete")
+      {:ok, view, _html} =
+        mount_today(conn, Today.Scenarios.AfterClockOut,
+          on_shift?: false,
+          path: "/today?state=shift_complete"
+        )
 
       assert has_element?(view, "#shift-complete-banner")
       html = render(view)
@@ -408,11 +278,8 @@ defmodule FoyerWeb.TodayLiveTest do
     end
 
     test "renders normal off-shift banner when state param absent", %{conn: conn} do
-      stub_with(Foyer.TodayMock, Today.Scenarios.AfterClockOut)
-      user = insert_user()
-      conn = sign_in(conn, user)
-
-      {:ok, view, _html} = live(conn, ~p"/today")
+      {:ok, view, _html} =
+        mount_today(conn, Today.Scenarios.AfterClockOut, on_shift?: false)
 
       assert has_element?(view, "#off-shift-banner")
       refute has_element?(view, "#shift-complete-banner")
@@ -427,16 +294,7 @@ defmodule FoyerWeb.TodayLiveTest do
     test "handoff card has opacity class after push_navigate re-renders same session", %{
       conn: conn
     } do
-      stub_with(Foyer.TodayMock, Today.Scenarios.OnShiftStaff)
-      user = insert_user()
-
-      {:ok, _} =
-        %FoyerShift{}
-        |> FoyerShift.changeset(%{user_id: user.id, started_at: DateTime.utc_now()})
-        |> Repo.insert()
-
-      conn = sign_in(conn, user)
-      {:ok, view, _html} = live(conn, ~p"/today")
+      {:ok, view, _html} = mount_today(conn, Today.Scenarios.OnShiftStaff)
 
       # First render: handoff card full attention (no opacity class)
       html_first = render(view)
@@ -449,5 +307,32 @@ defmodule FoyerWeb.TodayLiveTest do
 
       assert html_second =~ ~r/id="handoff-card"[^>]*opacity-60/
     end
+  end
+
+  defp mount_today(conn, scenario, opts \\ []) do
+    stub_with(Foyer.TodayMock, scenario)
+
+    action = Keyword.get(opts, :action, :index)
+    path = Keyword.get(opts, :path, "/today")
+    role = Keyword.get(opts, :role, :staff)
+    on_shift? = Keyword.get(opts, :on_shift?, true)
+
+    scope =
+      IsolatedHelpers.build_scope(
+        id: if(role == :manager, do: 2, else: 1),
+        role: role,
+        on_shift?: on_shift?,
+        name: if(role == :manager, do: "Test Manager", else: "Test User"),
+        initials: if(role == :manager, do: "TM", else: "TU"),
+        title: if(role == :manager, do: "Manager", else: "Housekeeper")
+      )
+
+    {conn, live_opts} =
+      IsolatedHelpers.prepare_isolated(conn, FoyerWeb.TodayLive, scope,
+        action: action,
+        path: path
+      )
+
+    live_isolated(conn, FoyerWeb.TodayLive, live_opts)
   end
 end

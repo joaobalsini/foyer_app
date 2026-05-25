@@ -1,9 +1,7 @@
 defmodule Foyer.TodayTest do
-  use Foyer.DataCase, async: true
+  use ExUnit.Case, async: true
 
   alias Foyer.Accounts.User
-  alias Foyer.Repo
-  alias Foyer.Shifts.Shift
   alias Foyer.Today
   alias Foyer.Today.Briefing
 
@@ -45,14 +43,10 @@ defmodule Foyer.TodayTest do
     end
   end
 
-  # Foyer.Today calls real context modules directly (not via LiveDeps).
-  # These tests use real DB data via the sandbox.
-  describe "Today.brief_for/1 with real DB" do
+  describe "Today.brief_for/2 with injected deps" do
     test "returns a Briefing struct with on_shift? true for a user with an open shift" do
-      user = insert_user()
-      _shift = insert_shift!(user)
-
-      briefing = Today.brief_for(user)
+      user = user()
+      briefing = Today.brief_for(user, on_shift_deps())
 
       assert %Briefing{} = briefing
       assert briefing.on_shift? == true
@@ -62,69 +56,65 @@ defmodule Foyer.TodayTest do
     end
 
     test "returns a Briefing struct with on_shift? false for a user with no open shift" do
-      user = insert_user()
-
-      briefing = Today.brief_for(user)
+      user = user()
+      briefing = Today.brief_for(user, off_shift_deps())
 
       assert %Briefing{} = briefing
       assert briefing.on_shift? == false
-      assert briefing.waiting_announcements >= 0
-      assert briefing.waiting_messages >= 0
-      assert briefing.waiting_recognitions >= 0
+      assert briefing.waiting_announcements == 3
+      assert briefing.waiting_messages == 2
+      assert briefing.waiting_recognitions == 1
     end
 
     test "on_shift? false: recent_recognitions is empty list" do
-      user = insert_user()
-      briefing = Today.brief_for(user)
+      briefing = Today.brief_for(user(), off_shift_deps())
       assert briefing.recent_recognitions == []
     end
 
     test "on_shift? false: needs_ack is empty list" do
-      user = insert_user()
-      briefing = Today.brief_for(user)
+      briefing = Today.brief_for(user(), off_shift_deps())
       assert briefing.needs_ack == []
     end
 
     test "on_shift? false: own_announcements is empty list" do
-      user = insert_user()
-      briefing = Today.brief_for(user)
+      briefing = Today.brief_for(user(), off_shift_deps())
       assert briefing.own_announcements == []
     end
 
     test "on_shift? true: waiting counts are all zero" do
-      user = insert_user()
-      _shift = insert_shift!(user)
-      briefing = Today.brief_for(user)
+      briefing = Today.brief_for(user(), on_shift_deps())
       assert briefing.waiting_announcements == 0
       assert briefing.waiting_messages == 0
       assert briefing.waiting_recognitions == 0
     end
   end
 
-  defp insert_user do
-    {:ok, user} =
-      %User{}
-      |> User.changeset(%{
-        name: "Unit Test User",
-        initials: "UT",
-        role: :staff,
-        department: "Testing",
-        title: "Tester"
-      })
-      |> Repo.insert()
-
-    user
+  defp user do
+    %User{
+      id: 42,
+      name: "Unit Test User",
+      initials: "UT",
+      role: :staff,
+      department: "Testing",
+      title: "Tester"
+    }
   end
 
-  defp insert_shift!(user) do
-    {:ok, shift} =
-      %Shift{}
-      |> Shift.changeset(%{
-        user_id: user.id,
-        started_at: DateTime.utc_now()
-      })
-      |> Repo.insert()
+  defp on_shift_deps do
+    %{
+      shifts: Elixir.Today.Scenarios.OnShiftDepsShifts,
+      house: Elixir.Today.Scenarios.OnShiftDepsHouse,
+      chat: Elixir.Today.Scenarios.OnShiftDepsChat,
+      recognitions: Elixir.Today.Scenarios.OnShiftDepsRecognitions
+    }
+  end
 
-    shift
+  defp off_shift_deps do
+    %{
+      shifts: Elixir.Today.Scenarios.OffShiftWaitingDepsShifts,
+      house: Elixir.Today.Scenarios.OffShiftWaitingDepsHouse,
+      chat: Elixir.Today.Scenarios.OffShiftWaitingDepsChat,
+      recognitions: Elixir.Today.Scenarios.OffShiftWaitingDepsRecognitions
+    }
   end
 end
