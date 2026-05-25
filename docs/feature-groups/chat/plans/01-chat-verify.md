@@ -341,6 +341,207 @@ No further conflicts on commits 2 (`9ebc317`) and 3 (`5c9beb7`).
 
 **Verdict after rebase:** Pass with follow-ups (unchanged from the pre-rebase verdict).
 
+## Second pass — test architecture + spec
+
+After the rebase, a second verify pass surfaced two architectural gaps the
+first pass missed against `docs/WORKFLOW.md` and `docs/TESTING_GUIDE.md`:
+
+1. **Spec drift from the given/when/then format.** `docs/WORKFLOW.md:38`
+   mandates given/when/then; the spec shipped flat declarative clauses.
+2. **Test architecture not aligned with `docs/TESTING_GUIDE.md`.** The chat
+   group had zero `live_isolated/3` coverage despite being the most
+   LiveView-heavy feature; no `test/support/scenarios/` modules existed; the
+   `chat_live_test.exs` file used `live(conn, path)` exclusively (route
+   smoke), and Mox was only ever used as a no-op `stub_with` proxy. The
+   spec also listed F-clauses (F.Chat.1 through F.Chat.5, F.Chat.7,
+   F.Chat.8) that had no e2e route-smoke coverage at all.
+
+### Spec rewrite
+
+`docs/feature-groups/chat/spec.md` was rewritten in given/when/then form
+for every clause, preserving the existing `F.Chat.1` … `F.Chat.11`
+numbering (per `docs/WORKFLOW.md:27-28`, F-numbers are stable per group).
+The `## Scaffold Gaps` section is preserved verbatim and `## Test Coverage`
+was updated at the end of this pass to reflect the new test files.
+
+### Scenario modules
+
+Six scenario modules were added under `test/support/scenarios/`:
+
+- `test/support/scenarios/chat/fixtures.ex` — in-memory struct builders
+  (`Foyer.ChatScenarios.Fixtures`) used by the scenarios. Stable IDs so
+  isolated tests can refer to them by name (Maya `id: 1`, Charlotte `id: 2`,
+  Hugo `id: 3`, Jamal `id: 4`, conversation `id: 50`, channel conv `id: 60`).
+- `test/support/scenarios/chat/empty_inbox.ex`
+  (`Foyer.ChatScenarios.EmptyInbox`) — implements `Foyer.ChatPort`,
+  returns `[]` from `inbox_for/1` and `0` from `unread_count/1`. Drives
+  F.Chat.5 (empty conversations excluded) and the "no unread dot" branch
+  of F.Chat.8.
+- `test/support/scenarios/chat/with_unread.ex`
+  (`Foyer.ChatScenarios.WithUnread`) — implements `Foyer.ChatPort`,
+  returns one enriched direct conversation with `unread?: true`,
+  `unread_count: 1`. Drives F.Chat.8 (unread dot rendered) and F.Chat.9
+  (latest-message preview).
+- `test/support/scenarios/chat/room_with_messages.ex`
+  (`Foyer.ChatScenarios.RoomWithMessages`) — implements `Foyer.ChatPort`
+  with two preloaded messages and `unread_count: 0`. Used for room-panel
+  tests (F.Chat.6 compose, F.Chat.7 mark_read trigger, F.Chat.11 header).
+- `test/support/scenarios/channels/maya_membership.ex`
+  (`Foyer.ChannelsScenarios.MayaMembership`) — implements
+  `Foyer.ChannelsPort`, returns the housekeeping floor-4 channel for
+  Maya. Drives the picker channel list and the side-rail.
+- `test/support/scenarios/accounts/people_with_off_shift.ex`
+  (`Foyer.AccountsScenarios.PeopleWithOffShift`) — implements
+  `Foyer.AccountsPort`, returns four picker people including the
+  off-shift Jamal.
+- `test/support/scenarios/shifts/maya_charlotte_hugo_on.ex`
+  (`Foyer.ShiftsScenarios.MayaCharlotteHugoOn`) — implements
+  `Foyer.ShiftsPort`, marks Maya/Charlotte/Hugo on shift and Jamal off
+  shift. Drives F.Chat.11 (off-shift tag) and F.Chat.6/F.Chat.10 (room
+  header "On shift").
+
+Scenarios are narrow on purpose: each only implements the port behaviour
+it pins, and only stubs the calls `FoyerWeb.ChatLive` makes (no whole-API
+shadowing). `@behaviour` annotations make a renamed callback fail the
+build rather than a single test.
+
+### Isolated test harness
+
+`test/support/isolated_helpers.ex` and `test/support/isolated_chat_live.ex`
+together form the test-only harness for `live_isolated/3` mounting of
+`FoyerWeb.ChatLive`:
+
+- `FoyerWeb.IsolatedHelpers.mount_isolated_chat/3` is a macro that wraps
+  `Phoenix.LiveViewTest.live_isolated/3` and encodes the test scope
+  (user, on_shift?, live_action, optional conversation_id) into the
+  session.
+- `FoyerWeb.IsolatedChatLive` is a Phoenix.LiveView module that delegates
+  `mount/3`, `handle_event/3`, `handle_info/2`, and `render/1` to
+  `FoyerWeb.ChatLive`, but pre-assigns `current_scope` from the session
+  before calling through. It explicitly does NOT define `handle_params/3`
+  because `live_isolated/3` mounts the view without a router, and
+  Phoenix's `Route.live_link_info!/3` would fail when post-mount tries to
+  resolve a path-less route. Instead the wrapper invokes
+  `ChatLive.handle_params/3` directly from `mount/3` with the configured
+  `live_action` and `conversation_id`.
+
+Both modules are compiled only in `test/support` (test env only) — they
+add no production routes, modules, or test-only flags to the runtime
+config.
+
+### Isolated tests (`test/foyer_web/chat_live_isolated_test.exs`, 9 tests)
+
+The new file mounts `FoyerWeb.ChatLive` via `live_isolated/3` against
+scenario modules. Tests are `async: true`. Each test pins an F-clause in
+its `describe` block.
+
+- **F.Chat.5** "inbox excludes empty conversations" — `EmptyInbox`
+  scenario; asserts no `#conversation-row-*` and no
+  `#bottom-nav-chat-unread-dot`.
+- **F.Chat.9** "inbox renders enriched conversations" — `WithUnread`
+  scenario; asserts `#conversation-row-50`, `#conversation-unread-50`,
+  and the "Confirmed in 412." latest-message preview.
+- **F.Chat.8** "unread_count rendering flips with scenario state" — two
+  tests, one against `WithUnread` (dot present) and one against
+  `RoomWithMessages` (dot absent).
+- **F.Chat.7** "mark_read is triggered when a conversation is opened" —
+  `RoomWithMessages` scenario plus `Mox.expect(:mark_read, 2, ...)` that
+  pattern-matches the conversation and user. The `2` count reflects that
+  `live_isolated/3` (like `live/2`) mounts the LV twice (disconnected +
+  connected) — both calls must hit with identical args.
+- **F.Chat.6** "compose form submits message via the port" —
+  `RoomWithMessages` + `Mox.expect(:send_message, ...)` pattern-matching
+  `%{"body" => ^body}` to prove the form attrs reach the port verbatim.
+- **F.Chat.10** "picker open events redirect" — two tests:
+  - `expect(:open_direct, ...)` on a person click → asserts
+    `live_redirect` to `/chat/50`.
+  - `expect(:open_channel, ...)` on a channel click → asserts
+    `live_redirect` to `/chat/60`.
+- **F.Chat.11** "picker tags off-shift colleagues" — two tests: picker
+  tag rendering (Jamal: `Off shift`, Hugo: no tag) and room header
+  rendering (Charlotte: `On shift`).
+
+### Route smoke tests (`test/foyer_web/chat_live_test.exs`, 6 tests)
+
+Reorganized into three `describe` blocks (inbox / picker / room surfaces),
+one or two tests per surface, with explicit F-clause coverage in test
+names:
+
+- **F.Chat.5** "inbox does not render empty-conversation rows" — creates
+  an empty DM and asserts the inbox row is absent. Closes the e2e gap
+  the first pass missed.
+- **F.Chat.8/F.Chat.9** "inbox renders unread dot and bottom-nav unread
+  dot for unread state" — wiring-level pin of the rendered unread chrome.
+- **F.Chat.10/F.Chat.11** "picker renders people and channels and tags
+  off-shift" + **F.Chat.10** "picker opens channel conversations".
+- **F.Chat.6/F.Chat.10** "room sends and streams messages, header shows
+  shift state".
+- **F.Chat.7** "opening a room clears that user's unread state via
+  mark_read" — asserts the F.Chat.8 unread_count drops from 1 to 0 after
+  opening the room. Closes the e2e gap for F.Chat.7 by observing the
+  side effect, not by stubbing the call.
+
+The previous F.Chat.11 standalone pinning tests were folded into these
+describe blocks (the new F.Chat.11 picker+header coverage in
+`chat_live_isolated_test.exs` is the primary pin; the smoke layer keeps a
+single wiring confirmation).
+
+### F-clauses pinned at the context layer (not duplicated as e2e)
+
+Per the `docs/TESTING_GUIDE.md` rule "test APIs between parts of the
+application at a high level rather than reaching across module
+boundaries," the following clauses are observable only at the context
+boundary and are pinned in `test/foyer/chat_test.exs`:
+
+- **F.Chat.1** "Opening a direct conversation creates or returns one
+  canonical conversation" — the canonical-key invariant is a context-side
+  truth (DB unique index + `Conversation.direct_key/1`). The LV only
+  exercises this through the picker, which is covered by F.Chat.10. No
+  duplicate e2e test added — would either repeat the context assertion
+  or weaken it.
+- **F.Chat.2** "Direct conversations unique by canonical participant
+  key" — same rationale; pinned by `chat_test.exs` line 21-30.
+- **F.Chat.3** "Opening a channel conversation creates or returns the
+  single conversation for that channel" — pinned at the context layer
+  (`chat_test.exs` line 33-44); the LV side is covered by F.Chat.10
+  channel-click test.
+- **F.Chat.4** "Channel conversations available only to channel members"
+  — pinned at the context layer (`chat_test.exs` line 43,
+  `open_channel(non-member, …)` returns `{:error, :unauthorized}`). The
+  LV behaviour is implicit (the picker only lists channels the user is a
+  member of, via `ChannelsPort.list_for_user/1`). Surface-pinning would
+  require seeding a forbidden channel and trying to `live(conn,
+  ~p"/chat/<that-id>")` — that's a context-level uniqueness assertion in
+  disguise, not new coverage.
+
+### Final check results
+
+After the second-pass changes:
+
+```
+$ mix deps.get                       # All dependencies have been fetched
+$ mix compile --warnings-as-errors   # clean
+$ mix format --check-formatted       # clean
+$ mix credo --strict                 # 0 issues, 376 mods/funs (was 301 pre-pass)
+$ mix dialyzer                       # 0 errors
+$ mix test                           # 60 tests, 0 failures, ~0.6s
+```
+
+Test count: 50 → 60 (added 9 isolated tests; the smoke file went from 6
+flat tests to 6 reorganized tests with broader F-clause coverage; the
+context test count is unchanged at 5; +9 net is the isolated file). The
+0.6s suite time is unchanged within noise — well inside the 10s budget.
+
+### New HEAD SHA
+
+After the three commits of this pass (spec rewrite + scenarios/harness +
+isolated-tests/smoke-split), `feature/chat` HEAD is `1c548d6` on top of
+the pre-pass `3033e3d`. The verify-doc commit itself lands on top of
+`1c548d6` and will be the new published HEAD.
+
+**Verdict after second pass:** Pass with follow-ups (the known follow-ups
+section below is unchanged).
+
 ## Known follow-ups (not fixed in this pass)
 
 ### 1. `compose_changeset/1` callback exists in the port but is unused
