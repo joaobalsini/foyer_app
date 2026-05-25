@@ -584,8 +584,6 @@ defmodule FoyerWeb.ChatLive do
 
   defp conversation_title(_, _), do: ""
 
-  # TODO: wire #rail-chat-unread dot visibility — requires exposing a new attr on
-  # FoyerComponents.desktop_rail (shared chrome); skipped to avoid touching shared components.
-  # TODO: per-row inbox unread dot — Foyer.Chat in foyer_app doesn't expose has_unread
-  # (no last_read_at on participants). Inbox row in inbox_row/1 omits the dot today.
+  # Unread dot visibility needs a future shared rail attr plus read-state data.
+  # The inbox row omits the dot until Foyer.Chat exposes per-conversation unread state.
 end

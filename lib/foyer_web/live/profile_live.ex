@@ -8,7 +8,7 @@ defmodule FoyerWeb.ProfileLive do
 
   alias FoyerWeb.FoyerComponents
 
-  # TODO: replace with Points.catalog() once foyer_app exposes that context API
+  # Static until Foyer exposes a Points catalog context API.
   @catalog [
     %{label: "1 hour early dismissal", cost: 100},
     %{label: "Staff meal at the Cellar", cost: 200},

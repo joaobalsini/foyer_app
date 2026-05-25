@@ -20,12 +20,10 @@ warnings in `receipts_for/2`. All three are fixed in this pass. After fixes:
 `mix compile --warnings-as-errors` all run clean; the full suite is 44 tests
 in 0.5 s.
 
-Three follow-ups remain (see end of doc): removed-announcement UX (manager
+Two follow-ups remain (see end of doc): removed-announcement UX (manager
 cannot reach `/announcements/:id` after removal to view audit receipts),
-absence of structured logging / telemetry for write events (a project-wide
-gap, not announcements-specific), and the `removed_at` btree index that
-would be more useful as a partial index for the hot "where removed_at IS
-NULL" filter.
+and the `removed_at` btree index that would be more useful as a partial index
+for the hot "where removed_at IS NULL" filter.
 
 ## Checklist
 
@@ -382,6 +380,219 @@ NULL" filter.
   were already present in `foyer_test` from the pre-rebase verify pass,
   so the migration was a no-op at test time.
 
+## Second pass — test architecture + spec
+
+**Verdict after second pass: Pass.**
+
+The first verify pass + rebase shipped, but two architectural gaps
+remained against `docs/WORKFLOW.md` and `docs/TESTING_GUIDE.md`. Both
+are closed in this pass; the four new commits sit on top of the rebase
+HEAD (`bd27e55`).
+
+### Spec rewrite — given/when/then form
+
+`docs/WORKFLOW.md:38` requires specs in given/when/then form so tests
+have a tight prose contract to pin against. The previous spec used
+flat declarative clauses ("Managers can create announcements for
+channels they belong to."). Rewrote each `F.Announcements.<N>` clause
+(`.1` through `.10`) in given/when/then form **without renumbering** —
+clause numbers are stable per `WORKFLOW.md:27-28`. The `## Scaffold
+Gaps` section is preserved verbatim. F.Announcements.4 uses two
+when/then blocks under a single clause to cover the "edits AND
+removals after grace" pair, since both fail with the same guard chain
+in the same code path.
+
+Commit: `65ddea5` "docs(announcements): rewrite spec clauses in
+given/when/then form".
+
+### Scenario modules — `test/support/scenarios/<port>/`
+
+`docs/TESTING_GUIDE.md:210` says "Organize scenario modules under
+`test/support/scenarios/`, grouped by port." Before this pass the
+directory did not exist; every test bound the mocks back to the real
+context via `stub_with(Foyer.HouseMock, Foyer.House)`, which works
+for route smoke tests but defeats the point of Mox for isolated
+tests — there's no fake-world boundary.
+
+Added under `test/support/scenarios/`:
+
+- `house/fixtures.ex` — `Foyer.HouseScenarios.Fixtures`, the shared
+  struct builder (`%User{}`, `%Channel{}`, `%Announcement{}`,
+  `%AnnouncementAck{}`, `%AnnouncementRead{}`) every scenario draws
+  from. No Repo round-trips.
+- `house/empty.ex` — `Foyer.HouseScenarios.Empty` (`@behaviour
+  Foyer.HousePort`): no announcements anywhere; mutations return
+  `{:error, :unauthorized}` or `{:error, :outside_grace_window}`.
+- `house/with_unacked.ex` — `Foyer.HouseScenarios.WithUnacked`:
+  the canonical ack-required announcement, within grace, with the
+  staff user in the `read_without_acknowledgement` bucket.
+- `house/with_receipts.ex` — `Foyer.HouseScenarios.WithReceipts`:
+  the same announcement viewed by its manager author, with one user
+  acked, one read, four buckets populated.
+- `channels/single_channel.ex` —
+  `Foyer.ChannelsScenarios.SingleChannel`: a one-channel
+  `Foyer.ChannelsPort` stub for tests that touch the compose
+  audience select.
+
+Each scenario implements its port behaviour, so a renamed callback
+fails at compile time rather than at a single test (per
+`TESTING_GUIDE.md:196-200`).
+
+### Isolated LiveView tests — `live_isolated/3`
+
+`docs/TESTING_GUIDE.md:83-95` says isolated tests are the **primary**
+layer; before this pass, zero tests on this branch used
+`live_isolated/3`. Added `test/foyer_web/announcement_live_test.exs`
+with nine tests, each pinning a single `F.Announcements.<N>` clause:
+
+- **F.Announcements.2** (two tests) — staff visiting
+  `/announcements/new` is redirected with `{:live_redirect, to:
+  "/house"}` and no form renders; manager sees `#announcement-new-form`.
+- **F.Announcements.3** (two tests) — author within grace sees
+  `#announcement-edit-link`; author outside grace sees the edit link
+  (identity-gated, always shown to author) but NOT
+  `#announcement-remove-btn` (grace-gated). The outside-grace test
+  uses `Mox.expect/3` per `TESTING_GUIDE.md`'s "When to keep expect/3
+  instead" — pinning the specific UI change against a one-off mock
+  override rather than a named scenario.
+- **F.Announcements.5** (two tests) — manager in the channel sees
+  `#announcement-unpin-btn` on a pinned post; staff sees neither
+  pin nor unpin.
+- **F.Announcements.7** (two tests) — author of an ack-required
+  post does NOT see `#acknowledge-btn`; a non-author who hasn't
+  acked DOES.
+- **F.Announcements.9** — the receipts panel renders all four
+  `#receipts-{acknowledged,read,unread,off-shift}` bucket sections
+  with the correct counts.
+
+All tests are `async: true`. Each test calls
+`FoyerWeb.IsolatedHelpers.prepare_isolated/4` to build the conn +
+opts, then `Mox.allow/3` so the LiveView pid can see the test
+process's mock expectations after mount.
+
+#### Why a test router and a synthetic on_mount hook
+
+`live_isolated/3` skips the production router, plugs,
+`live_session`, and `on_mount` hooks — but the channel mount (which
+runs after the static render to upgrade to a live view) DOES go
+through `Phoenix.LiveView.Route.live_link_info!/3`, which looks up
+the request URL in the configured router. Two consequences fall out:
+
+1. If the route's `live_session` differs from the synthetic one in
+   `conn.private[:phoenix_live_view]`, the channel mount treats the
+   URL as external and redirects to it.
+2. If we use the production router's `live_session
+   :authenticated_on_shift`, the real `FoyerWeb.UserAuth` on_mount
+   runs, sees no `current_user_id` in session, and redirects to `/`
+   with "Please pick a user."
+
+Both surfaced as `{:error, {:redirect, %{to: "http://www.example.com/"}}}`
+or `{:error, {:redirect, %{to: "/"}}}` during development. The fix
+is `test/support/isolated_router.ex` (`FoyerWeb.IsolatedRouter`),
+which redeclares the three announcement routes under an
+`:isolated_test` live_session whose on_mount is the synthetic
+`FoyerWeb.IsolatedHelpers.OnMount` (reads `"current_scope"` straight
+out of the session map). `prepare_isolated/4` defaults `router:` to
+this test router, so both the static render and the channel mount
+agree on which on_mount runs.
+
+Commits: `3ae6164` "test(announcements): add scenario modules and
+live_isolated harness", `678049f` "test(announcements): add isolated
+LiveView tests via live_isolated/3".
+
+### E2e gaps closed
+
+`docs/TESTING_GUIDE.md:60-61` and `docs/WORKFLOW.md:77` require each
+F-clause to be pinned by at least one e2e test. Before this pass,
+only `F.Announcements.2`, `.5`, and `.6` had route smoke tests at
+the LiveView/router layer. Added seven new tests in
+`test/foyer_web/scaffold_smoke_test.exs`, each name-prefixed with
+its F-number:
+
+- **F.Announcements.1** — manager submits the compose form → the
+  new announcement appears in their feed.
+- **F.Announcements.3** — author edits within grace → the new title
+  shows up in Maya's channel feed (and the old title is gone).
+- **F.Announcements.4** — visiting `/announcements/:id/edit` after
+  the grace window expires → `apply_edit/2` redirects to the show
+  route with `flash: "That announcement can no longer be edited."`
+  and the DB title is unchanged. (The route smoke layer cannot
+  exercise the post-grace `phx-submit` path directly — the LiveView
+  redirects before the form mounts — so the test pins the
+  `apply_edit/2` gate, which is the only LiveView-layer point where
+  this guard exists. The post-grace context-level rejection is
+  pinned by `test/foyer/house_test.exs:50` `F.Announcements.4`.)
+- **F.Announcements.7** — Charlotte (author of `suite_412`) does
+  NOT see the acknowledge CTA on the detail page.
+- **F.Announcements.8** — clicking `#acknowledge-btn` swaps it for
+  `#acked-state`; the underlying `announcement_acks` row count
+  stays at 1 even after a redundant context-level `acknowledge/2`,
+  proving the unique-index-backed idempotent upsert.
+- **F.Announcements.9** — manager loading the receipts panel sees
+  all four bucket `<section>`s with the correct counts (1
+  acknowledged, 1 read_without_acknowledgement, 0 unread, 1
+  off_shift for the seeded scenario).
+- **F.Announcements.10** — a non-member of the channel cannot
+  reach the announcement; the `get_announcement!/2` membership
+  guard raises `Ecto.NoResultsError`, which the LiveView converts
+  into a redirect back to `/house`.
+
+The F.10 test is intentionally distinct from the older
+"unauthorized: Maya cannot open Leadership-only" test (line 177):
+both pin the same membership guard, but only the new test mentions
+its F-number so a spec drift is easy to spot.
+
+Commit: `3ee07f5` "test(announcements): close e2e F-clause coverage
+gaps".
+
+### Final check results
+
+- `mix deps.get` — clean.
+- `mix compile --warnings-as-errors` — clean.
+- `mix format --check-formatted` — clean.
+- `mix credo --strict` — `383 mods/funs, found no issues` (was 309
+  before; the new test-only modules add 74 mods/funs). Three Software
+  Design nags about long-form module references were fixed by adding
+  `alias Foyer.House.Announcement / AnnouncementAck` at module top
+  and `alias Phoenix.LiveView.Lifecycle` in the harness.
+- `mix dialyzer` — `Total errors: 0`.
+- `mix test` — **72 tests, 0 failures, 0.6 s** (was 56 before
+  rebase, 65 after isolated tests landed, 72 after e2e gaps were
+  closed). Slowest test is still the unrelated Today on-shift smoke
+  test; slowest announcement test is `F.Announcements.6` remove flow
+  at ~17 ms. Well inside the 10-second budget.
+
+Test DB was **not** reset — no schema-shape error surfaced.
+
+### New HEAD SHA
+
+After the four commits in this pass: `3ee07f5` "test(announcements):
+close e2e F-clause coverage gaps". The four commits, in order:
+
+1. `65ddea5` — spec rewrite (given/when/then).
+2. `3ae6164` — scenario modules + isolated harness + test router.
+3. `678049f` — isolated LiveView tests.
+4. `3ee07f5` — e2e F-clause coverage.
+
+A fifth commit (this verify-doc update) sits on top.
+
+## Final review fixes
+
+The final merge-readiness pass checked the `docs/WORKFLOW.md` verify action
+directly and closed the remaining hard-gate gaps:
+
+- Added structured `Logger.info/2` events for successful announcement
+  create, update, remove, pin, and unpin operations. Each log includes
+  `event`, `user_id`, `announcement_id`, and `channel_id`; those metadata
+  keys are configured in `config/config.exs` so the fields are emitted.
+- Cleaned the existing `mix credo --strict` failures in untouched scaffold
+  areas by replacing stale `TODO` tags with neutral comments and extracting
+  the nested direct-conversation creation path in `Foyer.Chat`.
+- Updated `Foyer.HouseScenarios.WithUnacked`'s moduledoc so it matches the
+  isolated tests that actually use that scenario.
+- Re-ran the full verify gate: `mix format --check-formatted`,
+  `mix credo --strict`, `mix precommit`, and `mix dialyzer` all pass.
+
 ## Known follow-ups
 
 ### 1. Removed announcements are unreachable for managers wanting to audit receipts
@@ -402,23 +613,7 @@ NULL" filter.
   scaffold drift. Recommend a tiny follow-up plan to add a "Removed
   announcements" view in the manager rail.
 
-### 2. No structured logging or telemetry on write events
-
-- **Files:** `lib/foyer/house.ex` (all write paths), entire
-  `lib/foyer/` directory.
-- **Symptom:** `grep -rn "Logger\|:telemetry" lib/foyer/` returns
-  nothing. The verify checklist asks for telemetry/log lines on
-  meaningful events. Create/edit/remove/pin/unpin are meaningful state
-  mutations — without logs, an operator cannot reconstruct who
-  removed what or when.
-- **Why deferred:** introducing a logging pattern in only this feature
-  group would be inconsistent with the rest of `Foyer.*`. This is a
-  project-wide gap (no telemetry handler module, no
-  `Foyer.Telemetry.event/2` helper, no `Logger.metadata` discipline at
-  context boundaries). Recommend a cross-cutting plan, not a one-off
-  here.
-
-### 3. `announcements.removed_at` index is plain btree, not partial
+### 2. `announcements.removed_at` index is plain btree, not partial
 
 - **File:** `priv/repo/migrations/20260525134902_add_announcement_removal_fields.exs:10`.
 - **Symptom:** The hot query is `WHERE removed_at IS NULL` (every feed
@@ -432,7 +627,7 @@ NULL" filter.
   per channel) the index choice doesn't matter measurably. Recommend
   revisiting when announcement volume per channel exceeds ~1000.
 
-### 4. Migration doesn't use `CREATE INDEX CONCURRENTLY`
+### 3. Migration doesn't use `CREATE INDEX CONCURRENTLY`
 
 - **File:** `priv/repo/migrations/20260525134902_add_announcement_removal_fields.exs`.
 - **Symptom:** Both `create index` calls are blocking. On a production

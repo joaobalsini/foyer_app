@@ -75,32 +75,40 @@ defmodule Foyer.Chat do
         {:ok, Repo.preload(conversation, participants: :user)}
 
       nil ->
-        Repo.transaction(fn ->
-          {:ok, conversation} =
-            %Conversation{}
-            |> Conversation.changeset(%{
-              kind: :direct,
-              direct_key: direct_key,
-              participant_user_ids: [user_id, other_user_id]
-            })
-            |> Repo.insert()
+        create_direct_conversation(user_id, other_user_id, direct_key)
+    end
+  end
 
-          for participant_user_id <- [user_id, other_user_id] do
-            {:ok, _} =
-              %Participant{}
-              |> Participant.changeset(%{
-                conversation_id: conversation.id,
-                user_id: participant_user_id
-              })
-              |> Repo.insert()
-          end
+  defp create_direct_conversation(user_id, other_user_id, direct_key) do
+    Repo.transaction(fn ->
+      {:ok, conversation} = insert_direct_conversation(direct_key, [user_id, other_user_id])
+      insert_direct_participants!(conversation.id, [user_id, other_user_id])
+      Repo.preload(conversation, participants: :user)
+    end)
+    |> case do
+      {:ok, conversation} -> {:ok, conversation}
+      {:error, %Ecto.Changeset{} = changeset} -> {:error, changeset}
+    end
+  end
 
-          Repo.preload(conversation, participants: :user)
-        end)
-        |> case do
-          {:ok, conversation} -> {:ok, conversation}
-          {:error, %Ecto.Changeset{} = changeset} -> {:error, changeset}
-        end
+  defp insert_direct_conversation(direct_key, participant_user_ids) do
+    %Conversation{}
+    |> Conversation.changeset(%{
+      kind: :direct,
+      direct_key: direct_key,
+      participant_user_ids: participant_user_ids
+    })
+    |> Repo.insert()
+  end
+
+  defp insert_direct_participants!(conversation_id, user_ids) do
+    for user_id <- user_ids do
+      %Participant{}
+      |> Participant.changeset(%{
+        conversation_id: conversation_id,
+        user_id: user_id
+      })
+      |> Repo.insert!()
     end
   end
 

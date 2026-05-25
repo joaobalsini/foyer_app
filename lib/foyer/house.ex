@@ -14,6 +14,7 @@ defmodule Foyer.House do
   @behaviour Foyer.HousePort
 
   import Ecto.Query, warn: false
+  require Logger
 
   alias Foyer.Accounts.User
   alias Foyer.Channels.Membership
@@ -129,6 +130,7 @@ defmodule Foyer.House do
       changeset
       |> Repo.insert()
       |> preload_announcement()
+      |> log_announcement_result(:created, author)
     end
   end
 
@@ -151,6 +153,7 @@ defmodule Foyer.House do
       changeset
       |> Repo.update()
       |> preload_announcement()
+      |> log_announcement_result(:updated, editor)
     end
   end
 
@@ -169,6 +172,7 @@ defmodule Foyer.House do
       })
       |> Repo.update()
       |> preload_announcement()
+      |> log_announcement_result(:removed, remover)
     end
   end
 
@@ -176,14 +180,14 @@ defmodule Foyer.House do
   @spec pin_announcement(Announcement.t(), User.t()) ::
           {:ok, Announcement.t()} | {:error, Ecto.Changeset.t() | atom()}
   def pin_announcement(%Announcement{} = announcement, %User{} = manager) do
-    update_pin(announcement, manager, DateTime.utc_now() |> DateTime.truncate(:second))
+    update_pin(announcement, manager, DateTime.utc_now() |> DateTime.truncate(:second), :pinned)
   end
 
   @impl true
   @spec unpin_announcement(Announcement.t(), User.t()) ::
           {:ok, Announcement.t()} | {:error, Ecto.Changeset.t() | atom()}
   def unpin_announcement(%Announcement{} = announcement, %User{} = manager) do
-    update_pin(announcement, manager, nil)
+    update_pin(announcement, manager, nil, :unpinned)
   end
 
   @impl true
@@ -255,7 +259,7 @@ defmodule Foyer.House do
     |> Repo.all()
   end
 
-  defp update_pin(%Announcement{} = announcement, %User{} = manager, pinned_at) do
+  defp update_pin(%Announcement{} = announcement, %User{} = manager, pinned_at, event) do
     with :ok <- ensure_not_removed(announcement),
          :ok <- ensure_manager(manager),
          :ok <- ensure_member(announcement.channel_id, manager.id) do
@@ -263,8 +267,28 @@ defmodule Foyer.House do
       |> Announcement.changeset(%{"pinned_at" => pinned_at})
       |> Repo.update()
       |> preload_announcement()
+      |> log_announcement_result(event, manager)
     end
   end
+
+  defp log_announcement_result(
+         {:ok, %Announcement{} = announcement} = result,
+         event,
+         %User{} = actor
+       ) do
+    event_name = "announcement." <> Atom.to_string(event)
+
+    Logger.info(event_name,
+      event: event_name,
+      user_id: actor.id,
+      announcement_id: announcement.id,
+      channel_id: announcement.channel_id
+    )
+
+    result
+  end
+
+  defp log_announcement_result(other, _event, %User{}), do: other
 
   defp announcement_attrs(attrs) do
     attrs

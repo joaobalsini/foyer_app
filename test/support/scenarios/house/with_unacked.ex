@@ -6,9 +6,8 @@ defmodule Foyer.HouseScenarios.WithUnacked do
 
   Used by isolated tests that exercise:
 
-    * `F.Announcements.3` — author-within-grace edit affordance
-    * `F.Announcements.5` — pin/unpin button visibility for managers
-    * `F.Announcements.7` — required-ack list excludes the author
+    * `F.Announcements.5` — staff users do not see pin/unpin controls
+    * `F.Announcements.7` — non-authors see the required-ack CTA
     * the read/ack rendering branches of the detail page
 
   All callbacks return data shaped like the real `Foyer.House` context, but

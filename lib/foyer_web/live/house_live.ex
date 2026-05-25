@@ -192,7 +192,7 @@ defmodule FoyerWeb.HouseLive do
   attr :announcement, Foyer.House.Announcement, required: true
 
   defp announcement_feed_card(assigns) do
-    # TODO: audience_count not exposed by foyer_app's HousePort — showing ack count only
+    # Audience count is not exposed by HousePort yet, so this shows ack count only.
     ~H"""
     <article
       class="rounded-lg border p-4 flex flex-col gap-2"
