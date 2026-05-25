@@ -184,6 +184,22 @@ html, body {
   gap: 1rem;
 }
 
+@media (min-width: 768px) {
+  .foyer-scroll {
+    padding: 2.25rem;
+  }
+
+  .foyer-page-narrow {
+    width: min(100%, 42rem);
+    margin-inline: auto;
+  }
+
+  .foyer-page-wide {
+    width: min(100%, 48rem);
+    margin-inline: auto;
+  }
+}
+
 /* ---------------------------------------------------------------------------
    Bottom navigation.
    --------------------------------------------------------------------------- */
@@ -340,11 +356,51 @@ html, body {
   margin-top: 0.5rem;
 }
 
+.foyer-rail__section-rule {
+  border: 0;
+  border-top: 1px solid var(--foyer-rule);
+  margin: 0.45rem 0 0;
+}
+
 /* Rail footer (user + sign-out) */
 .foyer-rail__footer {
   margin-top: auto;
-  padding: 0.75rem 1rem 0;
+  padding: 0;
   border-top: 1px solid var(--foyer-rule);
+}
+
+.foyer-rail__profile {
+  min-height: 3.75rem;
+  background: var(--foyer-forest);
+  color: var(--foyer-cream);
+}
+
+.foyer-rail__profile .foyer-mono {
+  color: rgba(246, 241, 231, 0.72);
+}
+
+.foyer-rail__profile:hover,
+.foyer-rail__profile.is-active {
+  background: var(--foyer-forest-deep);
+  color: var(--foyer-cream);
+}
+
+.foyer-rail__sign-out {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--foyer-ink-soft);
+  text-decoration: none;
+}
+
+.foyer-rail__sign-out:hover {
+  color: var(--foyer-ink);
+  background: var(--foyer-cream-deep);
 }
 
 /* ---------------------------------------------------------------------------
@@ -381,7 +437,7 @@ html, body {
    --------------------------------------------------------------------------- */
 .foyer-flash {
   position: fixed;
-  top: 1rem;
+  top: 4.75rem;
   right: 1rem;
   z-index: 50;
   display: flex;
@@ -404,9 +460,18 @@ html, body {
 }
 
 .foyer-flash__item.is-info {
-  background: rgba(110, 138, 93, 0.12);
+  background: #eef3e8;
   border-color: rgba(110, 138, 93, 0.35);
   color: var(--foyer-forest-deep);
+}
+
+@media (max-width: 767px) {
+  .foyer-flash {
+    top: 1rem;
+    left: 1rem;
+    right: 1rem;
+    max-width: none;
+  }
 }
 
 .foyer-flash__item.is-error {

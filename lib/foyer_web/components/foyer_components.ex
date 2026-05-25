@@ -19,7 +19,7 @@ defmodule FoyerWeb.FoyerComponents do
   # Bottom navigation
   # ---------------------------------------------------------------------------
 
-  attr :active, :atom, required: true, values: [:today, :house, :chat, :me]
+  attr :active, :atom, required: true, values: [:today, :house, :chat, :me, :people, :profile]
   attr :current_scope, FoyerWeb.Scope, required: true
 
   @doc """
@@ -64,8 +64,8 @@ defmodule FoyerWeb.FoyerComponents do
         <.link
           id="bottom-nav-me"
           navigate={~p"/me"}
-          class={["foyer-bottom-nav__item", @active == :me && "is-active"]}
-          aria-current={if @active == :me, do: "page", else: nil}
+          class={["foyer-bottom-nav__item", @active in [:me, :profile] && "is-active"]}
+          aria-current={if @active in [:me, :profile], do: "page", else: nil}
         >
           <.icon name="hero-user-circle" class="size-5" />
           <span>Me</span>
@@ -110,18 +110,21 @@ defmodule FoyerWeb.FoyerComponents do
   # Desktop side-rail
   # ---------------------------------------------------------------------------
 
-  attr :active, :atom, required: true, values: [:today, :house, :chat, :me]
+  attr :active, :atom, required: true, values: [:today, :house, :chat, :me, :people, :profile]
   attr :current_scope, FoyerWeb.Scope, required: true
   attr :channels, :list, default: []
+  attr :property_name, :string, default: "The Linden · Mayfair"
 
   @doc """
   Fixed left side-rail for desktop widths (`md:+`). Hidden at mobile via CSS
   (`.foyer-rail { display: none }` below `768px`). Stable IDs for smoke tests:
   `#desktop-rail`, `#rail-nav-today`, `#rail-nav-house`, `#rail-nav-chat`,
-  `#rail-nav-me`.
+  `#rail-nav-people`.
 
-  When off-shift, House/Chat/Me render as disabled `<button>` elements matching
-  the same discipline as `bottom_nav/1`.
+  When off-shift, House/Chat/People render as disabled `<button>` elements
+  matching the same discipline as `bottom_nav/1`.
+
+  The profile chip at the bottom links to /me and is always clickable.
   """
   def desktop_rail(assigns) do
     ~H"""
@@ -129,7 +132,7 @@ defmodule FoyerWeb.FoyerComponents do
       <%!-- Wordmark --%>
       <div class="foyer-rail__header">
         <div class="foyer-serif text-xl">Foyer</div>
-        <div class="foyer-mono">{@current_scope.user.department}</div>
+        <div class="foyer-mono">{@property_name}</div>
       </div>
 
       <%!-- Primary nav --%>
@@ -149,7 +152,7 @@ defmodule FoyerWeb.FoyerComponents do
           class={["foyer-rail__item", @active == :house && "is-active"]}
           aria-current={if @active == :house, do: "page", else: nil}
         >
-          <.icon name="hero-building-library" class="size-4" /> House
+          <.icon name="hero-building-library" class="size-4" /> The House
         </.link>
         <.link
           id="rail-nav-chat"
@@ -157,15 +160,24 @@ defmodule FoyerWeb.FoyerComponents do
           class={["foyer-rail__item", @active == :chat && "is-active"]}
           aria-current={if @active == :chat, do: "page", else: nil}
         >
-          <.icon name="hero-chat-bubble-left-right" class="size-4" /> Chat
+          <span class="relative inline-flex">
+            <.icon name="hero-chat-bubble-left-right" class="size-4" />
+            <span
+              id="rail-chat-unread"
+              class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-red-500 hidden"
+              aria-hidden="true"
+            >
+            </span>
+          </span>
+          Chat
         </.link>
         <.link
-          id="rail-nav-me"
-          navigate={~p"/me"}
-          class={["foyer-rail__item", @active == :me && "is-active"]}
-          aria-current={if @active == :me, do: "page", else: nil}
+          id="rail-nav-people"
+          navigate={~p"/people"}
+          class={["foyer-rail__item", @active == :people && "is-active"]}
+          aria-current={if @active == :people, do: "page", else: nil}
         >
-          <.icon name="hero-user-circle" class="size-4" /> Me
+          <.icon name="hero-users" class="size-4" /> People
         </.link>
       <% else %>
         <button
@@ -175,7 +187,7 @@ defmodule FoyerWeb.FoyerComponents do
           aria-disabled="true"
           class="foyer-rail__item opacity-40 cursor-not-allowed"
         >
-          <.icon name="hero-building-library" class="size-4" /> House
+          <.icon name="hero-building-library" class="size-4" /> The House
         </button>
         <button
           id="rail-nav-chat"
@@ -193,7 +205,7 @@ defmodule FoyerWeb.FoyerComponents do
           aria-disabled="true"
           class="foyer-rail__item opacity-40 cursor-not-allowed"
         >
-          <.icon name="hero-user-circle" class="size-4" /> Me
+          <.icon name="hero-user-circle" class="size-4" /> Profile
         </button>
       <% end %>
 
@@ -201,6 +213,7 @@ defmodule FoyerWeb.FoyerComponents do
       <%= if @channels != [] do %>
         <div class="foyer-rail__section">
           <div class="foyer-mono">Channels</div>
+          <hr class="foyer-rail__section-rule" />
         </div>
         <.link
           :for={ch <- @channels}
@@ -208,21 +221,35 @@ defmodule FoyerWeb.FoyerComponents do
           class="foyer-rail__item pl-6"
           id={"rail-channel-#{ch.id}"}
         >
-          # {ch.name}
+          {ch.name}
         </.link>
       <% end %>
 
-      <%!-- Footer: current user + sign-out --%>
+      <%!-- Footer: profile chip + sign out --%>
       <div class="foyer-rail__footer">
-        <div class="flex items-center gap-2 mb-2">
+        <.link
+          navigate={~p"/me"}
+          id={if @current_scope.on_shift?, do: "rail-nav-me", else: "rail-profile-link"}
+          class={[
+            "foyer-rail__profile",
+            @active in [:me, :profile] && "foyer-rail__item is-active",
+            @active not in [:me, :profile] && "foyer-rail__item"
+          ]}
+          aria-current={if @active in [:me, :profile], do: "page", else: nil}
+        >
           <.avatar initials={@current_scope.user.initials} size={:sm} />
-          <div>
-            <div class="foyer-serif text-sm">{@current_scope.user.name}</div>
+          <div class="min-w-0">
+            <div class="text-sm font-semibold truncate">{@current_scope.user.name}</div>
             <div class="foyer-mono">{@current_scope.user.title}</div>
           </div>
-        </div>
-        <.link method="delete" href={~p"/session"} class="foyer-rail__item" id="rail-sign-out">
-          <.icon name="hero-arrow-right-on-rectangle" class="size-4" /> Sign out
+        </.link>
+        <.link
+          href={~p"/session"}
+          method="delete"
+          id="rail-sign-out"
+          class="foyer-rail__sign-out"
+        >
+          <.icon name="hero-arrow-left-on-rectangle" class="size-4" /> Sign out
         </.link>
       </div>
     </nav>
@@ -270,12 +297,13 @@ defmodule FoyerWeb.FoyerComponents do
   # Section label (mono eyebrow)
   # ---------------------------------------------------------------------------
 
+  attr :label, :string, default: nil
   attr :class, :string, default: nil
-  slot :inner_block, required: true
+  slot :inner_block
 
   def section_label(assigns) do
     ~H"""
-    <div class={["foyer-mono", @class]}>{render_slot(@inner_block)}</div>
+    <div class={["foyer-mono", @class]}>{@label}{render_slot(@inner_block)}</div>
     """
   end
 
@@ -286,6 +314,178 @@ defmodule FoyerWeb.FoyerComponents do
   def pulse(assigns) do
     ~H"""
     <span class="foyer-pulse" aria-hidden="true"></span>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # Status pill
+  # ---------------------------------------------------------------------------
+
+  attr :kind, :atom,
+    required: true,
+    values: [:on_shift, :off_shift, :pinned, :ack_required, :manager_only]
+
+  attr :label, :string, default: nil
+  attr :class, :string, default: ""
+
+  def status_pill(assigns) do
+    {pill_class, default_text} = status_pill_for(assigns.kind)
+    assigns = assign(assigns, pill_class: pill_class, text: assigns.label || default_text)
+
+    ~H"""
+    <span class={["foyer-tag", @pill_class, @class]} data-pill={@kind}>
+      <span
+        :if={@kind == :on_shift}
+        class="foyer-pulse"
+        aria-hidden="true"
+      >
+      </span>
+      {@text}
+    </span>
+    """
+  end
+
+  defp status_pill_for(:on_shift), do: {"moss", "On shift"}
+  defp status_pill_for(:off_shift), do: {"outline", "Off shift · notifications paused"}
+  defp status_pill_for(:pinned), do: {"claret", "Pinned"}
+  defp status_pill_for(:ack_required), do: {"outline", "Ack required"}
+  defp status_pill_for(:manager_only), do: {"forest", "Manager view only"}
+
+  # ---------------------------------------------------------------------------
+  # Editorial heading
+  # ---------------------------------------------------------------------------
+
+  attr :class, :string, default: ""
+  slot :inner_block, required: true
+
+  def editorial_heading(assigns) do
+    ~H"""
+    <h1 class={["foyer-serif text-3xl sm:text-4xl leading-tight", @class]}>
+      {render_slot(@inner_block)}
+    </h1>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # House value chip
+  # ---------------------------------------------------------------------------
+
+  @value_labels %{
+    "care" => "Care",
+    "craft" => "Craft",
+    "warmth" => "Warmth",
+    "discretion" => "Discretion",
+    "initiative" => "Initiative",
+    "excellence" => "Excellence",
+    "team" => "Team"
+  }
+
+  attr :value, :string, required: true
+  attr :selected, :boolean, default: false
+
+  def house_value_chip(assigns) do
+    assigns = assign(assigns, :label, Map.get(@value_labels, assigns.value, assigns.value))
+
+    ~H"""
+    <span
+      data-value={@value}
+      class={[
+        "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border",
+        @selected && "bg-[var(--foyer-forest)] text-[var(--foyer-cream)] border-[var(--foyer-forest)]",
+        !@selected && "bg-transparent border-[var(--foyer-rule)]"
+      ]}
+    >
+      {@label}
+    </span>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # Desktop topbar
+  # ---------------------------------------------------------------------------
+
+  attr :current_scope, FoyerWeb.Scope, required: true
+  attr :page_title, :string, default: nil
+
+  @doc """
+  Sticky topbar rendered above the main content pane on desktop (`md:+`).
+  Shows the current page title on the left and a "+ New" dropdown on the right.
+  The dropdown exposes: New chat · New announcement (managers only) · Give recognition.
+
+  Stable IDs: `#desktop-topbar`, `#new-menu`, `#new-menu-trigger`, `#new-menu-panel`.
+  """
+  def desktop_topbar(assigns) do
+    ~H"""
+    <header
+      id="desktop-topbar"
+      class="hidden md:flex items-center justify-between gap-4 px-6 py-3 border-b foyer-rail__header sticky top-0 z-20"
+    >
+      <div class="foyer-serif text-lg truncate">
+        {@page_title || ""}
+      </div>
+
+      <details
+        id="new-menu"
+        class="relative [&_summary::-webkit-details-marker]:hidden marker:hidden group"
+      >
+        <summary
+          id="new-menu-trigger"
+          class="foyer-btn sm cursor-pointer list-none inline-flex items-center gap-1 select-none"
+        >
+          <.icon name="hero-plus" class="size-4" /> New
+        </summary>
+        <div
+          id="new-menu-panel"
+          class="absolute right-0 mt-2 w-64 rounded-lg border p-2 z-30 shadow-xl"
+          style="background: var(--foyer-cream-deep); border-color: var(--foyer-rule);"
+        >
+          <.new_menu_item
+            to={~p"/chat/new"}
+            icon="hero-chat-bubble-left-right"
+            action="chat"
+            title="New chat"
+            description="Direct or group thread."
+          />
+          <.new_menu_item
+            :if={manager?(@current_scope)}
+            to={~p"/announcements/new"}
+            icon="hero-megaphone"
+            action="announcement"
+            title="New announcement"
+            description="Reach the team in The House."
+          />
+          <.new_menu_item
+            to={~p"/recognitions/new"}
+            icon="hero-sparkles"
+            action="recognition"
+            title="Give recognition"
+            description="Shout out a colleague."
+          />
+        </div>
+      </details>
+    </header>
+    """
+  end
+
+  attr :to, :string, required: true
+  attr :icon, :string, required: true
+  attr :action, :string, required: true
+  attr :title, :string, required: true
+  attr :description, :string, required: true
+
+  defp new_menu_item(assigns) do
+    ~H"""
+    <.link
+      navigate={@to}
+      data-new-action={@action}
+      class="flex items-start gap-3 p-3 rounded-md hover:bg-[var(--foyer-cream)] transition"
+    >
+      <.icon name={@icon} class="size-5 mt-0.5 shrink-0" />
+      <div class="min-w-0">
+        <div class="text-sm foyer-serif">{@title}</div>
+        <div class="text-xs foyer-mono">{@description}</div>
+      </div>
+    </.link>
     """
   end
 
@@ -342,19 +542,31 @@ defmodule FoyerWeb.FoyerComponents do
   def recognition_card(assigns) do
     ~H"""
     <article
-      class="rounded-lg border p-3 flex flex-col gap-2"
+      class="rounded-lg border p-5 flex flex-col gap-3 bg-[color-mix(in_srgb,var(--foyer-cream)_90%,white)]"
       style="border-color: var(--foyer-rule);"
+      id={"rec-card-#{@recognition.id}"}
+      data-rec-id={@recognition.id}
     >
-      <div class="foyer-mono">
-        Recognition for {@recognition.recipient && @recognition.recipient.name}
+      <div class="flex items-center gap-2 flex-wrap" data-values>
+        <.house_value_chip :for={v <- @recognition.values || []} value={v} selected />
+        <span :if={@recognition.public == false} class="foyer-mono">Private</span>
       </div>
-      <p class="foyer-serif text-lg">{@recognition.body}</p>
-      <div class="flex items-center gap-2 text-sm">
-        <.avatar :if={@recognition.sender} initials={@recognition.sender.initials} size={:sm} />
-        <span>{@recognition.sender && @recognition.sender.name}</span>
-        <%= if @recognition.bonus_points && @recognition.bonus_points > 0 do %>
-          <span class="foyer-tag forest ml-auto">+{@recognition.bonus_points} pts</span>
-        <% end %>
+
+      <p class="foyer-serif text-lg leading-snug italic">"{@recognition.body}"</p>
+
+      <div class="flex items-center justify-between text-sm gap-2">
+        <div class="flex items-center gap-2">
+          <.avatar :if={@recognition.sender} initials={@recognition.sender.initials} size={:sm} />
+          <span>{@recognition.sender && @recognition.sender.name}</span>
+          <span aria-hidden="true">→</span>
+          <span class="foyer-serif">{@recognition.recipient && @recognition.recipient.name}</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <%= if @recognition.bonus_points && @recognition.bonus_points > 0 do %>
+            <span class="foyer-tag claret" data-bonus>+{@recognition.bonus_points} pts</span>
+          <% end %>
+          <span class="text-xs text-stone-500">{relative_day(@recognition.inserted_at)}</span>
+        </div>
       </div>
     </article>
     """
@@ -429,20 +641,25 @@ defmodule FoyerWeb.FoyerComponents do
   attr :current_user_id, :integer, required: true
 
   def message_bubble(assigns) do
+    mine = assigns.message.author_id == assigns.current_user_id
+    assigns = assign(assigns, :mine, mine)
+
     ~H"""
-    <div class={[
-      "flex",
-      @message.author_id == @current_user_id && "justify-end"
-    ]}>
+    <div class={["flex gap-2", @mine && "justify-end"]} data-message-mine={@mine}>
       <div class={[
-        "rounded-lg px-3 py-2 max-w-[80%] text-sm",
-        @message.author_id == @current_user_id && "bg-[var(--foyer-forest)] text-[var(--foyer-cream)]",
-        @message.author_id != @current_user_id && "bg-[var(--foyer-cream-deep)]"
+        "rounded-2xl px-4 py-2 max-w-[78%] text-sm leading-relaxed",
+        @mine && "bg-[var(--foyer-forest)] text-[var(--foyer-cream)]",
+        !@mine && "bg-[var(--foyer-cream-deep)]"
       ]}>
-        <%= if @message.author && @message.author_id != @current_user_id do %>
-          <div class="foyer-mono mb-1">{@message.author.name}</div>
+        <%= if @message.author && !@mine do %>
+          <div class="foyer-mono mb-0.5">{@message.author.name}</div>
         <% end %>
-        {@message.body}
+        <p>{@message.body}</p>
+        <div class="text-[10px] opacity-70 mt-1 text-right">
+          {format_time(@message.inserted_at)}{if @mine and Map.get(@message, :read, false),
+            do: " · Read",
+            else: ""}
+        </div>
       </div>
     </div>
     """
@@ -523,6 +740,88 @@ defmodule FoyerWeb.FoyerComponents do
       </div>
     </div>
     """
+  end
+
+  # ---------------------------------------------------------------------------
+  # Colleague row
+  # ---------------------------------------------------------------------------
+
+  attr :user, Foyer.Accounts.User, required: true
+  attr :subtitle, :string, default: nil
+  attr :action, :string, default: nil
+  attr :action_href, :string, default: nil
+  attr :action_event, :string, default: nil
+  attr :action_value, :any, default: nil
+
+  def colleague_row(assigns) do
+    ~H"""
+    <div
+      class="flex items-center justify-between gap-3 p-3 rounded-lg hover:bg-[var(--foyer-cream-deep)]"
+      data-colleague-id={@user.id}
+      data-shift={if(Map.get(@user, :on_shift, false), do: "on_shift", else: "off_shift")}
+    >
+      <div class="flex items-center gap-3 min-w-0">
+        <.avatar initials={@user.initials} />
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <span class="foyer-serif truncate">{@user.name}</span>
+            <.status_pill
+              :if={Map.get(@user, :on_shift, false)}
+              kind={:on_shift}
+              label="On shift"
+              class="text-[10px]"
+            />
+          </div>
+          <div class="foyer-mono truncate">{@subtitle || @user.title}</div>
+        </div>
+      </div>
+      <button
+        :if={@action && @action_event}
+        type="button"
+        phx-click={@action_event}
+        phx-value-user_id={@action_value}
+        class="foyer-btn sm shrink-0"
+        data-colleague-action
+      >
+        {@action}
+      </button>
+      <.link
+        :if={@action && is_nil(@action_event)}
+        navigate={@action_href}
+        class="foyer-btn ghost sm"
+        data-colleague-action
+      >
+        {@action}
+      </.link>
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # Format helpers
+  # ---------------------------------------------------------------------------
+
+  @spec format_time(DateTime.t() | nil) :: String.t()
+  def format_time(nil), do: ""
+
+  def format_time(%DateTime{} = dt) do
+    "#{pad(dt.hour)}:#{pad(dt.minute)}"
+  end
+
+  defp pad(n) when n < 10, do: "0#{n}"
+  defp pad(n), do: "#{n}"
+
+  defp relative_day(nil), do: ""
+
+  defp relative_day(%DateTime{} = dt) do
+    today = Date.utc_today()
+    date = DateTime.to_date(dt)
+
+    case Date.diff(today, date) do
+      0 -> "Today"
+      1 -> "Yesterday"
+      _ -> Calendar.strftime(date, "%a %-d %b")
+    end
   end
 
   # ---------------------------------------------------------------------------

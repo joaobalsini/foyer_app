@@ -22,6 +22,11 @@ defmodule FoyerWeb.RecognitionsLive do
      |> assign(:preview_recipient_name, "")
      |> assign(:preview_body, "")
      |> assign(:preview_values, [])
+     |> assign(:preview_bonus_points, nil)
+     |> assign(:sent?, false)
+     |> assign(:sent_recognition, nil)
+     |> assign(:grace_state, :open)
+     |> assign(:grace_deadline_ms, nil)
      |> stream_configure(:recognitions, dom_id: &"recognition-#{&1.id}")
      |> stream(:recognitions, [])
      |> assign(:page_title, "Recognitions")}
@@ -50,8 +55,16 @@ defmodule FoyerWeb.RecognitionsLive do
     {:noreply,
      socket
      |> assign(:recognition, nil)
+     |> assign(:sent?, false)
+     |> assign(:sent_recognition, nil)
+     |> assign(:grace_state, :open)
+     |> assign(:grace_deadline_ms, nil)
      |> assign(:people, FoyerWeb.LiveDeps.accounts().list_people([]))
      |> assign(:form, to_form(FoyerWeb.LiveDeps.recognitions().compose_changeset(%{})))
+     |> assign(:preview_recipient_name, "")
+     |> assign(:preview_body, "")
+     |> assign(:preview_values, [])
+     |> assign(:preview_bonus_points, nil)
      |> assign(:page_title, "Give recognition")}
   end
 
@@ -100,14 +113,29 @@ defmodule FoyerWeb.RecognitionsLive do
     scope = socket.assigns.current_scope
 
     case FoyerWeb.LiveDeps.recognitions().give(scope.user, attrs) do
-      {:ok, _recognition} ->
-        {:noreply, push_navigate(socket, to: ~p"/recognitions")}
+      {:ok, recognition} ->
+        recipient_name =
+          socket.assigns.people
+          |> Enum.find(fn p -> p.id == recognition.recipient_id end)
+          |> case do
+            %{name: name} -> name
+            _ -> ""
+          end
+
+        {:noreply,
+         socket
+         |> assign(:sent?, true)
+         |> assign(:sent_recognition, recognition)
+         |> assign(:grace_state, :open)
+         |> assign(:grace_deadline_ms, nil)
+         |> assign(:preview_recipient_name, recipient_name)}
 
       {:error, :not_implemented} ->
         {:noreply,
          socket
-         |> put_flash(:info, "Recognition send is not implemented in scaffold.")
-         |> push_navigate(to: ~p"/recognitions")}
+         |> assign(:sent?, true)
+         |> assign(:sent_recognition, nil)
+         |> assign(:grace_state, :expired)}
 
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "Couldn't send recognition.")}
@@ -150,11 +178,41 @@ defmodule FoyerWeb.RecognitionsLive do
           ""
       end
 
+    bonus_points =
+      case Map.get(attrs, "bonus_points") do
+        nil -> nil
+        "" -> nil
+        v -> elem(Integer.parse(v), 0)
+      end
+
     {:noreply,
      socket
      |> assign(:preview_recipient_name, recipient_name)
      |> assign(:preview_body, Map.get(attrs, "body", ""))
-     |> assign(:preview_values, Map.get(attrs, "values", []))}
+     |> assign(:preview_values, Map.get(attrs, "values", []))
+     |> assign(:preview_bonus_points, bonus_points)}
+  end
+
+  def handle_event("set_bonus", %{"bonus" => "clear"}, socket) do
+    {:noreply, assign(socket, :preview_bonus_points, nil)}
+  end
+
+  def handle_event("set_bonus", %{"bonus" => bonus}, socket) do
+    {:noreply, assign(socket, :preview_bonus_points, String.to_integer(bonus))}
+  end
+
+  def handle_event("new_recognition", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:sent?, false)
+     |> assign(:sent_recognition, nil)
+     |> assign(:grace_state, :open)
+     |> assign(:grace_deadline_ms, nil)
+     |> assign(:preview_recipient_name, "")
+     |> assign(:preview_body, "")
+     |> assign(:preview_values, [])
+     |> assign(:preview_bonus_points, nil)
+     |> assign(:form, to_form(FoyerWeb.LiveDeps.recognitions().compose_changeset(%{})))}
   end
 
   @impl true
@@ -165,12 +223,15 @@ defmodule FoyerWeb.RecognitionsLive do
         <FoyerComponents.desktop_rail active={:house} current_scope={@current_scope} />
         <div class="foyer-content">
           <div class="foyer-scroll" id="recognitions">
+            <FoyerComponents.desktop_topbar current_scope={@current_scope} page_title={@page_title} />
             <%= cond do %>
               <% @live_action == :index -> %>
                 <header class="flex items-start justify-between">
                   <div>
                     <div class="foyer-mono">Recognition</div>
-                    <h1 class="foyer-serif text-3xl">Recognitions</h1>
+                    <FoyerComponents.editorial_heading>
+                      Recognitions
+                    </FoyerComponents.editorial_heading>
                   </div>
                   <.link
                     navigate={~p"/recognitions/new"}
@@ -239,7 +300,9 @@ defmodule FoyerWeb.RecognitionsLive do
                 >
                   <.icon name="hero-arrow-left" class="size-4" /> Back
                 </.link>
-                <h1 class="foyer-serif text-3xl">Edit recognition</h1>
+                <FoyerComponents.editorial_heading>
+                  Edit recognition
+                </FoyerComponents.editorial_heading>
                 <.form
                   for={@form}
                   id="recognition-edit-form"
@@ -258,127 +321,283 @@ defmodule FoyerWeb.RecognitionsLive do
                     Save changes
                   </button>
                 </.form>
-              <% @live_action == :new -> %>
-                <header class="flex items-start justify-between">
-                  <div>
-                    <div class="foyer-mono">Recognition</div>
-                    <h1 class="foyer-serif text-3xl">Give recognition</h1>
+              <% @live_action == :new and @sent? -> %>
+                <%!-- Sent / grace-window state --%>
+                <div
+                  id="post-send"
+                  class="card-parchment p-6 space-y-3 border-l-4 border-[color:var(--foyer-forest)]"
+                >
+                  <%!-- TODO: wire JS GraceCountdown hook once context exposes inserted_at --%>
+                  <FoyerComponents.editorial_heading>
+                    Recognition sent.
+                  </FoyerComponents.editorial_heading>
+                  <p class="text-sm text-stone-600">
+                    Recognition for <span class="font-medium">{@preview_recipient_name}</span>
+                    <span :if={
+                      (Scope.manager?(@current_scope) and
+                         @preview_bonus_points) && @preview_bonus_points > 0
+                    }>
+                      {" · #{@preview_bonus_points} Foyer points"}
+                    </span>
+                    — delivered.
+                  </p>
+                  <p
+                    :if={@grace_state == :open}
+                    id="grace-countdown"
+                    class="text-xs text-stone-500 italic"
+                  >
+                    60s to edit or remove.
+                  </p>
+                  <p
+                    :if={@grace_state == :expired}
+                    data-grace-expired
+                    class="text-xs text-stone-500 italic"
+                  >
+                    Edit window closed.
+                  </p>
+                  <div :if={@grace_state == :open} class="flex gap-2 pt-2">
+                    <.link
+                      :if={@sent_recognition}
+                      navigate={~p"/recognitions/#{@sent_recognition.id}/edit"}
+                      class="foyer-btn sm"
+                      id="edit-recognition"
+                    >
+                      Edit
+                    </.link>
+                    <button
+                      :if={@sent_recognition}
+                      type="button"
+                      class="foyer-btn ghost sm"
+                      id="remove-recognition"
+                      disabled
+                    >
+                      Remove
+                    </button>
+                    <.link navigate={~p"/recognitions"} class="foyer-btn ghost sm">
+                      See it in the feed
+                    </.link>
                   </div>
-                </header>
-
-                <div class="foyer-content-cols">
+                  <div :if={@grace_state == :expired} class="flex gap-2 pt-2">
+                    <p class="text-xs text-stone-500 italic">Edit window closed.</p>
+                    <button
+                      type="button"
+                      phx-click="new_recognition"
+                      class="foyer-btn ghost sm"
+                    >
+                      + Another
+                    </button>
+                  </div>
+                </div>
+              <% @live_action == :new -> %>
+                <div class="space-y-4">
                   <div>
-                    <.form
-                      for={@form}
+                    <FoyerComponents.editorial_heading>
+                      Give recognition
+                    </FoyerComponents.editorial_heading>
+                    <p class="text-sm text-stone-500 mt-2">
+                      Shout-out a colleague. Write it like you'd tell it at staff dinner. Specific moments land.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="grid lg:grid-cols-[1fr_360px] gap-8 mt-6" id="recognition-form-root">
+                  <div class="space-y-6">
+                    <form
                       id="recognize-form"
                       phx-submit="give_submit"
                       phx-change="preview_change"
-                      class="flex flex-col gap-3"
+                      class="space-y-5"
                     >
-                      <.input
-                        field={@form[:recipient_id]}
-                        type="select"
-                        label="To"
-                        options={Enum.map(@people, &{&1.name, &1.id})}
-                        prompt="Pick a colleague"
-                      />
-                      <.input field={@form[:body]} type="textarea" label="The story" />
+                      <input type="hidden" name="recognition[_unused]" value="" />
 
-                      <fieldset class="foyer-fieldset">
-                        <legend class="foyer-fieldset__label">House values</legend>
-                        <div class="flex flex-wrap gap-2 mt-1">
+                      <div>
+                        <FoyerComponents.section_label label="Recipient" class="block mb-1" />
+                        <select
+                          name="recognition[recipient_id]"
+                          id="recognition-recipient"
+                          class="w-full px-3 py-2 rounded-lg border border-stone-300 bg-[color:var(--foyer-cream-deep)] text-sm"
+                        >
+                          <option value="">— Select a colleague —</option>
+                          <option :for={p <- @people} value={p.id}>
+                            {p.name}
+                          </option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <FoyerComponents.section_label label="House values" class="block mb-2" />
+                        <div class="flex flex-wrap gap-2" id="house-values">
+                          <input type="hidden" name="recognition[values][]" value="" />
                           <label
                             :for={v <- @house_values}
-                            class="foyer-tag outline cursor-pointer"
+                            id={"house-value-chip-#{v}"}
+                            class={[
+                              "px-3 py-1 rounded-full text-xs font-medium border transition cursor-pointer select-none",
+                              v in @preview_values &&
+                                "bg-[var(--foyer-forest)] text-[var(--foyer-cream)] border-[var(--foyer-forest)]",
+                              v not in @preview_values &&
+                                "bg-transparent text-stone-700 border-stone-300"
+                            ]}
                           >
                             <input
                               type="checkbox"
                               name="recognition[values][]"
                               value={v}
-                              class="mr-1"
-                              id={"value-#{v}"}
+                              checked={v in @preview_values}
+                              class="sr-only"
                             />
                             {String.capitalize(v)}
                           </label>
                         </div>
-                      </fieldset>
+                        <p class="text-xs text-stone-500 mt-1 italic">Pick one or more.</p>
+                      </div>
 
-                      <fieldset class="foyer-fieldset">
-                        <legend class="foyer-fieldset__label">Visibility</legend>
-                        <label class="flex items-center gap-2">
+                      <div>
+                        <FoyerComponents.section_label label="The story" class="block mb-1" />
+                        <textarea
+                          name="recognition[body]"
+                          id="recognition-body"
+                          rows="6"
+                          placeholder="Stayed past 23:00 fixing the Garden Suite shower so the Yamada family could enjoy it on arrival…"
+                          class="w-full px-4 py-3 rounded-lg border border-stone-300 bg-[color:var(--foyer-cream-deep)] text-sm leading-relaxed"
+                        >{@preview_body}</textarea>
+                      </div>
+
+                      <fieldset class="space-y-2">
+                        <legend class="foyer-mono">Visibility</legend>
+                        <label class="flex items-start gap-2 text-sm">
                           <input
                             type="radio"
                             name="recognition[public]"
                             value="true"
                             checked
                             id="visibility-public"
+                            class="mt-1"
                           />
-                          <span>Public — visible on the House feed</span>
+                          <div>
+                            <div class="font-medium">Public</div>
+                            <div class="text-xs text-stone-500">Posted in The House.</div>
+                          </div>
                         </label>
-                        <label class="flex items-center gap-2">
+                        <label class="flex items-start gap-2 text-sm">
                           <input
                             type="radio"
                             name="recognition[public]"
                             value="false"
                             id="visibility-private"
+                            class="mt-1"
                           />
-                          <span>Private — just to the recipient</span>
+                          <div>
+                            <div class="font-medium">Private</div>
+                            <div class="text-xs text-stone-500">Only the recipient sees it.</div>
+                          </div>
                         </label>
                       </fieldset>
 
-                      <%= if Scope.manager?(@current_scope) do %>
-                        <fieldset class="foyer-fieldset" id="bonus-points-fieldset">
-                          <legend class="foyer-fieldset__label">Bonus points</legend>
-                          <div class="flex gap-2 mt-1" id="bonus-tiers">
-                            <label
-                              :for={pts <- [0, 10, 25, 50, 100]}
-                              class="foyer-btn sm cursor-pointer"
-                            >
-                              <input
-                                type="radio"
-                                name="recognition[bonus_points]"
-                                value={pts}
-                                class="mr-1"
-                                id={"bonus-#{pts}"}
-                              /> +{pts}
-                            </label>
-                          </div>
-                        </fieldset>
-                      <% end %>
+                      <fieldset
+                        :if={Scope.manager?(@current_scope)}
+                        id="bonus-points"
+                        class="card-parchment p-4 space-y-3"
+                      >
+                        <legend class="foyer-mono">Bonus points</legend>
+                        <p class="text-xs text-stone-500">
+                          Foyer points roll up to staff rewards — time off, meals, charitable donations.
+                        </p>
+                        <div class="flex gap-2 flex-wrap">
+                          <button
+                            :for={tier <- [25, 50, 100]}
+                            type="button"
+                            phx-click="set_bonus"
+                            phx-value-bonus={tier}
+                            data-bonus-tier={tier}
+                            class={[
+                              "px-3 py-1 rounded-full text-sm font-medium border",
+                              @preview_bonus_points == tier &&
+                                "bg-[var(--foyer-forest)] text-[var(--foyer-cream)] border-[var(--foyer-forest)]",
+                              @preview_bonus_points != tier &&
+                                "bg-transparent text-stone-700 border-stone-300"
+                            ]}
+                          >
+                            +{tier}
+                          </button>
+                          <input
+                            type="hidden"
+                            name="recognition[bonus_points]"
+                            value={@preview_bonus_points || 0}
+                          />
+                          <button
+                            :if={@preview_bonus_points}
+                            type="button"
+                            phx-click="set_bonus"
+                            phx-value-bonus="clear"
+                            class="text-xs text-stone-500 underline"
+                          >
+                            clear
+                          </button>
+                        </div>
+                      </fieldset>
 
-                      <button class="foyer-btn forest" type="submit" id="recognize-submit">
-                        Send recognition
-                      </button>
-                    </.form>
+                      <p
+                        :if={not Scope.manager?(@current_scope)}
+                        id="staff-bonus-note"
+                        class="text-xs text-stone-500 italic card-parchment p-3"
+                      >
+                        Recognition with bonus points is given by department heads. Your shout-out still lands on their phone and shows in The House.
+                      </p>
+
+                      <div class="flex gap-2 pt-4 border-t border-stone-200/70">
+                        <button type="submit" class="foyer-btn forest" id="recognize-submit">
+                          Send recognition
+                        </button>
+                        <.link navigate={~p"/recognitions"} class="foyer-btn ghost sm">
+                          Cancel
+                        </.link>
+                      </div>
+                    </form>
                   </div>
 
-                  <div class="hidden lg:block" id="recognition-preview-col">
-                    <div class="foyer-mono mb-2">Preview</div>
-                    <article
-                      class="rounded-lg border p-3 flex flex-col gap-2"
-                      style="border-color: var(--foyer-rule);"
-                    >
-                      <div class="foyer-mono">
-                        For {if @preview_recipient_name != "",
-                          do: @preview_recipient_name,
-                          else: "…"}
-                      </div>
-                      <p class="foyer-serif text-lg">
-                        {if @preview_body != "",
-                          do: @preview_body,
-                          else: "Your story will appear here…"}
-                      </p>
-                      <div class="flex flex-wrap gap-1">
-                        <span
+                  <aside id="recognition-preview" class="lg:sticky lg:top-6 self-start space-y-3">
+                    <FoyerComponents.section_label label="Preview · The House feed" />
+                    <article class="card-parchment p-5 space-y-3 max-w-[360px]">
+                      <div class="flex flex-wrap gap-1.5" data-preview-values>
+                        <FoyerComponents.house_value_chip
                           :for={v <- @preview_values}
-                          class="foyer-tag outline"
-                          id={"preview-value-#{v}"}
+                          value={v}
+                          selected
+                        />
+                        <span :if={@preview_values == []} class="text-xs text-stone-400 italic">
+                          Add values…
+                        </span>
+                      </div>
+                      <p class="foyer-serif text-base italic leading-snug">
+                        "{if @preview_body == "", do: "Tell the story…", else: @preview_body}"
+                      </p>
+                      <div class="flex items-center justify-between text-xs text-stone-500 pt-1">
+                        <div class="flex items-center gap-2">
+                          <FoyerComponents.avatar
+                            initials={@current_scope.user.initials}
+                            size={:sm}
+                          />
+                          <span>{@current_scope.user.name}</span>
+                          <span>→</span>
+                          <span class="font-medium text-stone-700">
+                            {if @preview_recipient_name == "",
+                              do: "…",
+                              else: @preview_recipient_name}
+                          </span>
+                        </div>
+                        <span
+                          :if={
+                            (Scope.manager?(@current_scope) and
+                               @preview_bonus_points) && @preview_bonus_points > 0
+                          }
+                          class="foyer-tag forest"
                         >
-                          {String.capitalize(v)}
+                          +{@preview_bonus_points} pts
                         </span>
                       </div>
                     </article>
-                  </div>
+                  </aside>
                 </div>
             <% end %>
 

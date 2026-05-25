@@ -18,4 +18,5 @@ Spec clauses live in the per-feature-group folders that follow (`docs/feature-gr
 Tests written from this plan should not reference `F.Scaffold.N` numbers — they should be tagged as
 infrastructure / smoke tests instead.
 
-See [`plans/01-mobile-ui-scaffold.md`](plans/01-mobile-ui-scaffold.md) for the concrete plan.
+See [`plans/01-mobile-ui-scaffold.md`](plans/01-mobile-ui-scaffold.md) for the mobile scaffold plan and
+[`plans/02-desktop-ui-scaffold.md`](plans/02-desktop-ui-scaffold.md) for the desktop layout plan that extends it.

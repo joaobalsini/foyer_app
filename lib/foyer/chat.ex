@@ -65,6 +65,46 @@ defmodule Foyer.Chat do
   end
 
   @impl true
+  @spec get_or_create_direct_conversation(User.t(), User.t()) ::
+          {:ok, Conversation.t()} | {:error, Ecto.Changeset.t()}
+  def get_or_create_direct_conversation(%User{id: user_id}, %User{id: other_user_id}) do
+    direct_key = Conversation.direct_key([user_id, other_user_id])
+
+    case Repo.get_by(Conversation, direct_key: direct_key) do
+      %Conversation{} = conversation ->
+        {:ok, Repo.preload(conversation, participants: :user)}
+
+      nil ->
+        Repo.transaction(fn ->
+          {:ok, conversation} =
+            %Conversation{}
+            |> Conversation.changeset(%{
+              kind: :direct,
+              direct_key: direct_key,
+              participant_user_ids: [user_id, other_user_id]
+            })
+            |> Repo.insert()
+
+          for participant_user_id <- [user_id, other_user_id] do
+            {:ok, _} =
+              %Participant{}
+              |> Participant.changeset(%{
+                conversation_id: conversation.id,
+                user_id: participant_user_id
+              })
+              |> Repo.insert()
+          end
+
+          Repo.preload(conversation, participants: :user)
+        end)
+        |> case do
+          {:ok, conversation} -> {:ok, conversation}
+          {:error, %Ecto.Changeset{} = changeset} -> {:error, changeset}
+        end
+    end
+  end
+
+  @impl true
   @spec list_messages(Conversation.t()) :: [Message.t()]
   def list_messages(%Conversation{id: conv_id}) do
     from(m in Message,
