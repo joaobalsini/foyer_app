@@ -102,17 +102,15 @@ defmodule FoyerWeb.DesktopSmokeTest do
   end
 
   describe "compose render-only gate" do
-    test "staff visiting /announcements/new sees gated view, NO form", ctx do
+    test "staff visiting /announcements/new is redirected, no form renders", ctx do
       conn = sign_in(ctx.conn, ctx.maya)
-      {:ok, view, _html} = live(conn, ~p"/announcements/new")
 
-      # Maya is staff. The gated view must be present and the compose form
-      # must be entirely absent from the DOM — not just hidden by CSS, but
-      # not rendered. A future regression that hides the form via CSS only
-      # would let a hand-crafted phx-submit reach handle_event/3.
-      assert has_element?(view, "#compose-gated")
-      refute has_element?(view, "#announcement-new-form")
-      refute has_element?(view, "button[type='submit']")
+      # Maya is staff. The Announcements feature group (F.Announcements.2)
+      # redirects staff at apply_new/1 with a flash — the form is never
+      # rendered. A hand-crafted phx-submit cannot reach handle_event/3
+      # because the LiveView is never mounted in the show state.
+      assert {:error, {:live_redirect, %{to: "/house"}}} =
+               live(conn, ~p"/announcements/new")
     end
 
     test "manager visiting /announcements/new sees the form", ctx do

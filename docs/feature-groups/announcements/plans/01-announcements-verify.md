@@ -311,6 +311,77 @@ NULL" filter.
 - **Change:** rewrote each moduledoc to describe the live behaviour and
   point at the `F.Announcements.<N>` clauses each module covers.
 
+## Rebase
+
+**Verdict after rebase: Pass.**
+
+- **Rebase target:** `origin/main` at `49cd39b` ("desktop version").
+- **New HEAD:** `bd27e55` (the four feature commits — `8dd17c1`, `2e63c03`,
+  `ea4a801`, `bd27e55` — replayed in order on top of `49cd39b`).
+- **Conflicts hit on the first commit (`98a6668` → `8dd17c1`):**
+  - `lib/foyer/house.ex` — one hunk in `get_announcement!/2`. Desktop tightened
+    the preload to `[:author, :channel, :reads, acks: :user]` so the
+    read-receipts panel can render ack initials without an N+1; feature added
+    `where: is_nil(a.removed_at)` for soft-removal semantics
+    (`F.Announcements.6`). **Resolved by keeping both** — the tightest preload
+    that satisfies the desktop ack-badge call site PLUS the removed-at filter.
+    Moduledoc kept from the feature side (the desktop moduledoc described a
+    stub that no longer exists). All other feature-side changes
+    (`ensure_available_member/2`, the `receipts_for/2` bucket helper, the
+    `%{integer() => true}` lookup-map id-set helpers with explicit `@spec`s)
+    sit in regions untouched by desktop and survived auto-merge unchanged.
+  - `lib/foyer_web/live/announcement_live.ex` — four hunks.
+    1. `mount/3` assigns: kept both desktop's `:preview_title`/`:preview_body`
+       and feature's `:can_ack?`/`:can_pin?`/`:receipts`.
+    2. `apply_edit/2`: kept feature's `managed_by?`+`within_grace_window?`
+       guard *and* added the desktop preview-field assigns inside the
+       success branch.
+    3. The render template (the largest hunk): rebuilt as desktop's shell
+       (`Layouts.app` + `desktop_rail/1` + `foyer-content-cols`) wrapping
+       the feature behaviour — `:new` keeps desktop's staff-gated div +
+       preview column but adds the feature's `requires_ack` checkbox;
+       `:edit` keeps the preview column and adds the `requires_ack`
+       checkbox; `:show` puts the feature's pin/unpin/remove buttons,
+       `can_ack?` gating and `requires_ack` tag inside the article (left
+       column) and adds the feature's full `<.receipt_group>` breakdown to
+       the desktop read-receipts right column (so both desktop's ack
+       badges and the feature's bucketed groups render side-by-side).
+    4. Trailing helpers: kept both `ack_initials/1` (desktop) and the
+       `receipt_group/1` private component + its `attr` declarations
+       (feature).
+- **Post-merge fix-up:** auto-merge placed `defp update_pin_state/3`
+  between two `def handle_event/3` clauses, which `--warnings-as-errors`
+  flagged as ungrouped clauses. Moved `update_pin_state/3` below the last
+  `handle_event/3` clause so all `handle_event/3` heads sit contiguously.
+- **Test collision (desktop test of pre-feature placeholder):** the
+  desktop pass added `test/foyer_web/desktop_smoke_test.exs` "staff
+  visiting /announcements/new sees gated view, NO form", which asserted
+  the **render-only** placeholder gate that existed before the
+  Announcements feature group landed. The feature group implements
+  `F.Announcements.2` as a **redirect** in `apply_new/1` (already pinned
+  by `test/foyer_web/scaffold_smoke_test.exs` "F.Announcements.2 staff
+  visiting /announcements/new is redirected..."). The desktop test was
+  pinning superseded behaviour; rewrote it to assert the redirect (same
+  intent — "no form must render for staff" — with the assertion now
+  matching the spec-compliant implementation). The companion "manager
+  visiting /announcements/new sees the form" test was unaffected.
+- **No further conflicts** on the three verify commits (`c9d0e8e` →
+  `2e63c03`, `e3f8cb5` → `ea4a801`, `bbd0500` → `bd27e55`).
+
+### Post-rebase checks
+
+- `mix deps.get` — all dependencies fetched, no version drift.
+- `mix compile --warnings-as-errors` — clean (2 files recompiled).
+- `mix format --check-formatted` — clean.
+- `mix credo --strict` — `309 mods/funs, found no issues`.
+- `mix dialyzer` — `Total errors: 0` (PLT already up to date for OTP 28 /
+  Elixir 1.19).
+- `mix test` — 56 tests, 0 failures, 0.7 s. Test DB was **not** reset; no
+  schema-shape error surfaced. The `removed_at`/`removed_by_id` columns
+  introduced by `20260525134902_add_announcement_removal_fields.exs`
+  were already present in `foyer_test` from the pre-rebase verify pass,
+  so the migration was a no-op at test time.
+
 ## Known follow-ups
 
 ### 1. Removed announcements are unreachable for managers wanting to audit receipts
