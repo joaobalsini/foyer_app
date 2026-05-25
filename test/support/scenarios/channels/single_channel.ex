@@ -18,4 +18,10 @@ defmodule Foyer.ChannelsScenarios.SingleChannel do
 
   @impl true
   def get!(_id), do: Fixtures.channel()
+
+  @impl true
+  def member?(_user, _channel), do: true
+
+  @impl true
+  def member_count(_channel), do: 4
 end

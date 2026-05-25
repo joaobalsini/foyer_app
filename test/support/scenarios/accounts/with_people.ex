@@ -67,14 +67,21 @@ defmodule Foyer.AccountsScenarios.WithPeople do
   @impl true
   def list_people(opts \\ []) do
     case Keyword.get(opts, :channel_id) do
-      nil -> @people
-      channel_id when is_integer(channel_id) -> filter_by_channel(@people, channel_id)
-      channel_id when is_binary(channel_id) -> list_people(channel_id: String.to_integer(channel_id))
+      nil ->
+        @people
+
+      channel_id when is_integer(channel_id) ->
+        filter_by_channel(@people, channel_id)
+
+      channel_id when is_binary(channel_id) ->
+        list_people(channel_id: String.to_integer(channel_id))
     end
   end
 
   defp filter_by_channel(people, channel_id) do
-    Enum.filter(people, fn p -> Enum.any?(p.memberships, fn m -> m.channel_id == channel_id end) end)
+    Enum.filter(people, fn p ->
+      Enum.any?(p.memberships, fn m -> m.channel_id == channel_id end)
+    end)
   end
 
   @impl true

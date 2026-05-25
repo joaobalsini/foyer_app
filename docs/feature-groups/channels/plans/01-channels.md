@@ -1,17 +1,15 @@
 # Plan 01 — Channels feature group
 
-Status: revised after Codex review (v2)
+Status: revised after review (v2)
 Scope: `Foyer.Channels` context, `ChannelsPort` behaviour, `PeopleLive` finishing, seeds,
 tests for all `F.Channels.*` clauses
 Spec: [`../spec.md`](../spec.md)
-Review: [`01-channels-review.md`](./01-channels-review.md)
 
 ---
 
 ## Revision log
 
-**v2 — addressed Codex review of 2026-05-25.** Key changes (see review doc for
-full rationale):
+**v2 — addressed review feedback from 2026-05-25.** Key changes:
 
 - **§7 / spec F.Channels.12**: Resolved the manager-membership contradiction. The invariant
   "manager role alone grants no access" (FOYER.md, F.Channels.19) is preserved. F.Channels.12
@@ -594,7 +592,7 @@ After `live_isolated/3`, call `Mox.allow(Foyer.ChannelsMock, self(), view.pid)` 
 The test asserts `assert has_element?(view, "#people-row-#{user.id}")`. This is required — tests
 that rely on display names alone are fragile.
 
-### 8.6 Route smoke test — addition to `test/foyer_web/scaffold_smoke_test.exs`
+### 8.6 Route smoke test — addition to `test/foyer_web/smoke_test.exs`
 
 Or a dedicated `test/foyer_web/live/people_live_route_test.exs`. `@tag :integration`, `async: false`.
 Tests:

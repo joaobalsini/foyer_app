@@ -8,7 +8,7 @@ defmodule Foyer.ProfileScenarios.Simple do
   alias Foyer.Profile.Card
 
   @impl true
-  def profile_for(user) do
+  def profile_for(user, _viewer) do
     %Card{
       user: user,
       received: [],
