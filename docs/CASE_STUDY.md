@@ -59,3 +59,34 @@ Don't go too deep into the details at this point, we will evolve this later when
 
 This don't need specs, we should have a single plan created by a opus agent and a codex agent review. Later another opus agent shall implement it and another codex agent should review it.
 
+
+## Session 3
+
+### Terminal 1 - Desktop Ui mocks
+
+Ask sonnet to write a plan for writing a desktop version of the UI based on our designs. We already have a mobile version of it, later ask codex for review, and another sonnet agent to implement.
+
+### Terminal 2 - Annoucements, Recognitions and Chats (codex)
+
+Read from claude.md
+
+Develop the announcements, recognitions and chats feature group considering our specs, design and guidelines. 
+
+Ask for me to confirm before moving from specs to plan and from plan to implementation.
+
+Ask an independent agent to write the specs of each to start. 
+
+We should have different worktrees and branches per feature group and work in parallel with three different agents.
+
+(After work done asked opus to verify the three branches and open PRs)
+
+### Terminal 3
+
+Develop the channels, today, profile feature groups considering our specs. Trigger one sonnet agent for each, develop it on its own worktrees and branches named after the feature groups.
+
+trigger a sonnet agent to implement each feature group (on their worktrees). We have one branch for each feature group already implemented (or wip) feature/announcements, feature/chat, feature/recognitions, in case you need to see how the interfaces were implemented.
+
+### Session 4
+
+
+
