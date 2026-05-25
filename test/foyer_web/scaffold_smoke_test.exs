@@ -183,6 +183,46 @@ defmodule FoyerWeb.ScaffoldSmokeTest do
       assert {:error, {:live_redirect, %{to: "/house"}}} =
                live(conn, ~p"/announcements/#{ctx.leadership_only_announcement.id}")
     end
+
+    test "F.Announcements.2 staff visiting /announcements/new is redirected and no form renders",
+         ctx do
+      conn = sign_in(ctx.conn, ctx.maya)
+
+      # Staff are on-shift here, so the route admits them; the LiveView gate
+      # in apply_new/1 must redirect with a flash. If a future change replaces
+      # this redirect with a render-only gate, this assertion still passes —
+      # but if the gate is dropped entirely, the form will render and live/2
+      # will return {:ok, _, _}, failing the redirect match below.
+      assert {:error, {:live_redirect, %{to: "/house"}}} = live(conn, ~p"/announcements/new")
+    end
+
+    test "F.Announcements.5 manager can pin and unpin an announcement", ctx do
+      # suite_412 is pinned in the fixture; start by unpinning it.
+      conn = sign_in(ctx.conn, ctx.charlotte)
+      {:ok, view, _html} = live(conn, ~p"/announcements/#{ctx.suite_412.id}")
+
+      assert has_element?(view, "#announcement-unpin-btn")
+      view |> element("#announcement-unpin-btn") |> render_click()
+      assert has_element?(view, "#announcement-pin-btn")
+
+      view |> element("#announcement-pin-btn") |> render_click()
+      assert has_element?(view, "#announcement-unpin-btn")
+    end
+
+    test "F.Announcements.6 removing an announcement drops it from feeds and back to /house",
+         ctx do
+      conn = sign_in(ctx.conn, ctx.charlotte)
+      {:ok, view, _html} = live(conn, ~p"/announcements/#{ctx.suite_412.id}")
+
+      assert has_element?(view, "#announcement-remove-btn")
+      result = view |> element("#announcement-remove-btn") |> render_click()
+      assert {:error, {:live_redirect, %{to: "/house"}}} = result
+
+      # Maya can no longer see the announcement in her feed.
+      conn = sign_in(build_conn(), ctx.maya)
+      {:ok, _house_view, html} = live(conn, ~p"/house")
+      refute html =~ "Allergy protocol in effect"
+    end
   end
 
   describe "Chat" do
