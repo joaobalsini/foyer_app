@@ -71,4 +71,28 @@ defmodule FoyerWeb.ChatLiveTest do
     assert has_element?(view, "#conversation-unread-#{ctx.maya_charlotte.id}")
     assert has_element?(view, "#bottom-nav-chat-unread-dot")
   end
+
+  test "F.Chat.11 picker tags off-shift colleagues and on-shift colleagues are unmarked", ctx do
+    conn = sign_in(ctx.conn, ctx.maya)
+    {:ok, view, _html} = live(conn, ~p"/chat/new")
+
+    # Jamal ended his shift yesterday — picker must mark him "Off shift".
+    assert has_element?(view, "#new-msg-person-#{ctx.jamal.id}", "Off shift")
+    # Hugo is on shift in the seeded fixtures — must NOT be tagged off-shift.
+    refute view
+           |> element("#new-msg-person-#{ctx.hugo.id}")
+           |> render() =~ "Off shift"
+  end
+
+  test "F.Chat.11 direct room header reflects the other participant's shift state", ctx do
+    conn = sign_in(ctx.conn, ctx.maya)
+    {:ok, view, _html} = live(conn, ~p"/chat/#{ctx.maya_charlotte.id}")
+
+    # Charlotte is on shift in the seeded fixtures.
+    assert has_element?(view, "#chat-room-shift-state", "On shift")
+
+    refute view
+           |> element("#chat-room-shift-state")
+           |> render() =~ "Off shift"
+  end
 end

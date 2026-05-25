@@ -23,51 +23,59 @@ defmodule Foyer.Chat do
     participant_ids = Enum.sort([a_id, b_id])
     direct_key = Conversation.direct_key(participant_ids)
 
-    Repo.transaction(fn ->
-      conversation =
-        case Repo.get_by(Conversation, kind: :direct, direct_key: direct_key) do
-          nil ->
-            conversation =
-              %Conversation{}
-              |> Conversation.changeset(%{
-                kind: :direct,
-                direct_key: direct_key,
-                participant_user_ids: participant_ids
-              })
-              |> Repo.insert()
-              |> case do
-                {:ok, conversation} ->
-                  conversation
-
-                {:error, %Ecto.Changeset{}} ->
-                  Repo.get_by!(Conversation, kind: :direct, direct_key: direct_key)
-              end
-
-            participant_rows =
-              Enum.map(participant_ids, fn participant_id ->
-                now = DateTime.utc_now() |> DateTime.truncate(:second)
-
-                %{
-                  conversation_id: conversation.id,
-                  user_id: participant_id,
-                  inserted_at: now,
-                  updated_at: now
-                }
-              end)
-
-            Repo.insert_all(Participant, participant_rows, on_conflict: :nothing)
-            conversation
-
-          conversation ->
-            conversation
-        end
-
-      preload_conversation(conversation)
-    end)
-    |> case do
+    case Repo.transaction(fn -> upsert_direct(direct_key, participant_ids) end) do
       {:ok, conversation} -> {:ok, conversation}
       {:error, reason} -> {:error, reason}
     end
+  end
+
+  defp upsert_direct(direct_key, participant_ids) do
+    conversation =
+      case Repo.get_by(Conversation, kind: :direct, direct_key: direct_key) do
+        nil -> create_direct(direct_key, participant_ids)
+        existing -> existing
+      end
+
+    preload_conversation(conversation)
+  end
+
+  defp create_direct(direct_key, participant_ids) do
+    conversation = insert_or_fetch_direct(direct_key, participant_ids)
+    insert_direct_participants(conversation, participant_ids)
+    conversation
+  end
+
+  defp insert_or_fetch_direct(direct_key, participant_ids) do
+    %Conversation{}
+    |> Conversation.changeset(%{
+      kind: :direct,
+      direct_key: direct_key,
+      participant_user_ids: participant_ids
+    })
+    |> Repo.insert()
+    |> case do
+      {:ok, conversation} ->
+        conversation
+
+      {:error, %Ecto.Changeset{}} ->
+        Repo.get_by!(Conversation, kind: :direct, direct_key: direct_key)
+    end
+  end
+
+  defp insert_direct_participants(%Conversation{id: conversation_id}, participant_ids) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    rows =
+      Enum.map(participant_ids, fn participant_id ->
+        %{
+          conversation_id: conversation_id,
+          user_id: participant_id,
+          inserted_at: now,
+          updated_at: now
+        }
+      end)
+
+    Repo.insert_all(Participant, rows, on_conflict: :nothing)
   end
 
   @impl true
@@ -75,27 +83,36 @@ defmodule Foyer.Chat do
           {:ok, Conversation.t()} | {:error, Ecto.Changeset.t() | :unauthorized}
   def open_channel(%User{id: user_id}, channel_id) do
     if member_of_channel?(channel_id, user_id) do
-      case Repo.get_by(Conversation, kind: :channel, channel_id: channel_id) do
-        nil ->
-          %Conversation{}
-          |> Conversation.changeset(%{kind: :channel, channel_id: channel_id})
-          |> Repo.insert()
-          |> case do
-            {:ok, conversation} ->
-              {:ok, preload_conversation(conversation)}
-
-            {:error, %Ecto.Changeset{} = changeset} ->
-              case Repo.get_by(Conversation, kind: :channel, channel_id: channel_id) do
-                nil -> {:error, changeset}
-                conversation -> {:ok, preload_conversation(conversation)}
-              end
-          end
-
-        conversation ->
-          {:ok, preload_conversation(conversation)}
-      end
+      find_or_create_channel(channel_id)
     else
       {:error, :unauthorized}
+    end
+  end
+
+  defp find_or_create_channel(channel_id) do
+    case Repo.get_by(Conversation, kind: :channel, channel_id: channel_id) do
+      nil -> insert_channel_conversation(channel_id)
+      conversation -> {:ok, preload_conversation(conversation)}
+    end
+  end
+
+  defp insert_channel_conversation(channel_id) do
+    %Conversation{}
+    |> Conversation.changeset(%{kind: :channel, channel_id: channel_id})
+    |> Repo.insert()
+    |> case do
+      {:ok, conversation} ->
+        {:ok, preload_conversation(conversation)}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        recover_channel_conversation(channel_id, changeset)
+    end
+  end
+
+  defp recover_channel_conversation(channel_id, changeset) do
+    case Repo.get_by(Conversation, kind: :channel, channel_id: channel_id) do
+      nil -> {:error, changeset}
+      conversation -> {:ok, preload_conversation(conversation)}
     end
   end
 
@@ -229,40 +246,51 @@ defmodule Foyer.Chat do
     conversation = ensure_conversation_loaded(conversation)
 
     if conversation_member?(conversation, author.id) do
-      now = DateTime.utc_now() |> DateTime.truncate(:second)
-      changeset = message_changeset(conversation, author, attrs)
-
-      if changeset.valid? do
-        Repo.transaction(fn ->
-          message =
-            changeset
-            |> Repo.insert!()
-            |> Repo.preload(:author)
-
-          conversation
-          |> Ecto.Changeset.change(last_message_at: now)
-          |> Repo.update!()
-
-          %MessageRead{}
-          |> MessageRead.changeset(%{message_id: message.id, user_id: author.id, read_at: now})
-          |> Repo.insert(on_conflict: :nothing, conflict_target: [:message_id, :user_id])
-
-          message
-        end)
-        |> case do
-          {:ok, message} ->
-            broadcast_message(conversation, message)
-            {:ok, message}
-
-          {:error, reason} ->
-            {:error, reason}
-        end
-      else
-        {:error, changeset}
-      end
+      do_send_message(conversation, author, attrs)
     else
       {:error, :unauthorized}
     end
+  end
+
+  defp do_send_message(conversation, author, attrs) do
+    changeset = message_changeset(conversation, author, attrs)
+
+    if changeset.valid? do
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+      persist_and_broadcast(conversation, author, changeset, now)
+    else
+      {:error, changeset}
+    end
+  end
+
+  defp persist_and_broadcast(conversation, author, changeset, now) do
+    case Repo.transaction(fn ->
+           insert_message_with_side_effects(conversation, author, changeset, now)
+         end) do
+      {:ok, message} ->
+        broadcast_message(conversation, message)
+        {:ok, message}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp insert_message_with_side_effects(conversation, author, changeset, now) do
+    message =
+      changeset
+      |> Repo.insert!()
+      |> Repo.preload(:author)
+
+    conversation
+    |> Ecto.Changeset.change(last_message_at: now)
+    |> Repo.update!()
+
+    %MessageRead{}
+    |> MessageRead.changeset(%{message_id: message.id, user_id: author.id, read_at: now})
+    |> Repo.insert(on_conflict: :nothing, conflict_target: [:message_id, :user_id])
+
+    message
   end
 
   @impl true
