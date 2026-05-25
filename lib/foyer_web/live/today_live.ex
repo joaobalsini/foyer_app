@@ -8,6 +8,7 @@ defmodule FoyerWeb.TodayLive do
   use FoyerWeb, :live_view
 
   alias Foyer.Shifts.Shift
+  alias Foyer.Today.Briefing
   alias FoyerWeb.FoyerComponents
   alias FoyerWeb.Scope
 
@@ -17,31 +18,46 @@ defmodule FoyerWeb.TodayLive do
      socket
      |> assign(:briefing, nil)
      |> assign(:end_shift_form, nil)
-     |> assign(:channels, [])
+     |> assign(:channel_options, [])
+     |> assign(:just_clocked_out, false)
+     |> assign(:handoff_seen, false)
      |> assign(:page_title, "Today")}
   end
 
   @impl true
-  def handle_params(_params, _uri, socket) do
+  def handle_params(params, _uri, socket) do
     scope = socket.assigns.current_scope
     briefing = FoyerWeb.LiveDeps.today().brief_for(scope.user)
 
-    channels = FoyerWeb.LiveDeps.channels().list_for_user(scope.user)
+    # F.Today.21: handoff_seen tracks whether this session has already rendered
+    # the handoff card once. On subsequent handle_params calls within the same
+    # LiveView session (e.g. after push_navigate from end-shift), if the
+    # previous render had a handoff, mark it as seen so it renders de-emphasised.
+    prev_briefing = socket.assigns.briefing
+
+    handoff_seen =
+      socket.assigns.handoff_seen || (prev_briefing != nil and prev_briefing.handoff != nil)
 
     socket =
       socket
       |> assign(:briefing, briefing)
-      |> assign(:channels, channels)
-      |> maybe_assign_end_shift_form()
+      |> assign(:just_clocked_out, params["state"] == "shift_complete")
+      |> assign(:handoff_seen, handoff_seen)
+      |> maybe_assign_end_shift_form(scope)
 
     {:noreply, socket}
   end
 
-  defp maybe_assign_end_shift_form(%{assigns: %{live_action: :end_shift}} = socket) do
-    assign(socket, :end_shift_form, build_end_shift_form())
+  defp maybe_assign_end_shift_form(%{assigns: %{live_action: :end_shift}} = socket, scope) do
+    channels = FoyerWeb.LiveDeps.channels().list_for_user(scope.user)
+    channel_options = Enum.map(channels, &{&1.name, &1.id})
+
+    socket
+    |> assign(:end_shift_form, build_end_shift_form())
+    |> assign(:channel_options, channel_options)
   end
 
-  defp maybe_assign_end_shift_form(socket), do: socket
+  defp maybe_assign_end_shift_form(socket, _scope), do: socket
 
   defp build_end_shift_form do
     %Shift{}
@@ -65,15 +81,28 @@ defmodule FoyerWeb.TodayLive do
     end
   end
 
+  def handle_event("skip_clock_out", _params, socket) do
+    scope = socket.assigns.current_scope
+
+    case scope.shift do
+      nil ->
+        {:noreply, put_flash(socket, :error, "No active shift to end.")}
+
+      shift ->
+        case FoyerWeb.LiveDeps.shifts().end_shift(shift, %{}) do
+          {:ok, _ended} ->
+            {:noreply,
+             socket
+             |> put_flash(:info, "Shift ended. Rest well.")
+             |> push_navigate(to: ~p"/today?state=shift_complete")}
+
+          {:error, changeset} ->
+            {:noreply, assign(socket, :end_shift_form, to_form(changeset, as: :shift))}
+        end
+    end
+  end
+
   def handle_event("end_shift_submit", %{"shift" => attrs}, socket) do
-    end_shift(socket, attrs)
-  end
-
-  def handle_event("end_shift_without_handoff", _params, socket) do
-    end_shift(socket, %{"handoff_note" => ""})
-  end
-
-  defp end_shift(socket, attrs) do
     scope = socket.assigns.current_scope
 
     case scope.shift do
@@ -86,7 +115,7 @@ defmodule FoyerWeb.TodayLive do
             {:noreply,
              socket
              |> put_flash(:info, "Shift ended. Rest well.")
-             |> push_navigate(to: ~p"/today")}
+             |> push_navigate(to: ~p"/today?state=shift_complete")}
 
           {:error, changeset} ->
             {:noreply, assign(socket, :end_shift_form, to_form(changeset, as: :shift))}
@@ -106,200 +135,263 @@ defmodule FoyerWeb.TodayLive do
         />
         <div class="foyer-content">
           <FoyerComponents.desktop_topbar current_scope={@current_scope} page_title={@page_title} />
-          <div class="foyer-scroll" id="today">
-            <div
-              :if={not @current_scope.on_shift? and @live_action != :end_shift}
-              id="off-shift"
-              class="foyer-page-narrow space-y-6"
-            >
+          <div class="foyer-scroll md:max-w-2xl md:mx-auto" id="today">
+            <header class="flex items-start justify-between">
               <div>
-                <FoyerComponents.editorial_heading>
-                  Hello, {first_name(@current_scope.user.name)}.
-                </FoyerComponents.editorial_heading>
-                <p class="foyer-serif text-2xl italic mt-1">You're off the clock.</p>
-                <p class="text-sm mt-2">Rest is part of the work.</p>
+                <div class="foyer-mono">{header_eyebrow(@current_scope)}</div>
+                <h1 class="foyer-serif text-3xl">{greeting(@current_scope)}</h1>
               </div>
-
-              <div class="flex items-center gap-3">
-                <FoyerComponents.status_pill kind={:off_shift} />
-                <button
-                  phx-click="start_shift"
-                  class="foyer-btn sm"
-                  id="start-shift-btn"
-                >
-                  Start shift
+              <div class="flex gap-2">
+                <button aria-label="Search" class="foyer-btn ghost sm" id="today-search">
+                  <.icon name="hero-magnifying-glass" class="size-5" />
+                </button>
+                <button aria-label="Notifications" class="foyer-btn ghost sm" id="today-bell">
+                  <.icon name="hero-bell" class="size-5" />
                 </button>
               </div>
+            </header>
 
-              <section id="queued" class="space-y-3">
-                <FoyerComponents.section_label label={"Quietly held for you · #{@briefing.waiting_count} waiting"} />
-                <p class="text-xs italic" style="color: var(--foyer-stone);">
-                  These will be marked unread the moment you start your shift.
-                </p>
-              </section>
-            </div>
-
-            <div
-              :if={
-                @current_scope.on_shift? and not Scope.manager?(@current_scope) and
-                  @live_action != :end_shift
-              }
-              id="today-on-shift-staff"
-              class="foyer-page-narrow space-y-6"
-            >
-              <div class="flex items-start justify-between gap-3">
-                <div>
-                  <FoyerComponents.editorial_heading>
-                    Good morning, {first_name(@current_scope.user.name)}.
-                  </FoyerComponents.editorial_heading>
-                  <p class="foyer-serif text-2xl mt-1">Today · your morning briefing</p>
-                </div>
-                <div class="flex flex-col items-end gap-2">
-                  <FoyerComponents.status_pill kind={:on_shift} />
-                  <.link
-                    patch={~p"/today/end-shift"}
-                    class="foyer-btn sm"
-                    id="end-shift-link"
+            <%= cond do %>
+              <% not @current_scope.on_shift? -> %>
+                <section
+                  id="off-shift"
+                  class="rounded-lg p-4 flex flex-col gap-3"
+                  style="background: var(--foyer-cream-deep);"
+                >
+                  <%= if @just_clocked_out do %>
+                    <div id="shift-complete-banner">
+                      <div class="flex items-center gap-2">
+                        <span class="foyer-tag moss">Shift complete</span>
+                      </div>
+                      <h2 class="foyer-serif text-2xl mt-2">Eight hours well held.</h2>
+                      <p class="foyer-mono mt-1">Notifications will quiet down.</p>
+                      <div class="foyer-mono text-sm mt-2">
+                        <div>Announcements acked</div>
+                        <div>What happens next: start your next shift when you're ready.</div>
+                      </div>
+                    </div>
+                  <% else %>
+                    <div id="off-shift-banner">
+                      <div class="flex items-center gap-2">
+                        <span class="foyer-tag outline">Off shift · notifications paused</span>
+                      </div>
+                      <p class="foyer-serif text-xl">
+                        You're off the clock.<br /><em>Rest is part of the work.</em>
+                      </p>
+                      <p>You won't receive notifications until you start your next shift.</p>
+                      <div class="foyer-mono">
+                        While you were off · {Briefing.waiting_total(@briefing)} waiting
+                      </div>
+                      <div :if={Briefing.waiting_total(@briefing) > 0} class="foyer-mono text-sm">
+                        {waiting_breakdown(@briefing)}
+                      </div>
+                    </div>
+                  <% end %>
+                  <button
+                    class="foyer-btn forest"
+                    phx-click="start_shift"
+                    id="start-shift-btn"
+                    aria-label="Start shift"
                   >
-                    End shift
+                    <span class="foyer-pulse"></span>Start shift
+                  </button>
+                </section>
+              <% Scope.manager?(@current_scope) -> %>
+                <section id="manager-today" class="flex flex-col gap-3">
+                  <div class="flex items-center gap-3">
+                    <span class="foyer-pulse"></span>
+                    <div>On shift · {@current_scope.user.title}</div>
+                    <.link
+                      patch={~p"/today/end-shift"}
+                      class="foyer-btn sm ml-auto"
+                      id="end-shift-link"
+                    >
+                      End shift
+                    </.link>
+                  </div>
+                  <.link navigate={~p"/announcements/new"} id="compose-cta" class="foyer-btn forest">
+                    <.icon name="hero-pencil-square" class="size-4" /> New announcement
                   </.link>
-                </div>
-              </div>
 
-              <section :if={@briefing.handoff} id="handoff" class="space-y-3">
-                <FoyerComponents.section_label label={"Handoff from your last shift · ended #{FoyerComponents.format_time(@briefing.handoff.ended_at)}"} />
-                <article
-                  class="rounded-lg border p-4 text-sm space-y-1"
-                  style="background: var(--foyer-cream-deep); border-color: var(--foyer-rule);"
-                >
-                  <p>{@briefing.handoff.handoff_note}</p>
-                </article>
-              </section>
-
-              <section id="needs-ack" class="space-y-3">
-                <FoyerComponents.section_label label={"Needs your acknowledgement · #{length(@briefing.needs_ack)} to go"} />
-                <div
-                  :if={@briefing.needs_ack == []}
-                  class="text-sm italic"
-                  style="color: var(--foyer-stone);"
-                >
-                  You're caught up.
-                </div>
-                <FoyerComponents.announcement_card
-                  :for={ann <- @briefing.needs_ack}
-                  announcement={ann}
-                  current_user_id={@current_scope.user.id}
-                />
-              </section>
-
-              <section
-                :if={@briefing.recent_recognition != []}
-                id="recognition-received"
-                class="space-y-3"
-              >
-                <FoyerComponents.section_label label="Recognition received" />
-                <FoyerComponents.recognition_card
-                  :for={rec <- Enum.take(@briefing.recent_recognition, 2)}
-                  recognition={rec}
-                />
-              </section>
-            </div>
-
-            <div
-              :if={
-                @current_scope.on_shift? and Scope.manager?(@current_scope) and
-                  @live_action != :end_shift
-              }
-              id="today-on-shift-manager"
-              class="foyer-page-narrow space-y-6"
-            >
-              <div class="flex items-start justify-between gap-3">
-                <div>
-                  <FoyerComponents.editorial_heading>
-                    Good morning, {first_name(@current_scope.user.name)}.
-                  </FoyerComponents.editorial_heading>
-                  <p class="foyer-serif text-2xl mt-1">Today · your morning briefing</p>
-                </div>
-                <div class="flex flex-col items-end gap-2">
-                  <FoyerComponents.status_pill kind={:on_shift} />
-                  <.link
-                    patch={~p"/today/end-shift"}
-                    class="foyer-btn sm"
-                    id="end-shift-link"
+                  <div
+                    :if={@briefing.handoff}
+                    id="handoff-card"
+                    class={handoff_card_class(@handoff_seen)}
                   >
-                    End shift
-                  </.link>
-                </div>
-              </div>
+                    <div class="foyer-mono">Handoff from your last shift</div>
+                    <div class="flex items-center gap-2 mt-2">
+                      <FoyerComponents.avatar
+                        initials={@briefing.handoff.user.initials}
+                        size={:sm}
+                      />
+                      <div>
+                        <div>{@briefing.handoff.user.name}</div>
+                        <div class="foyer-mono">
+                          Night · ended {format_time(@briefing.handoff.ended_at)}
+                        </div>
+                      </div>
+                    </div>
+                    <p class="foyer-serif mt-2">"{@briefing.handoff.handoff_note}"</p>
+                  </div>
 
-              <section id="acks-you-owe" class="space-y-2">
-                <FoyerComponents.section_label label="Acks you owe others" />
-                <div
-                  :if={@briefing.needs_ack == []}
-                  class="text-sm italic"
-                  style="color: var(--foyer-stone);"
-                >
-                  Nothing waiting on you right now. You're caught up.
-                </div>
-                <FoyerComponents.announcement_card
-                  :for={ann <- @briefing.needs_ack}
-                  announcement={ann}
-                  current_user_id={@current_scope.user.id}
-                />
-              </section>
+                  <div :if={@briefing.needs_ack != []} id="manager-needs-ack">
+                    <div class="foyer-mono">Needs your acknowledgement</div>
+                    <.link
+                      :for={a <- @briefing.needs_ack}
+                      navigate={~p"/announcements/#{a.id}"}
+                      id={"needs-ack-#{a.id}"}
+                      class="block rounded-lg border p-3 mt-2 min-h-[44px]"
+                      style="border-color: var(--foyer-rule);"
+                    >
+                      <span class="foyer-tag claret">Pinned · Action</span>
+                      <div class="foyer-serif mt-2">{a.title}</div>
+                    </.link>
+                  </div>
 
-              <section id="new-announcement" class="space-y-2">
-                <FoyerComponents.section_label label="Publish to your team" />
-                <.link navigate={~p"/announcements/new"} id="compose-cta" class="foyer-btn forest">
-                  <.icon name="hero-pencil-square" class="size-4" /> New announcement
-                </.link>
-              </section>
-            </div>
+                  <div :if={@briefing.own_announcements != []} id="manager-live-posts">
+                    <div class="foyer-mono">Your live posts</div>
+                    <.link
+                      :for={a <- @briefing.own_announcements}
+                      navigate={~p"/announcements/#{a.id}"}
+                      id={"live-post-#{a.id}"}
+                      class="block rounded-lg border p-3 mt-2 min-h-[44px]"
+                      style="border-color: var(--foyer-rule);"
+                    >
+                      <span :if={a.pinned_at} class="foyer-tag claret">Pinned</span>
+                      <div class="foyer-serif mt-1">{a.title}</div>
+                    </.link>
+                  </div>
+
+                  <div :if={@briefing.recent_recognitions != []} id="recent-recognition">
+                    <div class="foyer-mono">Recognition for you</div>
+                    <div
+                      :for={r <- @briefing.recent_recognitions}
+                      id={"recognition-#{r.id}"}
+                      class="rounded-lg border p-3 mt-2"
+                      style="border-color: var(--foyer-rule);"
+                    >
+                      <div class="flex items-center gap-2">
+                        <FoyerComponents.avatar initials={r.sender.initials} size={:sm} />
+                        <span class="foyer-mono">{r.sender.name}</span>
+                      </div>
+                      <p class="foyer-serif mt-2">{r.body}</p>
+                      <div class="flex gap-1 mt-2">
+                        <span :for={v <- r.values} class="foyer-tag outline">{v}</span>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              <% true -> %>
+                <section id="on-shift-staff" class="flex flex-col gap-3">
+                  <div class="flex items-center gap-3">
+                    <span class="foyer-pulse"></span>
+                    <div>On shift · {@current_scope.user.title}</div>
+                    <.link
+                      patch={~p"/today/end-shift"}
+                      class="foyer-btn sm ml-auto"
+                      id="end-shift-link"
+                    >
+                      End shift
+                    </.link>
+                  </div>
+
+                  <div
+                    :if={@briefing.handoff}
+                    id="handoff-card"
+                    class={handoff_card_class(@handoff_seen)}
+                  >
+                    <div class="foyer-mono">Handoff from your last shift</div>
+                    <div class="flex items-center gap-2 mt-2">
+                      <FoyerComponents.avatar
+                        initials={@briefing.handoff.user.initials}
+                        size={:sm}
+                      />
+                      <div>
+                        <div>{@briefing.handoff.user.name}</div>
+                        <div class="foyer-mono">
+                          Night · ended {format_time(@briefing.handoff.ended_at)}
+                        </div>
+                      </div>
+                    </div>
+                    <p class="foyer-serif mt-2">"{@briefing.handoff.handoff_note}"</p>
+                  </div>
+
+                  <div :if={@briefing.needs_ack != []} id="needs-ack">
+                    <div class="foyer-mono">Needs your acknowledgement</div>
+                    <.link
+                      :for={a <- @briefing.needs_ack}
+                      navigate={~p"/announcements/#{a.id}"}
+                      id={"needs-ack-#{a.id}"}
+                      class="block rounded-lg border p-3 mt-2 min-h-[44px]"
+                      style="border-color: var(--foyer-rule);"
+                    >
+                      <span class="foyer-tag claret">Pinned · Action</span>
+                      <div class="foyer-serif mt-2">{a.title}</div>
+                      <div class="flex items-center gap-2 mt-2 text-sm">
+                        <FoyerComponents.avatar
+                          :if={a.author}
+                          initials={a.author.initials}
+                          size={:sm}
+                        />
+                        <span>{a.author && a.author.name} · {a.channel && a.channel.name}</span>
+                      </div>
+                    </.link>
+                  </div>
+
+                  <div :if={@briefing.recent_recognitions != []} id="recent-recognition">
+                    <div class="foyer-mono">Recognition for you</div>
+                    <div
+                      :for={r <- @briefing.recent_recognitions}
+                      id={"recognition-#{r.id}"}
+                      class="rounded-lg border p-3 mt-2"
+                      style="border-color: var(--foyer-rule);"
+                    >
+                      <div class="flex items-center gap-2">
+                        <FoyerComponents.avatar initials={r.sender.initials} size={:sm} />
+                        <span class="foyer-mono">{r.sender.name}</span>
+                      </div>
+                      <p class="foyer-serif mt-2">{r.body}</p>
+                      <div class="flex gap-1 mt-2">
+                        <span :for={v <- r.values} class="foyer-tag outline">{v}</span>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+            <% end %>
 
             <%= if @live_action == :end_shift do %>
               <div
                 id="end-shift-modal"
-                class="foyer-page-narrow space-y-5 md:pt-8"
+                class="rounded-lg border p-4 mt-4"
+                style="border-color: var(--foyer-rule);"
               >
-                <div>
-                  <FoyerComponents.editorial_heading>
-                    Shift complete.
-                  </FoyerComponents.editorial_heading>
-                  <p class="foyer-serif text-2xl italic">Leave a note for the next shift?</p>
-                  <p class="text-sm text-stone-500">
-                    Started at {FoyerComponents.format_time(
-                      @current_scope.shift && @current_scope.shift.started_at
-                    )}
-                  </p>
-                </div>
+                <h2 class="foyer-serif text-xl">Anything the next shift needs to know?</h2>
                 <.form
                   for={@end_shift_form}
                   id="end-shift-form"
                   phx-submit="end_shift_submit"
-                  class="flex flex-col gap-4"
+                  class="flex flex-col gap-3 mt-3"
                 >
                   <.input
                     field={@end_shift_form[:handoff_note]}
                     type="textarea"
                     label="Handoff note"
-                    placeholder="What does the next shift need to know?"
                   />
                   <.input
                     field={@end_shift_form[:handoff_channel_id]}
                     type="select"
-                    label="Who should see this?"
-                    options={Enum.map(@channels, &{&1.name, &1.id})}
+                    label="Send to channel"
+                    options={[{"— no channel —", nil} | @channel_options]}
+                    id="handoff-channel-select"
                   />
-                  <button class="foyer-btn forest w-full" type="submit">
-                    End shift with handoff
-                  </button>
+                  <button class="foyer-btn forest sm" type="submit">Clock out</button>
                   <button
                     type="button"
-                    phx-click="end_shift_without_handoff"
-                    id="end-shift-no-handoff"
-                    class="foyer-btn ghost w-full border-[var(--foyer-rule)]"
+                    phx-click="skip_clock_out"
+                    id="skip-clock-out"
+                    class="foyer-mono text-sm text-center"
                   >
-                    End shift, no handoff
+                    Skip · clock out
                   </button>
                 </.form>
               </div>
@@ -317,11 +409,48 @@ defmodule FoyerWeb.TodayLive do
     """
   end
 
+  defp header_eyebrow(%Scope{} = scope) do
+    "The Linden · #{scope.user.department}"
+  end
+
+  defp greeting(%Scope{} = scope) do
+    "Good morning, #{first_name(scope.user.name)}"
+  end
+
   defp first_name(nil), do: "there"
 
   defp first_name(name) when is_binary(name) do
     name
     |> String.split(" ", parts: 2)
     |> List.first()
+  end
+
+  defp format_time(nil), do: ""
+
+  defp format_time(%DateTime{} = dt) do
+    dt
+    |> DateTime.to_time()
+    |> Time.to_string()
+    |> String.slice(0, 5)
+  end
+
+  defp handoff_card_class(true) do
+    "rounded-lg border p-3 opacity-60"
+  end
+
+  defp handoff_card_class(false) do
+    "rounded-lg border p-3"
+  end
+
+  defp waiting_breakdown(%Briefing{} = b) do
+    parts =
+      [
+        if(b.waiting_announcements > 0, do: "#{b.waiting_announcements} announcements"),
+        if(b.waiting_messages > 0, do: "#{b.waiting_messages} messages"),
+        if(b.waiting_recognitions > 0, do: "#{b.waiting_recognitions} recognitions")
+      ]
+      |> Enum.reject(&is_nil/1)
+
+    Enum.join(parts, " · ")
   end
 end
