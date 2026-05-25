@@ -217,6 +217,17 @@ defmodule FoyerWeb.ScaffoldFixtures do
       })
       |> Repo.insert()
 
+    {:ok, private_recognition} =
+      %Recognition{}
+      |> Recognition.changeset(%{
+        sender_id: maya.id,
+        recipient_id: aisha.id,
+        body: "Handled the linen reset quietly and kindly.",
+        values: ["warmth"],
+        public: false
+      })
+      |> Repo.insert()
+
     # --- Conversations + messages ---
     direct_key_mc = Conversation.direct_key([maya.id, charlotte.id])
     eight_14 = %{now | hour: 8, minute: 14, second: 0}
@@ -277,7 +288,8 @@ defmodule FoyerWeb.ScaffoldFixtures do
       leadership_only_announcement: leadership_only_announcement,
       maya_charlotte: maya_charlotte,
       maya_recognition: maya_recognition,
-      hugo_recognition: hugo_recognition
+      hugo_recognition: hugo_recognition,
+      private_recognition: private_recognition
     }
   end
 end

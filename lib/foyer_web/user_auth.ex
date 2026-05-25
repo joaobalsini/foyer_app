@@ -91,6 +91,14 @@ defmodule FoyerWeb.UserAuth do
   end
 
   @spec load_scope(map()) :: Scope.t() | nil
+  # Isolated-test fallback. Production paths set `current_user_id` (see the
+  # `:current_user_id` clause below). `FoyerWeb.IsolatedHelpers` stuffs a
+  # pre-built `Scope` into the session so `live_isolated/3` tests don't need a
+  # real DB user. This clause is unreachable from production code paths
+  # because no controller / live_session puts `"current_scope"` in the
+  # session.
+  defp load_scope(%{"current_scope" => %Scope{} = scope}), do: scope
+
   defp load_scope(%{"current_user_id" => user_id}) when not is_nil(user_id) do
     case Accounts.get_user(user_id) do
       nil ->

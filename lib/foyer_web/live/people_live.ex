@@ -59,7 +59,8 @@ defmodule FoyerWeb.PeopleLive do
 
   defp apply_show(socket, %{"id" => id}) do
     target = FoyerWeb.LiveDeps.accounts().get_user!(id)
-    card = FoyerWeb.LiveDeps.profile().profile_for(target)
+    viewer = socket.assigns.current_scope.user
+    card = FoyerWeb.LiveDeps.profile().profile_for(target, viewer)
 
     {:noreply,
      socket

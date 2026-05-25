@@ -5,18 +5,13 @@ defmodule FoyerWeb.IsolatedHelpers do
   `live_isolated/3` skips the router, plugs, `live_session`, and `on_mount`
   hooks (see `docs/TESTING_GUIDE.md`). Foyer LiveViews rely on a
   `@current_scope` assign that the real on_mount hook installs, so isolated
-  tests need a small harness to provide it without booting the router.
-
-  The harness here installs a single test-only on_mount hook
-  (`FoyerWeb.IsolatedHelpers.OnMount`) by stashing a synthetic `live_session`
-  in `conn.private[:phoenix_live_view]`. The hook reads the `%FoyerWeb.Scope{}`
-  out of the LiveView session (passed as a session value with string key
-  `"current_scope"`).
+  tests use this module to provide it without booting the production router.
 
   This module is compiled in the test environment only (see
   `mix.exs :elixirc_paths`).
   """
 
+  alias Foyer.Accounts.User
   alias FoyerWeb.Scope
   alias Phoenix.LiveView.Lifecycle
 
@@ -38,49 +33,11 @@ defmodule FoyerWeb.IsolatedHelpers do
   @doc """
   Prepares a conn for `live_isolated/3` and produces the matching opts.
 
-  Returns `{conn, opts}` ready to pipe into `live_isolated/3`. The conn has
+  Returns `{conn, opts}` ready to pass into `live_isolated/3`. The conn has
   `phoenix_live_view` private set so the test on_mount hook runs during the
-  static render, `params` set so `handle_params/3` receives an actual map
-  (not `:not_mounted_at_router`), and `request_path` set so the channel
-  mount's `live_link_info!/3` finds a matching route in the **test router**
-  (`FoyerWeb.IsolatedRouter`) rather than the production router.
-
-  Why a test router? When the LiveView channel reconnects after the static
-  render, `live_link_info!/3` looks up the matching route in the configured
-  router. If the route's `live_session` differs from the synthetic one set
-  in `conn.private[:phoenix_live_view]`, the channel mount treats the URL
-  as external and redirects. If it matches, the channel mount runs the on
-  mount hooks declared on that `live_session` — which for the production
-  router means `FoyerWeb.UserAuth`, which redirects unauthenticated requests
-  to `/`. `FoyerWeb.IsolatedRouter` redeclares the routes under a
-  `:isolated_test` live_session with the test on_mount hook, so both the
-  static render and the channel mount agree on what to do.
-
-  Required option:
-
-    * `:action` — the `live_action` (`:new`, `:show`, `:edit`).
-
-  Optional:
-
-    * `:params` — map handed to `handle_params/3` (default `%{}`).
-    * `:path` — the conn's request path (default inferred from action).
-    * `:router` — override the test router (default `FoyerWeb.IsolatedRouter`).
-
-  Usage:
-
-      {conn, opts} =
-        FoyerWeb.IsolatedHelpers.prepare_isolated(
-          conn,
-          FoyerWeb.AnnouncementLive,
-          scope,
-          action: :show,
-          params: %{"id" => "100"},
-          path: "/announcements/100"
-        )
-
-      {:ok, view, html} = live_isolated(conn, FoyerWeb.AnnouncementLive, opts)
-
-      Mox.allow(Foyer.HouseMock, self(), view.pid)
+  static render, `params` set so `handle_params/3` receives a map, and
+  `request_path` set so the channel mount can resolve a matching route in the
+  test router.
   """
   @spec prepare_isolated(Plug.Conn.t(), module(), Scope.t(), keyword()) ::
           {Plug.Conn.t(), keyword()}
@@ -103,7 +60,7 @@ defmodule FoyerWeb.IsolatedHelpers do
       |> Map.put(:params, params)
       |> Map.put(:request_path, path)
 
-    {conn, [session: %{"current_scope" => scope}, router: router, action: action]}
+    {conn, [session: session_for(scope), router: router, action: action]}
   end
 
   defp default_path_for(:new, _params), do: "/announcements/new"
@@ -112,17 +69,66 @@ defmodule FoyerWeb.IsolatedHelpers do
   defp default_path_for(_action, _params), do: "/"
 
   @doc """
-  Builds a `%Scope{}` for a `%User{}` and on-shift state. Convenience
-  alternative to `FoyerWeb.Scope.for_user/2` when the test doesn't have a
-  `%Shift{}` handy.
+  Builds a `%Scope{}` for a `%User{}` and on-shift state.
   """
-  @spec scope_for(Foyer.Accounts.User.t(), boolean()) :: Scope.t()
-  def scope_for(%Foyer.Accounts.User{} = user, on_shift?) do
+  @spec scope_for(User.t(), boolean()) :: Scope.t()
+  def scope_for(%User{} = user, on_shift?) do
     %Scope{
       user: user,
       on_shift?: on_shift?,
       shift: if(on_shift?, do: %Foyer.Shifts.Shift{user_id: user.id}, else: nil),
       role: user.role
     }
+  end
+
+  @doc """
+  Builds a `FoyerWeb.Scope` for an in-memory user. Pass `:role`, `:on_shift?`,
+  and any other `User` field as keyword overrides.
+  """
+  @spec build_scope(keyword()) :: Scope.t()
+  def build_scope(opts \\ []) do
+    on_shift? = Keyword.get(opts, :on_shift?, true)
+
+    user_fields =
+      opts
+      |> Keyword.drop([:on_shift?])
+      |> Keyword.put_new(:id, 1)
+      |> Keyword.put_new(:name, "Maya Okafor")
+      |> Keyword.put_new(:initials, "MO")
+      |> Keyword.put_new(:role, :staff)
+      |> Keyword.put_new(:department, "Housekeeping")
+      |> Keyword.put_new(:title, "Senior Housekeeper")
+      |> Keyword.put_new(:languages, ["EN"])
+      |> Keyword.put_new(:points_balance, 0)
+
+    user = struct!(User, user_fields)
+    scope_for(user, on_shift?)
+  end
+
+  @doc """
+  Returns a session map ready for `live_isolated/3`.
+  """
+  @spec session_for(Scope.t()) :: %{required(String.t()) => term()}
+  def session_for(%Scope{} = scope), do: %{"current_scope" => scope}
+
+  @doc """
+  Prepares a `Plug.Conn` for `live_isolated/3` by setting `request_path` and
+  `private[:phoenix_live_view]` to match the LiveView's intended route.
+  """
+  @spec prepare_conn(Plug.Conn.t(), module(), atom(), String.t(), [{module(), atom()}]) ::
+          Plug.Conn.t()
+  def prepare_conn(%Plug.Conn{} = conn, live_view, live_session_name, path, on_mount \\ []) do
+    hooks =
+      on_mount
+      |> Enum.map(&Lifecycle.validate_on_mount!(live_view, &1))
+      |> Lifecycle.prepare_on_mount!()
+
+    live_session = %{
+      name: live_session_name,
+      extra: %{on_mount: hooks}
+    }
+
+    %{conn | request_path: path}
+    |> Plug.Conn.put_private(:phoenix_live_view, {live_view, [], live_session})
   end
 end

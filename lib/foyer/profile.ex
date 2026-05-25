@@ -12,14 +12,14 @@ defmodule Foyer.Profile do
   alias Foyer.Shifts
 
   @impl true
-  @spec profile_for(User.t()) :: Card.t()
-  def profile_for(%User{} = user) do
+  @spec profile_for(target :: User.t(), viewer :: User.t()) :: Card.t()
+  def profile_for(%User{} = target, %User{} = viewer) do
     %Card{
-      user: user,
-      received: Recognitions.received_by(user),
-      given: Recognitions.given_by(user),
-      points: user.points_balance || 0,
-      on_shift?: not is_nil(Shifts.current_shift_for(user))
+      user: target,
+      received: Recognitions.received_by(target, viewer),
+      given: Recognitions.given_by(target, viewer),
+      points: target.points_balance || 0,
+      on_shift?: not is_nil(Shifts.current_shift_for(target))
     }
   end
 end

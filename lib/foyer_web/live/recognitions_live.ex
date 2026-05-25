@@ -130,12 +130,11 @@ defmodule FoyerWeb.RecognitionsLive do
          |> assign(:grace_deadline_ms, nil)
          |> assign(:preview_recipient_name, recipient_name)}
 
-      {:error, :not_implemented} ->
-        {:noreply,
-         socket
-         |> assign(:sent?, true)
-         |> assign(:sent_recognition, nil)
-         |> assign(:grace_state, :expired)}
+      {:error, :self_recognition} ->
+        {:noreply, put_flash(socket, :error, "Choose someone else to recognize.")}
+
+      {:error, :invalid_point_tier} ->
+        {:noreply, put_flash(socket, :error, "Choose one of the available point tiers.")}
 
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "Couldn't send recognition.")}
@@ -150,14 +149,36 @@ defmodule FoyerWeb.RecognitionsLive do
       {:ok, _updated} ->
         {:noreply, push_navigate(socket, to: ~p"/recognitions/#{id}")}
 
-      {:error, :not_implemented} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Edit not implemented in scaffold.")
-         |> push_navigate(to: ~p"/recognitions/#{id}")}
+      {:error, :outside_grace_window} ->
+        {:noreply, put_flash(socket, :error, "That recognition can no longer be edited.")}
+
+      {:error, :unauthorized} ->
+        {:noreply, put_flash(socket, :error, "Only the sender can edit this recognition.")}
 
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "Couldn't update recognition.")}
+    end
+  end
+
+  def handle_event("remove", _params, socket) do
+    scope = socket.assigns.current_scope
+    recognition = socket.assigns.recognition
+
+    case FoyerWeb.LiveDeps.recognitions().remove_recognition(recognition, scope.user) do
+      {:ok, _removed} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Recognition removed.")
+         |> push_navigate(to: ~p"/recognitions")}
+
+      {:error, :outside_grace_window} ->
+        {:noreply, put_flash(socket, :error, "That recognition can no longer be removed.")}
+
+      {:error, :unauthorized} ->
+        {:noreply, put_flash(socket, :error, "Only the sender can remove this recognition.")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Couldn't remove recognition.")}
     end
   end
 
@@ -288,6 +309,24 @@ defmodule FoyerWeb.RecognitionsLive do
                       </.link>
                     <% end %>
                   </div>
+                  <div class="flex flex-wrap gap-2">
+                    <span :for={value <- @recognition.values} class="foyer-tag outline">
+                      {String.capitalize(value)}
+                    </span>
+                    <span :if={!@recognition.public} class="foyer-tag outline">Private</span>
+                    <button
+                      :if={
+                        managed_by?(@recognition, @current_scope) and
+                          FoyerWeb.LiveDeps.recognitions().within_grace_window?(@recognition)
+                      }
+                      class="foyer-btn sm ml-auto"
+                      phx-click="remove"
+                      id="recognition-remove-btn"
+                      type="button"
+                    >
+                      <.icon name="hero-trash" class="size-4" /> Remove
+                    </button>
+                  </div>
                   <%= if @recognition.bonus_points > 0 do %>
                     <span class="foyer-tag outline">+{@recognition.bonus_points} pts</span>
                   <% end %>
@@ -317,6 +356,45 @@ defmodule FoyerWeb.RecognitionsLive do
                     prompt="Pick a colleague"
                   />
                   <.input field={@form[:body]} type="textarea" label="The story" />
+                  <fieldset class="foyer-fieldset">
+                    <legend class="foyer-fieldset__label">House values</legend>
+                    <div class="flex flex-wrap gap-2 mt-1">
+                      <label :for={v <- @house_values} class="foyer-tag outline cursor-pointer">
+                        <input
+                          type="checkbox"
+                          name="recognition[values][]"
+                          value={v}
+                          checked={v in (@recognition.values || [])}
+                          class="mr-1"
+                          id={"edit-value-#{v}"}
+                        />
+                        {String.capitalize(v)}
+                      </label>
+                    </div>
+                  </fieldset>
+                  <fieldset class="foyer-fieldset">
+                    <legend class="foyer-fieldset__label">Visibility</legend>
+                    <label class="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="recognition[public]"
+                        value="true"
+                        checked={@recognition.public}
+                        id="edit-visibility-public"
+                      />
+                      <span>Public</span>
+                    </label>
+                    <label class="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="recognition[public]"
+                        value="false"
+                        checked={!@recognition.public}
+                        id="edit-visibility-private"
+                      />
+                      <span>Private</span>
+                    </label>
+                  </fieldset>
                   <button class="foyer-btn forest" type="submit" id="recognition-edit-submit">
                     Save changes
                   </button>
@@ -444,6 +522,7 @@ defmodule FoyerWeb.RecognitionsLive do
                               name="recognition[values][]"
                               value={v}
                               checked={v in @preview_values}
+                              id={"value-#{v}"}
                               class="sr-only"
                             />
                             {String.capitalize(v)}
@@ -496,20 +575,16 @@ defmodule FoyerWeb.RecognitionsLive do
 
                       <fieldset
                         :if={Scope.manager?(@current_scope)}
-                        id="bonus-points"
+                        id="bonus-points-fieldset"
                         class="card-parchment p-4 space-y-3"
                       >
                         <legend class="foyer-mono">Bonus points</legend>
                         <p class="text-xs text-stone-500">
                           Foyer points roll up to staff rewards — time off, meals, charitable donations.
                         </p>
-                        <div class="flex gap-2 flex-wrap">
-                          <button
-                            :for={tier <- [25, 50, 100]}
-                            type="button"
-                            phx-click="set_bonus"
-                            phx-value-bonus={tier}
-                            data-bonus-tier={tier}
+                        <div class="flex gap-2 flex-wrap" id="bonus-tiers">
+                          <label
+                            :for={tier <- [0, 10, 25, 50, 100]}
                             class={[
                               "px-3 py-1 rounded-full text-sm font-medium border",
                               @preview_bonus_points == tier &&
@@ -518,22 +593,16 @@ defmodule FoyerWeb.RecognitionsLive do
                                 "bg-transparent text-stone-700 border-stone-300"
                             ]}
                           >
-                            +{tier}
-                          </button>
-                          <input
-                            type="hidden"
-                            name="recognition[bonus_points]"
-                            value={@preview_bonus_points || 0}
-                          />
-                          <button
-                            :if={@preview_bonus_points}
-                            type="button"
-                            phx-click="set_bonus"
-                            phx-value-bonus="clear"
-                            class="text-xs text-stone-500 underline"
-                          >
-                            clear
-                          </button>
+                            <input
+                              type="radio"
+                              name="recognition[bonus_points]"
+                              value={tier}
+                              checked={(@preview_bonus_points || 0) == tier}
+                              id={"bonus-#{tier}"}
+                              class="sr-only"
+                            />
+                            {if tier == 0, do: "0", else: "+#{tier}"}
+                          </label>
                         </div>
                       </fieldset>
 
