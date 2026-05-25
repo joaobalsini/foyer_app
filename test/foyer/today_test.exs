@@ -7,10 +7,6 @@ defmodule Foyer.TodayTest do
   alias Foyer.Today
   alias Foyer.Today.Briefing
 
-  # ──────────────────────────────────────────────────────────
-  # Briefing.waiting_total/1
-  # ──────────────────────────────────────────────────────────
-
   describe "Briefing.waiting_total/1" do
     test "sums the three waiting fields" do
       briefing = %Briefing{
@@ -48,10 +44,6 @@ defmodule Foyer.TodayTest do
       assert Briefing.waiting_total(briefing) == 0
     end
   end
-
-  # ──────────────────────────────────────────────────────────
-  # Today.brief_for/1 — shape tests with mocked cousins
-  # ──────────────────────────────────────────────────────────
 
   # Foyer.Today calls real context modules directly (not via LiveDeps).
   # These tests use real DB data via the sandbox.
@@ -108,10 +100,6 @@ defmodule Foyer.TodayTest do
       assert briefing.waiting_recognitions == 0
     end
   end
-
-  # ──────────────────────────────────────────────────────────
-  # Helper functions
-  # ──────────────────────────────────────────────────────────
 
   defp insert_user do
     {:ok, user} =

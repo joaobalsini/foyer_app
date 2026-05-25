@@ -2,8 +2,8 @@
 #
 # Run with: `mix run priv/repo/seeds.exs` (or via the `ecto.setup` alias).
 #
-# This file is for manual demo / `mix phx.server` walkthroughs. The smoke test
-# (`test/foyer_web/smoke_test.exs`) owns its fixtures via the
+# This file is for manual demo / `mix phx.server` walkthroughs. The smoke tests
+# (`test/foyer_web/smoke_test.exs`) own their fixtures via the
 # `FoyerWeb.ScaffoldFixtures` module so it stays sandboxed.
 
 import Ecto.Query

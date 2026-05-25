@@ -4,13 +4,12 @@ Status: revised after Codex review (v2)
 Scope: Today feature group — briefing surface, shift start/end, off-shift gate, acknowledgement
 flow, waiting counts, mobile rendering across all four design variants  
 Spec: [`../spec.md`](../spec.md)
-Review: [`01-today-briefing-review.md`](./01-today-briefing-review.md)
 
 ---
 
 ## Revision log
 
-**v2 — addressed Codex review of 2026-05-25.** Key changes (see review doc for full rationale):
+**v2 — addressed Codex review of 2026-05-25.** Key changes:
 
 - **Stubbed helpers removed from execution steps.** Step 2 no longer adds stub implementations
   for `House.authored_by`, `House.unacked_since`, `Chat.unread_since`,
@@ -601,7 +600,7 @@ For each spec clause that has observable UI state, one `test` block using `live_
 - `F.Today.18` / `F.Today.19` — recognition cards: assert recognition body text present /
   absent based on scenario. Field name in scenario struct: `recent_recognitions` (plural).
 
-### 8.3 Route smoke tests (`test/foyer_web/scaffold_smoke_test.exs` or a new `today_smoke_test.exs`)
+### 8.3 Route smoke tests (`test/foyer_web/smoke_test.exs`)
 
 These use `live(conn, path)` against the real router and real seeded data:
 
@@ -614,7 +613,7 @@ These use `live(conn, path)` against the real router and real seeded data:
 ### 8.4 Context unit tests (`test/foyer/today_test.exs`)
 
 - Test `Foyer.Today.brief_for/1` returns a `%Briefing{}` with correct field shapes when called
-  with mocked cousins (or a minimal test DB setup via sandbox).
+  with a minimal test DB setup via the sandbox.
 - Test `Briefing.waiting_total/1` correctly sums the three waiting fields.
 
 ### 8.5 Delta context tests (owned by those feature groups)
