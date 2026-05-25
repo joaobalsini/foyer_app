@@ -1,5 +1,5 @@
 defmodule Foyer.ProfileTest do
-  use Foyer.DataCase, async: true
+  use ExUnit.Case, async: true
 
   alias Foyer.Accounts.User
   alias Foyer.Profile
