@@ -220,6 +220,51 @@ clean. Three follow-ups remain — see "Known follow-ups" below.
 - Every `F.Recognitions.<N>` clause now appears in at least one test name; the
   list at the top of this doc has the cross-references.
 
+## Rebase
+
+Rebased onto `origin/main` = `49cd39b "desktop version"`. New `feature/recognitions`
+HEAD = `eaffb06`.
+
+**Conflict files (1):**
+
+- `lib/foyer_web/live/recognitions_live.ex` — `origin/main` rewrote the LiveView
+  with the desktop shell (`Layouts.app` + `<main class="foyer-shell">` +
+  `FoyerComponents.desktop_rail` + `<div class="foyer-content">` wrapper, plus a
+  `foyer-content-cols` two-column layout on `:new` with a live `recognition-preview-col`
+  pane driven by a new `preview_change` event and `preview_*` assigns).
+  `feature/recognitions` rewrote the same file to wire real `give/2`,
+  `update_recognition/3`, `remove_recognition/2`, `within_grace_window?/1`, plus
+  values/visibility fieldsets on `:edit` and a Remove button + values + Private
+  tag on `:show`. Resolution kept both: the desktop shell wraps, the feature
+  content fills it. Concretely:
+  - mount: added all three `preview_*` assigns (from desktop) on top of the
+    feature head's existing assigns.
+  - `handle_event/3`: kept the feature head's three real handlers
+    (`give_submit` with `:self_recognition`/`:invalid_point_tier`, `edit_submit`
+    with `:outside_grace_window`/`:unauthorized`, `remove`), AND added the
+    desktop's `preview_change` handler.
+  - `render/1`: used desktop's shell wrapper (`foyer-shell` + `desktop_rail` +
+    `foyer-content` + inner `foyer-scroll`); inside, kept feature's enhanced
+    `:show` (values tags, Private tag, Remove button) and `:edit` (values +
+    visibility fieldsets); kept desktop's two-column `:new` layout with the live
+    preview pane (form contents were identical, so no behaviour was dropped).
+  No further conflicts on the two verify commits (`973cd1e`, `eaffb06`);
+  neither touched this file.
+
+**Checks (all green after rebase):**
+
+- `mix deps.get` → all dependencies fetched
+- `mix compile --warnings-as-errors` → clean
+- `mix format --check-formatted` → clean
+- `mix credo --strict` → 0 issues, 293 mods/funs
+- `mix dialyzer` → Total errors 2, Skipped 2, Unnecessary Skips 0, passed
+  successfully (exit 0) — same shape as pre-rebase, ignore file unchanged.
+- `mix test` → 51 tests, 0 failures, 0.6s. Count rose from 39 → 51 because the
+  rebase picked up the desktop's `test/foyer_web/desktop_smoke_test.exs` (12
+  tests) introduced in `origin/main`. All pass against the feature-side wiring.
+
+**Verdict after rebase: Pass with follow-ups — unchanged from the pre-rebase verdict above.**
+
 ## Known follow-ups
 
 ### 1. `recognitions.removed_at` index is a regular index, not partial
