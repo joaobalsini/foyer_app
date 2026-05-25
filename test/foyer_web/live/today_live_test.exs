@@ -443,12 +443,11 @@ defmodule FoyerWeb.TodayLiveTest do
       # First render has full-attention border (not opacity-60 yet)
       refute html_first =~ ~r/id="handoff-card"[^>]*opacity-60/
 
-      # Navigate to end-shift and back within same session to trigger handoff_seen
-      view |> element("#end-shift-link") |> render_click()
-      # patch to /today/end-shift then navigate back to /today
-      {:ok, view2, _} = live(conn, ~p"/today")
-      # New connection so handoff_seen resets — just verify handoff still renders
-      assert has_element?(view2, "#handoff-card")
+      # Patch within the same LiveView session to trigger the UI-only seen flag.
+      render_patch(view, ~p"/today/end-shift")
+      html_second = render_patch(view, ~p"/today")
+
+      assert html_second =~ ~r/id="handoff-card"[^>]*opacity-60/
     end
   end
 end

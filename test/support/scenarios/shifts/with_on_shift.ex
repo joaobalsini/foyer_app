@@ -30,6 +30,9 @@ defmodule Foyer.ShiftsScenarios.WithOnShift do
   def last_handoff_for(_user), do: nil
 
   @impl true
+  def last_ended_shift_for(_user), do: nil
+
+  @impl true
   def end_shift(_shift, _attrs), do: {:error, :not_implemented}
 
   @impl true

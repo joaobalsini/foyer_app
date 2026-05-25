@@ -41,7 +41,7 @@ defmodule FoyerWeb.SmokeTest do
   end
 
   describe "route gates" do
-    test "F.Recognitions.1 / F.Chat.10 — off-shift users are redirected away from on-shift surfaces",
+    test "F.Today.2 / F.Recognitions.1 / F.Chat.10 — off-shift users are redirected away from on-shift surfaces",
          ctx do
       assert {:error, {:redirect, %{to: "/today"}}} =
                ctx.conn

@@ -272,7 +272,8 @@ defmodule Foyer.Recognitions do
     Repo.preload(recognition, [:sender, :recipient])
   end
 
-  # Owned by feature/recognitions; this branch carries a local copy until that branch lands on main.
+  # Used by Foyer.Today to count private recognitions received since the user's
+  # last shift ended (F.Today.16, F.Today.20).
   @impl true
   @spec private_received_since(User.t(), DateTime.t() | nil) :: non_neg_integer()
   def private_received_since(%User{id: user_id}, since) do
