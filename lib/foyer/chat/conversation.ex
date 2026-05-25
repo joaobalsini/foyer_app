@@ -23,6 +23,8 @@ defmodule Foyer.Chat.Conversation do
     belongs_to :channel, Foyer.Channels.Channel
     field :direct_key, :string
     field :last_message_at, :utc_datetime
+    field :unread?, :boolean, virtual: true, default: false
+    field :unread_count, :integer, virtual: true, default: 0
 
     has_many :participants, Foyer.Chat.Participant
     has_many :messages, Foyer.Chat.Message
