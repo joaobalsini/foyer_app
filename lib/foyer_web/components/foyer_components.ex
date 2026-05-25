@@ -881,7 +881,7 @@ defmodule FoyerWeb.FoyerComponents do
                 class="flex items-center gap-2 rounded-lg border p-2"
                 style="border-color: var(--foyer-rule);"
               >
-                <.avatar initials={r.sender && r.sender.initials || "?"} size={:sm} />
+                <.avatar initials={(r.sender && r.sender.initials) || "?"} size={:sm} />
                 <span class="flex-1 text-sm">{truncate(r.body)}</span>
                 <span class="foyer-tag forest">+{r.bonus_points} pts</span>
               </div>
@@ -923,16 +923,13 @@ defmodule FoyerWeb.FoyerComponents do
           <div class="foyer-mono mb-2">Settings</div>
           <div class="flex flex-col gap-1">
             <button type="button" aria-disabled="true" class="foyer-btn ghost">
-              Notifications &amp; alerts
-              <span class="foyer-mono ml-auto">Coming soon</span>
+              Notifications &amp; alerts <span class="foyer-mono ml-auto">Coming soon</span>
             </button>
             <button type="button" aria-disabled="true" class="foyer-btn ghost">
-              Languages &amp; translation
-              <span class="foyer-mono ml-auto">Coming soon</span>
+              Languages &amp; translation <span class="foyer-mono ml-auto">Coming soon</span>
             </button>
             <button type="button" aria-disabled="true" class="foyer-btn ghost">
-              Shift availability
-              <span class="foyer-mono ml-auto">Coming soon</span>
+              Shift availability <span class="foyer-mono ml-auto">Coming soon</span>
             </button>
           </div>
         </section>
