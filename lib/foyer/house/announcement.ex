@@ -16,6 +16,8 @@ defmodule Foyer.House.Announcement do
           pinned_at: DateTime.t() | nil,
           requires_ack: boolean() | nil,
           published_at: DateTime.t() | nil,
+          removed_at: DateTime.t() | nil,
+          removed_by_id: integer() | nil,
           inserted_at: DateTime.t() | nil,
           updated_at: DateTime.t() | nil
         }
@@ -28,6 +30,8 @@ defmodule Foyer.House.Announcement do
     field :pinned_at, :utc_datetime
     field :requires_ack, :boolean, default: false
     field :published_at, :utc_datetime
+    field :removed_at, :utc_datetime
+    belongs_to :removed_by, Foyer.Accounts.User
 
     has_many :reads, Foyer.House.AnnouncementRead
     has_many :acks, Foyer.House.AnnouncementAck
@@ -45,7 +49,9 @@ defmodule Foyer.House.Announcement do
       :body,
       :pinned_at,
       :requires_ack,
-      :published_at
+      :published_at,
+      :removed_at,
+      :removed_by_id
     ])
     |> validate_required([:author_id, :channel_id, :title, :body, :published_at])
   end

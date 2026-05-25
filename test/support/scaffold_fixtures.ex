@@ -139,7 +139,7 @@ defmodule FoyerWeb.ScaffoldFixtures do
       |> Repo.insert()
 
     # --- Announcements ---
-    seven_42 = %{now | hour: 7, minute: 42, second: 0}
+    seven_42 = DateTime.add(now, -5 * 60, :second) |> DateTime.truncate(:second)
 
     {:ok, suite_412} =
       %Announcement{}
