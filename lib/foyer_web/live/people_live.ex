@@ -55,61 +55,66 @@ defmodule FoyerWeb.PeopleLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <main class="foyer-root">
-        <div class="foyer-scroll" id="people">
-          <%= cond do %>
-            <% @live_action == :show and @card -> %>
-              <.link
-                navigate={~p"/people"}
-                class="foyer-btn ghost sm self-start"
-                id="back-to-people"
-              >
-                <.icon name="hero-arrow-left" class="size-4" /> Back
-              </.link>
-              <FoyerComponents.profile_card card={@card} />
-            <% true -> %>
-              <header class="flex items-start justify-between">
-                <div>
-                  <div class="foyer-mono">The Linden · Mayfair, London</div>
-                  <h1 class="foyer-serif text-3xl">People</h1>
-                </div>
-              </header>
+      <main class="foyer-shell">
+        <FoyerComponents.desktop_rail active={:me} current_scope={@current_scope} />
+        <div class="foyer-content">
+          <div class="foyer-scroll" id="people">
+            <%= cond do %>
+              <% @live_action == :show and @card -> %>
+                <.link
+                  navigate={~p"/people"}
+                  class="foyer-btn ghost sm self-start"
+                  id="back-to-people"
+                >
+                  <.icon name="hero-arrow-left" class="size-4" /> Back
+                </.link>
+                <FoyerComponents.profile_card card={@card} />
+              <% true -> %>
+                <header class="flex items-start justify-between">
+                  <div>
+                    <div class="foyer-mono">The Linden · Mayfair, London</div>
+                    <h1 class="foyer-serif text-3xl">People</h1>
+                  </div>
+                </header>
 
-              <aside
-                class="hidden md:block rounded-lg border p-3"
-                style="border-color: var(--foyer-rule);"
-              >
-                <div class="foyer-mono">Filters</div>
-                <ul class="mt-2 flex flex-col gap-1 text-sm">
-                  <li>All</li>
-                  <li>On shift</li>
-                  <li>Off shift</li>
-                  <li>Managers</li>
-                </ul>
-              </aside>
-
-              <ul id="people-list" class="flex flex-col gap-2">
-                <li :for={p <- @people}>
-                  <.link
-                    navigate={~p"/people/#{p.id}"}
-                    class="flex items-center gap-3 p-3 rounded-lg border"
+                <div class="md:flex md:gap-4">
+                  <aside
+                    class="hidden md:block md:w-48 md:flex-shrink-0 rounded-lg border p-3"
                     style="border-color: var(--foyer-rule);"
-                    id={"people-row-#{p.id}"}
                   >
-                    <FoyerComponents.avatar initials={p.initials} />
-                    <div class="flex-1">
-                      <div class="foyer-serif">{p.name}</div>
-                      <div class="foyer-mono">{p.title}</div>
-                    </div>
-                    <span :if={MapSet.member?(@on_shift_ids, p.id)} class="foyer-tag moss">
-                      <span class="foyer-pulse"></span>On shift
-                    </span>
-                  </.link>
-                </li>
-              </ul>
-          <% end %>
+                    <div class="foyer-mono">Filters</div>
+                    <ul class="mt-2 flex flex-col gap-1 text-sm">
+                      <li>All</li>
+                      <li>On shift</li>
+                      <li>Off shift</li>
+                      <li>Managers</li>
+                    </ul>
+                  </aside>
 
-          <FoyerComponents.bottom_nav active={:me} current_scope={@current_scope} />
+                  <ul id="people-list" class="flex flex-col gap-2 md:flex-1">
+                    <li :for={p <- @people}>
+                      <.link
+                        navigate={~p"/people/#{p.id}"}
+                        class="flex items-center gap-3 p-3 rounded-lg border"
+                        style="border-color: var(--foyer-rule);"
+                        id={"people-row-#{p.id}"}
+                      >
+                        <FoyerComponents.avatar initials={p.initials} />
+                        <div class="flex-1">
+                          <div class="foyer-serif">{p.name}</div>
+                          <div class="foyer-mono">{p.title}</div>
+                        </div>
+                        <span :if={MapSet.member?(@on_shift_ids, p.id)} class="foyer-tag moss">
+                          <span class="foyer-pulse"></span>On shift
+                        </span>
+                      </.link>
+                    </li>
+                  </ul>
+                </div>
+            <% end %>
+
+            <FoyerComponents.bottom_nav active={:me} current_scope={@current_scope} />
+          </div>
         </div>
       </main>
     </Layouts.app>

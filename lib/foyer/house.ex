@@ -47,11 +47,15 @@ defmodule Foyer.House do
   @impl true
   @spec get_announcement!(integer() | String.t(), User.t()) :: Announcement.t()
   def get_announcement!(id, %User{id: user_id}) do
+    # `acks: :user` is preloaded so the desktop read-receipts panel can render
+    # ack badges with the acking user's initials without a per-ack N+1. One
+    # extra join per page load — backed by index(:announcement_acks,
+    # [:announcement_id, :user_id]).
     from(a in Announcement,
       join: m in Membership,
       on: m.channel_id == a.channel_id and m.user_id == ^user_id,
       where: a.id == ^id,
-      preload: [:author, :channel, :reads, :acks]
+      preload: [:author, :channel, :reads, acks: :user]
     )
     |> Repo.one!()
   end

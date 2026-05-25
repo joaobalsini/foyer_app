@@ -235,9 +235,145 @@ html, body {
   color: var(--foyer-ink);
 }
 
+/* Desktop: bottom-nav hidden globally by the new .foyer-shell rules above. */
+
+/* ---------------------------------------------------------------------------
+   Desktop shell. Activated at md: via class toggling.
+   Side-rail is 15 rem (240 px) fixed on the left.
+   Content area fills the rest, scrolls independently.
+   --------------------------------------------------------------------------- */
+
+/* The top-level shell wrapper: side-rail + content side by side at md:. */
+/* Applied to the <main> element in every LiveView (replaces .foyer-root at md:). */
+.foyer-shell {
+  background: var(--foyer-cream);
+  min-height: 100vh;
+}
+
+/* Mobile: bottom-nav padding. Desktop: no bottom padding (side-rail, not bottom-nav). */
+.foyer-content {
+  padding-bottom: 5rem; /* room for bottom-nav on mobile */
+}
+
 @media (min-width: 768px) {
-  /* The desktop side-rail is the People Directory's chrome; the bottom-nav
-     stays visible because feature groups will add desktop variants later. */
+  .foyer-shell {
+    display: flex;
+    flex-direction: row;
+  }
+
+  .foyer-content {
+    flex: 1;
+    min-width: 0;       /* prevents flex children from overflowing */
+    padding-bottom: 0;
+    overflow-y: auto;
+    max-height: 100vh;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Side-rail.
+   Hidden at < md:; fixed (sticky) column at md:+.
+   --------------------------------------------------------------------------- */
+.foyer-rail {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .foyer-rail {
+    display: flex;
+    flex-direction: column;
+    width: 15rem;
+    min-height: 100vh;
+    position: sticky;
+    top: 0;
+    flex-shrink: 0;
+    background: var(--foyer-cream);
+    border-right: 1px solid var(--foyer-rule);
+    padding: 1.25rem 0;
+    gap: 0;
+    overflow-y: auto;
+  }
+}
+
+/* Rail wordmark / header block */
+.foyer-rail__header {
+  padding: 0 1rem 1rem;
+  border-bottom: 1px solid var(--foyer-rule);
+  margin-bottom: 0.75rem;
+}
+
+/* Rail nav item */
+.foyer-rail__item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 1rem;
+  border-radius: 0;
+  text-decoration: none;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--foyer-ink-soft);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: background 100ms ease, color 100ms ease;
+}
+
+.foyer-rail__item:hover {
+  background: var(--foyer-cream-deep);
+  color: var(--foyer-ink);
+}
+
+.foyer-rail__item[aria-current="page"],
+.foyer-rail__item.is-active {
+  color: var(--foyer-forest-deep);
+  font-weight: 600;
+}
+
+/* Channels sub-group inside rail */
+.foyer-rail__section {
+  padding: 0.5rem 1rem 0.25rem;
+  margin-top: 0.5rem;
+}
+
+/* Rail footer (user + sign-out) */
+.foyer-rail__footer {
+  margin-top: auto;
+  padding: 0.75rem 1rem 0;
+  border-top: 1px solid var(--foyer-rule);
+}
+
+/* ---------------------------------------------------------------------------
+   Hide bottom-nav at desktop widths.
+   --------------------------------------------------------------------------- */
+@media (min-width: 768px) {
+  .foyer-bottom-nav {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Desktop two-column content grid (used inside .foyer-content at lg:).
+   Used by House and Recognition for the compose + preview split.
+   --------------------------------------------------------------------------- */
+.foyer-content-cols {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .foyer-content-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+    gap: 2rem;
+  }
 }
 
 /* ---------------------------------------------------------------------------

@@ -107,6 +107,129 @@ defmodule FoyerWeb.FoyerComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # Desktop side-rail
+  # ---------------------------------------------------------------------------
+
+  attr :active, :atom, required: true, values: [:today, :house, :chat, :me]
+  attr :current_scope, FoyerWeb.Scope, required: true
+  attr :channels, :list, default: []
+
+  @doc """
+  Fixed left side-rail for desktop widths (`md:+`). Hidden at mobile via CSS
+  (`.foyer-rail { display: none }` below `768px`). Stable IDs for smoke tests:
+  `#desktop-rail`, `#rail-nav-today`, `#rail-nav-house`, `#rail-nav-chat`,
+  `#rail-nav-me`.
+
+  When off-shift, House/Chat/Me render as disabled `<button>` elements matching
+  the same discipline as `bottom_nav/1`.
+  """
+  def desktop_rail(assigns) do
+    ~H"""
+    <nav id="desktop-rail" class="foyer-rail" aria-label="Main navigation">
+      <%!-- Wordmark --%>
+      <div class="foyer-rail__header">
+        <div class="foyer-serif text-xl">Foyer</div>
+        <div class="foyer-mono">{@current_scope.user.department}</div>
+      </div>
+
+      <%!-- Primary nav --%>
+      <.link
+        id="rail-nav-today"
+        navigate={~p"/today"}
+        class={["foyer-rail__item", @active == :today && "is-active"]}
+        aria-current={if @active == :today, do: "page", else: nil}
+      >
+        <.icon name="hero-home" class="size-4" /> Today
+      </.link>
+
+      <%= if @current_scope.on_shift? do %>
+        <.link
+          id="rail-nav-house"
+          navigate={~p"/house"}
+          class={["foyer-rail__item", @active == :house && "is-active"]}
+          aria-current={if @active == :house, do: "page", else: nil}
+        >
+          <.icon name="hero-building-library" class="size-4" /> House
+        </.link>
+        <.link
+          id="rail-nav-chat"
+          navigate={~p"/chat"}
+          class={["foyer-rail__item", @active == :chat && "is-active"]}
+          aria-current={if @active == :chat, do: "page", else: nil}
+        >
+          <.icon name="hero-chat-bubble-left-right" class="size-4" /> Chat
+        </.link>
+        <.link
+          id="rail-nav-me"
+          navigate={~p"/me"}
+          class={["foyer-rail__item", @active == :me && "is-active"]}
+          aria-current={if @active == :me, do: "page", else: nil}
+        >
+          <.icon name="hero-user-circle" class="size-4" /> Me
+        </.link>
+      <% else %>
+        <button
+          id="rail-nav-house"
+          type="button"
+          disabled
+          aria-disabled="true"
+          class="foyer-rail__item opacity-40 cursor-not-allowed"
+        >
+          <.icon name="hero-building-library" class="size-4" /> House
+        </button>
+        <button
+          id="rail-nav-chat"
+          type="button"
+          disabled
+          aria-disabled="true"
+          class="foyer-rail__item opacity-40 cursor-not-allowed"
+        >
+          <.icon name="hero-chat-bubble-left-right" class="size-4" /> Chat
+        </button>
+        <button
+          id="rail-nav-me"
+          type="button"
+          disabled
+          aria-disabled="true"
+          class="foyer-rail__item opacity-40 cursor-not-allowed"
+        >
+          <.icon name="hero-user-circle" class="size-4" /> Me
+        </button>
+      <% end %>
+
+      <%!-- Channels sub-group (shown when list is not empty) --%>
+      <%= if @channels != [] do %>
+        <div class="foyer-rail__section">
+          <div class="foyer-mono">Channels</div>
+        </div>
+        <.link
+          :for={ch <- @channels}
+          navigate={~p"/chat"}
+          class="foyer-rail__item pl-6"
+          id={"rail-channel-#{ch.id}"}
+        >
+          # {ch.name}
+        </.link>
+      <% end %>
+
+      <%!-- Footer: current user + sign-out --%>
+      <div class="foyer-rail__footer">
+        <div class="flex items-center gap-2 mb-2">
+          <.avatar initials={@current_scope.user.initials} size={:sm} />
+          <div>
+            <div class="foyer-serif text-sm">{@current_scope.user.name}</div>
+            <div class="foyer-mono">{@current_scope.user.title}</div>
+          </div>
+        </div>
+        <.link method="delete" href={~p"/session"} class="foyer-rail__item" id="rail-sign-out">
+          <.icon name="hero-arrow-right-on-rectangle" class="size-4" /> Sign out
+        </.link>
+      </div>
+    </nav>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # Avatar
   # ---------------------------------------------------------------------------
 
@@ -334,63 +457,71 @@ defmodule FoyerWeb.FoyerComponents do
 
   def profile_card(assigns) do
     ~H"""
-    <header class="flex items-center gap-3">
-      <.avatar initials={@card.user.initials} size={:lg} />
-      <div>
-        <h1 class="foyer-serif text-3xl">{@card.user.name}</h1>
-        <div class="foyer-mono">{@card.user.title}</div>
-        <div class="text-sm">
-          Languages · {Enum.join(@card.user.languages || [], ", ")}
-        </div>
-        <span :if={@card.on_shift?} class="foyer-tag moss">
-          <span class="foyer-pulse"></span>On shift
-        </span>
-      </div>
-    </header>
+    <div class="foyer-content-cols">
+      <%!-- Left column: header + stats --%>
+      <div class="flex flex-col gap-4">
+        <header class="flex items-center gap-3">
+          <.avatar initials={@card.user.initials} size={:lg} />
+          <div>
+            <h1 class="foyer-serif text-3xl">{@card.user.name}</h1>
+            <div class="foyer-mono">{@card.user.title}</div>
+            <div class="text-sm">
+              Languages · {Enum.join(@card.user.languages || [], ", ")}
+            </div>
+            <span :if={@card.on_shift?} class="foyer-tag moss">
+              <span class="foyer-pulse"></span>On shift
+            </span>
+          </div>
+        </header>
 
-    <section class="grid grid-cols-2 gap-2" id="profile-stats">
-      <div class="rounded-lg border p-3" style="border-color: var(--foyer-rule);">
-        <div class="foyer-mono">Recognitions this month</div>
-        <div class="foyer-serif text-2xl">{length(@card.received)}</div>
+        <section class="grid grid-cols-2 gap-2" id="profile-stats">
+          <div class="rounded-lg border p-3" style="border-color: var(--foyer-rule);">
+            <div class="foyer-mono">Recognitions this month</div>
+            <div class="foyer-serif text-2xl">{length(@card.received)}</div>
+          </div>
+          <div class="rounded-lg border p-3" style="border-color: var(--foyer-rule);">
+            <div class="foyer-mono">Ack on time</div>
+            <div class="foyer-serif text-2xl">—</div>
+          </div>
+        </section>
       </div>
-      <div class="rounded-lg border p-3" style="border-color: var(--foyer-rule);">
-        <div class="foyer-mono">Ack on time</div>
-        <div class="foyer-serif text-2xl">—</div>
-      </div>
-    </section>
 
-    <section id="recognitions-received">
-      <div class="foyer-mono">Received</div>
-      <div class="flex flex-col gap-2 mt-2">
-        <.recognition_card :for={r <- @card.received} recognition={r} />
-      </div>
-    </section>
+      <%!-- Right column: recognitions + points + rewards (at lg:, stacks below at md: and mobile) --%>
+      <div class="flex flex-col gap-4">
+        <section id="recognitions-received">
+          <div class="foyer-mono">Received</div>
+          <div class="flex flex-col gap-2 mt-2">
+            <.recognition_card :for={r <- @card.received} recognition={r} />
+          </div>
+        </section>
 
-    <section id="recognitions-given">
-      <div class="foyer-mono">Given</div>
-      <div class="flex flex-col gap-2 mt-2">
-        <.recognition_card :for={r <- @card.given} recognition={r} />
-      </div>
-    </section>
+        <section id="recognitions-given">
+          <div class="foyer-mono">Given</div>
+          <div class="flex flex-col gap-2 mt-2">
+            <.recognition_card :for={r <- @card.given} recognition={r} />
+          </div>
+        </section>
 
-    <section id="points">
-      <div class="foyer-mono">Foyer points</div>
-      <div class="foyer-serif text-3xl">{@card.points}</div>
-    </section>
+        <section id="points">
+          <div class="foyer-mono">Foyer points</div>
+          <div class="foyer-serif text-3xl">{@card.points}</div>
+        </section>
 
-    <section :if={@rewards != []} id="rewards">
-      <div class="foyer-mono">Rewards</div>
-      <div class="grid grid-cols-2 gap-2 mt-2">
-        <div
-          :for={r <- @rewards}
-          class="rounded-lg border p-3"
-          style="border-color: var(--foyer-rule);"
-        >
-          <div class="foyer-serif">{r.title}</div>
-          <div class="foyer-mono">{r.cost} pts</div>
-        </div>
+        <section :if={@rewards != []} id="rewards">
+          <div class="foyer-mono">Rewards</div>
+          <div class="grid grid-cols-2 gap-2 mt-2">
+            <div
+              :for={r <- @rewards}
+              class="rounded-lg border p-3"
+              style="border-color: var(--foyer-rule);"
+            >
+              <div class="foyer-serif">{r.title}</div>
+              <div class="foyer-mono">{r.cost} pts</div>
+            </div>
+          </div>
+        </section>
       </div>
-    </section>
+    </div>
     """
   end
 

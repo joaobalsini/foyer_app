@@ -36,10 +36,13 @@ defmodule FoyerWeb.ProfileLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <main class="foyer-root">
-        <div class="foyer-scroll" id="profile">
-          <FoyerComponents.profile_card :if={@card} card={@card} rewards={@rewards} />
-          <FoyerComponents.bottom_nav active={:me} current_scope={@current_scope} />
+      <main class="foyer-shell">
+        <FoyerComponents.desktop_rail active={:me} current_scope={@current_scope} />
+        <div class="foyer-content">
+          <div class="foyer-scroll" id="profile">
+            <FoyerComponents.profile_card :if={@card} card={@card} rewards={@rewards} />
+            <FoyerComponents.bottom_nav active={:me} current_scope={@current_scope} />
+          </div>
         </div>
       </main>
     </Layouts.app>

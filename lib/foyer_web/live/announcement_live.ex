@@ -20,6 +20,8 @@ defmodule FoyerWeb.AnnouncementLive do
      |> assign(:form, nil)
      |> assign(:channel_options, [])
      |> assign(:acked?, false)
+     |> assign(:preview_title, "")
+     |> assign(:preview_body, "")
      |> assign(:page_title, "Announcement")}
   end
 
@@ -77,6 +79,8 @@ defmodule FoyerWeb.AnnouncementLive do
        |> assign(:announcement, a)
        |> assign(:form, to_form(FoyerWeb.LiveDeps.house().change_announcement(a, %{})))
        |> assign(:channel_options, Enum.map(channels, &{&1.name, &1.id}))
+       |> assign(:preview_title, a.title || "")
+       |> assign(:preview_body, a.body || "")
        |> assign(:page_title, "Edit · " <> a.title)}
     rescue
       Ecto.NoResultsError ->
@@ -140,6 +144,13 @@ defmodule FoyerWeb.AnnouncementLive do
      |> put_flash(:info, "Acknowledged.")}
   end
 
+  def handle_event("preview_change", %{"announcement" => attrs}, socket) do
+    {:noreply,
+     socket
+     |> assign(:preview_title, Map.get(attrs, "title", ""))
+     |> assign(:preview_body, Map.get(attrs, "body", ""))}
+  end
+
   defp acked_by?(%{acks: acks}, user_id) when is_list(acks) do
     Enum.any?(acks, fn ack -> ack.user_id == user_id end)
   end
@@ -150,112 +161,183 @@ defmodule FoyerWeb.AnnouncementLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <main class="foyer-root">
-        <div class="foyer-scroll" id="announcement">
-          <.link navigate={~p"/house"} class="foyer-btn ghost sm self-start" id="back-to-house">
-            <.icon name="hero-arrow-left" class="size-4" /> Back
-          </.link>
+      <main class="foyer-shell">
+        <FoyerComponents.desktop_rail active={:house} current_scope={@current_scope} />
+        <div class="foyer-content">
+          <div class="foyer-scroll" id="announcement">
+            <.link navigate={~p"/house"} class="foyer-btn ghost sm self-start" id="back-to-house">
+              <.icon name="hero-arrow-left" class="size-4" /> Back
+            </.link>
 
-          <%= cond do %>
-            <% @live_action == :new -> %>
-              <h1 class="foyer-serif text-3xl">New announcement</h1>
-              <.form
-                for={@form}
-                id="announcement-new-form"
-                phx-submit="compose_submit"
-                class="flex flex-col gap-3"
-              >
-                <.input field={@form[:title]} type="text" label="Title" />
-                <.input field={@form[:body]} type="textarea" label="The detail" />
-                <.input
-                  field={@form[:channel_id]}
-                  type="select"
-                  label="To · audience"
-                  options={@channel_options}
-                />
-                <button class="foyer-btn forest" type="submit">Publish</button>
-              </.form>
-            <% @live_action == :edit and @announcement -> %>
-              <h1 class="foyer-serif text-3xl">Edit announcement</h1>
-              <.form
-                for={@form}
-                id="announcement-edit-form"
-                phx-submit="edit_submit"
-                class="flex flex-col gap-3"
-              >
-                <.input field={@form[:title]} type="text" label="Title" />
-                <.input field={@form[:body]} type="textarea" label="The detail" />
-                <.input
-                  field={@form[:channel_id]}
-                  type="select"
-                  label="To · audience"
-                  options={@channel_options}
-                />
-                <button class="foyer-btn forest" type="submit">Save changes</button>
-              </.form>
-            <% @live_action == :show and @announcement -> %>
-              <article class="flex flex-col gap-3">
-                <div class="flex items-center gap-2">
-                  <span :if={@announcement.pinned_at} class="foyer-tag claret">Pinned</span>
-                  <span :if={@announcement.requires_ack} class="foyer-tag outline">
-                    Requires acknowledgement
-                  </span>
-                  <span class="foyer-mono ml-auto">
-                    {@announcement.channel && @announcement.channel.name}
-                  </span>
-                </div>
-
-                <h1 class="foyer-serif text-3xl">{@announcement.title}</h1>
-
-                <div class="flex items-center gap-2">
-                  <FoyerComponents.avatar
-                    :if={@announcement.author}
-                    initials={@announcement.author.initials}
-                    size={:sm}
-                  />
-                  <div>
-                    <div>{@announcement.author && @announcement.author.name}</div>
-                    <div class="foyer-mono">
-                      Audience · {@announcement.channel && @announcement.channel.name}
+            <%= cond do %>
+              <% @live_action == :new -> %>
+                <%= if not FoyerWeb.FoyerComponents.manager?(@current_scope) do %>
+                  <div id="compose-gated" class="flex flex-col items-center gap-3 mt-8">
+                    <div class="foyer-mono">Manager view only</div>
+                    <p class="foyer-serif text-xl">Compose is for managers.</p>
+                    <.link navigate={~p"/house"} class="foyer-btn sm">
+                      Back to The House
+                    </.link>
+                  </div>
+                <% else %>
+                  <h1 class="foyer-serif text-3xl">New announcement</h1>
+                  <div class="foyer-content-cols">
+                    <div>
+                      <.form
+                        for={@form}
+                        id="announcement-new-form"
+                        phx-submit="compose_submit"
+                        phx-change="preview_change"
+                        class="flex flex-col gap-3"
+                      >
+                        <.input field={@form[:title]} type="text" label="Title" />
+                        <.input field={@form[:body]} type="textarea" label="The detail" />
+                        <.input
+                          field={@form[:channel_id]}
+                          type="select"
+                          label="To · audience"
+                          options={@channel_options}
+                        />
+                        <button class="foyer-btn forest" type="submit">Publish</button>
+                      </.form>
+                    </div>
+                    <div class="hidden lg:block" id="announcement-preview-col">
+                      <div class="foyer-mono mb-2">Preview</div>
+                      <article
+                        class="rounded-lg border p-3 flex flex-col gap-2"
+                        style="border-color: var(--foyer-rule);"
+                      >
+                        <h3 class="foyer-serif text-xl">
+                          {if @preview_title != "", do: @preview_title, else: "Untitled"}
+                        </h3>
+                        <p class="text-sm">
+                          {if @preview_body != "", do: @preview_body, else: "Body will appear here…"}
+                        </p>
+                      </article>
                     </div>
                   </div>
-                  <%= if managed_by?(@announcement, @current_scope) do %>
-                    <.link
-                      navigate={~p"/announcements/#{@announcement.id}/edit"}
-                      class="foyer-btn ghost sm ml-auto"
-                      id="announcement-edit-link"
-                    >
-                      Edit
-                    </.link>
-                  <% end %>
-                </div>
-
-                <p class="foyer-serif">{@announcement.body}</p>
-
-                <%= if @announcement.requires_ack do %>
-                  <div class="foyer-mono">
-                    {length(@announcement.acks)} confirmed
-                  </div>
-
-                  <%= if @acked? do %>
-                    <button class="foyer-btn" disabled id="acked-state">
-                      Acknowledged
-                    </button>
-                  <% else %>
-                    <button
-                      class="foyer-btn forest"
-                      phx-click="acknowledge"
-                      id="acknowledge-btn"
-                      type="button"
-                    >
-                      I've read &amp; understood
-                    </button>
-                  <% end %>
                 <% end %>
-              </article>
-          <% end %>
+              <% @live_action == :edit and @announcement -> %>
+                <h1 class="foyer-serif text-3xl">Edit announcement</h1>
+                <div class="foyer-content-cols">
+                  <div>
+                    <.form
+                      for={@form}
+                      id="announcement-edit-form"
+                      phx-submit="edit_submit"
+                      phx-change="preview_change"
+                      class="flex flex-col gap-3"
+                    >
+                      <.input field={@form[:title]} type="text" label="Title" />
+                      <.input field={@form[:body]} type="textarea" label="The detail" />
+                      <.input
+                        field={@form[:channel_id]}
+                        type="select"
+                        label="To · audience"
+                        options={@channel_options}
+                      />
+                      <button class="foyer-btn forest" type="submit">Save changes</button>
+                    </.form>
+                  </div>
+                  <div class="hidden lg:block" id="announcement-edit-preview-col">
+                    <div class="foyer-mono mb-2">Preview</div>
+                    <article
+                      class="rounded-lg border p-3 flex flex-col gap-2"
+                      style="border-color: var(--foyer-rule);"
+                    >
+                      <h3 class="foyer-serif text-xl">
+                        {if @preview_title != "", do: @preview_title, else: "Untitled"}
+                      </h3>
+                      <p class="text-sm">
+                        {if @preview_body != "", do: @preview_body, else: "Body will appear here…"}
+                      </p>
+                    </article>
+                  </div>
+                </div>
+              <% @live_action == :show and @announcement -> %>
+                <div class="foyer-content-cols">
+                  <article class="flex flex-col gap-3">
+                    <div class="flex items-center gap-2">
+                      <span :if={@announcement.pinned_at} class="foyer-tag claret">Pinned</span>
+                      <span :if={@announcement.requires_ack} class="foyer-tag outline">
+                        Requires acknowledgement
+                      </span>
+                      <span class="foyer-mono ml-auto">
+                        {@announcement.channel && @announcement.channel.name}
+                      </span>
+                    </div>
 
-          <FoyerComponents.bottom_nav active={:house} current_scope={@current_scope} />
+                    <h1 class="foyer-serif text-3xl">{@announcement.title}</h1>
+
+                    <div class="flex items-center gap-2">
+                      <FoyerComponents.avatar
+                        :if={@announcement.author}
+                        initials={@announcement.author.initials}
+                        size={:sm}
+                      />
+                      <div>
+                        <div>{@announcement.author && @announcement.author.name}</div>
+                        <div class="foyer-mono">
+                          Audience · {@announcement.channel && @announcement.channel.name}
+                        </div>
+                      </div>
+                      <%= if managed_by?(@announcement, @current_scope) do %>
+                        <.link
+                          navigate={~p"/announcements/#{@announcement.id}/edit"}
+                          class="foyer-btn ghost sm ml-auto"
+                          id="announcement-edit-link"
+                        >
+                          Edit
+                        </.link>
+                      <% end %>
+                    </div>
+
+                    <p class="foyer-serif">{@announcement.body}</p>
+
+                    <%= if @announcement.requires_ack do %>
+                      <div class="foyer-mono">
+                        {length(@announcement.acks)} confirmed
+                      </div>
+
+                      <%= if @acked? do %>
+                        <button class="foyer-btn" disabled id="acked-state">
+                          Acknowledged
+                        </button>
+                      <% else %>
+                        <button
+                          class="foyer-btn forest"
+                          phx-click="acknowledge"
+                          id="acknowledge-btn"
+                          type="button"
+                        >
+                          I've read &amp; understood
+                        </button>
+                      <% end %>
+                    <% end %>
+                  </article>
+
+                  <div class="hidden lg:block" id="read-receipts-col">
+                    <div class="foyer-mono mb-2">Read receipts</div>
+                    <div class="flex flex-col gap-2">
+                      <div class="foyer-mono">
+                        {length(@announcement.acks)} confirmed / {length(@announcement.reads)} read
+                      </div>
+                      <div class="flex flex-wrap gap-2">
+                        <span
+                          :for={ack <- @announcement.acks}
+                          class="foyer-tag moss"
+                          id={"ack-badge-#{ack.user_id}"}
+                        >
+                          {ack_initials(ack)} ✓
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+            <% end %>
+
+            <FoyerComponents.bottom_nav active={:house} current_scope={@current_scope} />
+          </div>
         </div>
       </main>
     </Layouts.app>
@@ -266,4 +348,7 @@ defmodule FoyerWeb.AnnouncementLive do
     do: author_id == id
 
   defp managed_by?(_, _), do: false
+
+  defp ack_initials(%{user: %{initials: initials}}), do: initials
+  defp ack_initials(_), do: "??"
 end
