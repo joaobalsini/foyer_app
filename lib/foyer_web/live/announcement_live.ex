@@ -4,13 +4,20 @@ defmodule FoyerWeb.AnnouncementLive do
   `/announcements/:id/edit`. Membership-authorized via
   `Foyer.House.get_announcement!/2`; an unauthorized user (e.g. Maya trying to
   open a Leadership-only announcement) is redirected back to `/house` with a
-  flash. The "I've read & understood" CTA writes an `AnnouncementAck` row.
+  flash.
+
+  Compose (`/announcements/new`) is manager-gated in `apply_new/1` — staff
+  are redirected back to `/house` with a flash, defending in depth on top of
+  the context-level guard in `Foyer.House.create_announcement/2`
+  (`F.Announcements.2`). The "I've read & understood" CTA writes an
+  `AnnouncementAck` row (`F.Announcements.7`, `F.Announcements.8`). Pin /
+  unpin / remove buttons render only for the author or a channel manager
+  within the 15-minute grace window (`F.Announcements.3` – .5).
   """
   use FoyerWeb, :live_view
 
   alias Foyer.House.Announcement
   alias FoyerWeb.FoyerComponents
-  alias FoyerWeb.Scope
 
   @impl true
   def mount(_params, _session, socket) do
@@ -20,12 +27,11 @@ defmodule FoyerWeb.AnnouncementLive do
      |> assign(:form, nil)
      |> assign(:channel_options, [])
      |> assign(:acked?, false)
-     |> assign(:title, "")
-     |> assign(:body, "")
-     |> assign(:channel_id, nil)
-     |> assign(:pinned, false)
-     |> assign(:require_ack, false)
-     |> assign(:grace_state, :idle)
+     |> assign(:can_ack?, false)
+     |> assign(:can_pin?, false)
+     |> assign(:receipts, nil)
+     |> assign(:preview_title, "")
+     |> assign(:preview_body, "")
      |> assign(:page_title, "Announcement")}
   end
 
@@ -41,23 +47,20 @@ defmodule FoyerWeb.AnnouncementLive do
   defp apply_new(socket) do
     scope = socket.assigns.current_scope
 
-    if not Scope.manager?(scope) do
-      {:noreply, socket |> assign(:page_title, "New announcement")}
-    else
+    if FoyerWeb.Scope.manager?(scope) do
       channels = FoyerWeb.LiveDeps.channels().list_for_user(scope.user)
-      channel_options = Enum.map(channels, &{&1.name, &1.id})
-      default_channel_id = channels |> List.first() |> then(&(&1 && &1.id))
 
       {:noreply,
        socket
-       |> assign(:channel_options, channel_options)
-       |> assign(:channel_id, default_channel_id)
-       |> assign(:title, "")
-       |> assign(:body, "")
-       |> assign(:pinned, false)
-       |> assign(:require_ack, false)
-       |> assign(:grace_state, :idle)
+       |> assign(:announcement, nil)
+       |> assign(:form, to_form(FoyerWeb.LiveDeps.house().compose_changeset(%{})))
+       |> assign(:channel_options, Enum.map(channels, &{&1.name, &1.id}))
        |> assign(:page_title, "New announcement")}
+    else
+      {:noreply,
+       socket
+       |> put_flash(:error, "Only managers can publish announcements.")
+       |> push_navigate(to: ~p"/house")}
     end
   end
 
@@ -67,13 +70,14 @@ defmodule FoyerWeb.AnnouncementLive do
     try do
       a = FoyerWeb.LiveDeps.house().get_announcement!(id, scope.user)
       FoyerWeb.LiveDeps.house().mark_read(a, scope.user)
-      grace_state = grace_state(a)
 
       {:noreply,
        socket
        |> assign(:announcement, a)
        |> assign(:acked?, acked_by?(a, scope.user.id))
-       |> assign(:grace_state, grace_state)
+       |> assign(:can_ack?, can_ack?(a, scope.user))
+       |> assign(:can_pin?, can_pin?(a, scope.user))
+       |> assign(:receipts, load_receipts(a, scope.user))
        |> assign(:page_title, a.title)}
     rescue
       Ecto.NoResultsError ->
@@ -90,19 +94,22 @@ defmodule FoyerWeb.AnnouncementLive do
     try do
       a = FoyerWeb.LiveDeps.house().get_announcement!(id, scope.user)
       channels = FoyerWeb.LiveDeps.channels().list_for_user(scope.user)
-      grace_state = grace_state(a)
 
-      {:noreply,
-       socket
-       |> assign(:announcement, a)
-       |> assign(:channel_options, Enum.map(channels, &{&1.name, &1.id}))
-       |> assign(:title, a.title || "")
-       |> assign(:body, a.body || "")
-       |> assign(:channel_id, a.channel_id)
-       |> assign(:pinned, not is_nil(a.pinned_at))
-       |> assign(:require_ack, a.requires_ack || false)
-       |> assign(:grace_state, grace_state)
-       |> assign(:page_title, "Edit · " <> a.title)}
+      if managed_by?(a, scope) and FoyerWeb.LiveDeps.house().within_grace_window?(a) do
+        {:noreply,
+         socket
+         |> assign(:announcement, a)
+         |> assign(:form, to_form(FoyerWeb.LiveDeps.house().change_announcement(a, %{})))
+         |> assign(:channel_options, Enum.map(channels, &{&1.name, &1.id}))
+         |> assign(:preview_title, a.title || "")
+         |> assign(:preview_body, a.body || "")
+         |> assign(:page_title, "Edit · " <> a.title)}
+      else
+        {:noreply,
+         socket
+         |> put_flash(:error, "That announcement can no longer be edited.")
+         |> push_navigate(to: ~p"/announcements/#{a.id}")}
+      end
     rescue
       Ecto.NoResultsError ->
         {:noreply,
@@ -113,114 +120,128 @@ defmodule FoyerWeb.AnnouncementLive do
   end
 
   @impl true
-  def handle_event("compose_change", params, socket) do
-    channel_id =
-      case params["audience"] do
-        nil ->
-          socket.assigns.channel_id
-
-        id_str ->
-          case Integer.parse(id_str) do
-            {n, ""} -> n
-            _ -> socket.assigns.channel_id
-          end
-      end
-
-    {:noreply,
-     socket
-     |> assign(:title, params["title"] || socket.assigns.title)
-     |> assign(:body, params["body"] || socket.assigns.body)
-     |> assign(:channel_id, channel_id)
-     |> assign(:pinned, params["pinned"] == "true")
-     |> assign(:require_ack, params["require_ack"] == "true")}
-  end
-
-  def handle_event("compose_submit", _params, socket) do
+  def handle_event("compose_submit", %{"announcement" => attrs}, socket) do
     scope = socket.assigns.current_scope
 
-    attrs = %{
-      "title" => socket.assigns.title,
-      "body" => socket.assigns.body,
-      "channel_id" => socket.assigns.channel_id,
-      "pinned_at" => if(socket.assigns.pinned, do: DateTime.utc_now(), else: nil),
-      "requires_ack" => socket.assigns.require_ack
-    }
-
     case FoyerWeb.LiveDeps.house().create_announcement(scope.user, attrs) do
-      {:ok, announcement} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Announcement published.")
-         |> push_navigate(to: ~p"/announcements/#{announcement.id}")}
+      {:ok, _announcement} ->
+        {:noreply, push_navigate(socket, to: ~p"/house")}
 
-      {:error, :not_implemented} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Compose not implemented in scaffold.")
-         |> push_navigate(to: ~p"/house")}
+      {:error, :unauthorized} ->
+        {:noreply, put_flash(socket, :error, "Only managers can publish announcements.")}
 
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "Couldn't publish announcement.")}
     end
   end
 
-  def handle_event("edit_submit", _params, socket) do
+  def handle_event("edit_submit", %{"announcement" => attrs}, socket) do
     scope = socket.assigns.current_scope
     %Announcement{id: id} = announcement = socket.assigns.announcement
 
-    attrs = %{
-      "title" => socket.assigns.title,
-      "body" => socket.assigns.body,
-      "channel_id" => socket.assigns.channel_id,
-      "pinned_at" =>
-        if(socket.assigns.pinned, do: announcement.pinned_at || DateTime.utc_now(), else: nil),
-      "requires_ack" => socket.assigns.require_ack
-    }
-
     case FoyerWeb.LiveDeps.house().update_announcement(announcement, scope.user, attrs) do
       {:ok, _updated} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Announcement updated.")
-         |> push_navigate(to: ~p"/announcements/#{id}")}
+        {:noreply, push_navigate(socket, to: ~p"/announcements/#{id}")}
 
-      {:error, :not_implemented} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Edit not implemented in scaffold.")
-         |> push_navigate(to: ~p"/announcements/#{id}")}
+      {:error, :outside_grace_window} ->
+        {:noreply, put_flash(socket, :error, "That announcement can no longer be edited.")}
+
+      {:error, :unauthorized} ->
+        {:noreply, put_flash(socket, :error, "Only the author can edit this announcement.")}
 
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "Couldn't update announcement.")}
     end
   end
 
+  def handle_event("remove", _params, socket) do
+    scope = socket.assigns.current_scope
+    announcement = socket.assigns.announcement
+
+    case FoyerWeb.LiveDeps.house().remove_announcement(announcement, scope.user) do
+      {:ok, _removed} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Announcement removed.")
+         |> push_navigate(to: ~p"/house")}
+
+      {:error, :outside_grace_window} ->
+        {:noreply, put_flash(socket, :error, "That announcement can no longer be removed.")}
+
+      {:error, :unauthorized} ->
+        {:noreply, put_flash(socket, :error, "Only the author can remove this announcement.")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Couldn't remove announcement.")}
+    end
+  end
+
+  def handle_event("pin", _params, socket) do
+    update_pin_state(
+      socket,
+      fn announcement, user -> FoyerWeb.LiveDeps.house().pin_announcement(announcement, user) end,
+      "Announcement pinned."
+    )
+  end
+
+  def handle_event("unpin", _params, socket) do
+    update_pin_state(
+      socket,
+      fn announcement, user ->
+        FoyerWeb.LiveDeps.house().unpin_announcement(announcement, user)
+      end,
+      "Announcement unpinned."
+    )
+  end
+
   def handle_event("acknowledge", _params, socket) do
     scope = socket.assigns.current_scope
     a = socket.assigns.announcement
 
-    FoyerWeb.LiveDeps.house().acknowledge(a, scope.user)
+    case FoyerWeb.LiveDeps.house().acknowledge(a, scope.user) do
+      {:ok, _} ->
+        refreshed = FoyerWeb.LiveDeps.house().get_announcement!(a.id, scope.user)
 
-    refreshed = FoyerWeb.LiveDeps.house().get_announcement!(a.id, scope.user)
+        {:noreply,
+         socket
+         |> assign(:announcement, refreshed)
+         |> assign(:acked?, true)
+         |> assign(:can_ack?, can_ack?(refreshed, scope.user))
+         |> put_flash(:info, "Acknowledged.")}
 
-    {:noreply,
-     socket
-     |> assign(:announcement, refreshed)
-     |> assign(:acked?, true)
-     |> put_flash(:info, "Acknowledged.")}
+      {:error, :not_required} ->
+        {:noreply, put_flash(socket, :error, "No acknowledgement is required from you.")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Couldn't acknowledge announcement.")}
+    end
   end
 
-  def handle_event("unpin", _params, socket) do
-    # TODO: unpin_announcement not exposed by foyer_app's HousePort — stubbed
-    {:noreply, put_flash(socket, :info, "Unpin not implemented in scaffold.")}
-  end
-
-  def handle_event("remove", _params, socket) do
-    # TODO: remove_announcement not exposed by foyer_app's HousePort — stubbed
+  def handle_event("preview_change", %{"announcement" => attrs}, socket) do
     {:noreply,
      socket
-     |> put_flash(:info, "Remove not implemented in scaffold.")
-     |> push_navigate(to: ~p"/house")}
+     |> assign(:preview_title, Map.get(attrs, "title", ""))
+     |> assign(:preview_body, Map.get(attrs, "body", ""))}
+  end
+
+  defp update_pin_state(socket, fun, message) do
+    scope = socket.assigns.current_scope
+    announcement = socket.assigns.announcement
+
+    case fun.(announcement, scope.user) do
+      {:ok, updated} ->
+        {:noreply,
+         socket
+         |> assign(:announcement, updated)
+         |> assign(:receipts, load_receipts(updated, scope.user))
+         |> put_flash(:info, message)}
+
+      {:error, :unauthorized} ->
+        {:noreply, put_flash(socket, :error, "Only managers can pin announcements.")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Couldn't update pin.")}
+    end
   end
 
   defp acked_by?(%{acks: acks}, user_id) when is_list(acks) do
@@ -229,18 +250,24 @@ defmodule FoyerWeb.AnnouncementLive do
 
   defp acked_by?(_, _), do: false
 
-  defp grace_state(%Announcement{published_at: nil}), do: :idle
+  defp can_ack?(%Announcement{requires_ack: true, author_id: author_id}, %{id: user_id})
+       when author_id != user_id,
+       do: true
 
-  defp grace_state(%Announcement{published_at: published_at}) do
-    elapsed_ms = DateTime.diff(DateTime.utc_now(), published_at, :millisecond)
-    remaining_ms = max(0, 60_000 - elapsed_ms)
-    if remaining_ms > 0, do: :open, else: :expired
+  defp can_ack?(%Announcement{}, %{}), do: false
+
+  defp can_pin?(%Announcement{channel_id: channel_id}, %{role: :manager} = user) do
+    user
+    |> FoyerWeb.LiveDeps.channels().list_for_user()
+    |> Enum.any?(&(&1.id == channel_id))
   end
 
-  defp audience_label(channel_options, channel_id) do
-    case Enum.find(channel_options, fn {_, id} -> id == channel_id end) do
-      {label, _} -> label
-      _ -> ""
+  defp can_pin?(%Announcement{}, %{}), do: false
+
+  defp load_receipts(announcement, user) do
+    case FoyerWeb.LiveDeps.house().receipts_for(announcement, user) do
+      {:ok, receipts} -> receipts
+      {:error, _} -> nil
     end
   end
 
@@ -252,587 +279,247 @@ defmodule FoyerWeb.AnnouncementLive do
         <FoyerComponents.desktop_rail active={:house} current_scope={@current_scope} />
         <div class="foyer-content">
           <div class="foyer-scroll" id="announcement">
-            <FoyerComponents.desktop_topbar current_scope={@current_scope} page_title={@page_title} />
+            <.link navigate={~p"/house"} class="foyer-btn ghost sm self-start" id="back-to-house">
+              <.icon name="hero-arrow-left" class="size-4" /> Back
+            </.link>
 
             <%= cond do %>
               <% @live_action == :new -> %>
-                <%= if not FoyerComponents.manager?(@current_scope) do %>
-                  <div
-                    id="compose-gated"
-                    class="flex flex-col items-center gap-4 mt-12 max-w-md mx-auto rounded-lg p-8 text-center"
-                    style="background: var(--foyer-cream-deep); border: 1px solid var(--foyer-rule);"
-                  >
-                    <FoyerComponents.status_pill kind={:manager_only} />
-                    <h1 class="foyer-serif text-3xl">Manager view only.</h1>
-                    <p class="text-sm" style="color: var(--foyer-stone-600, #57534e);">
-                      Composing announcements and viewing read receipts is reserved for department heads. You can still acknowledge them and react in The House.
-                    </p>
-                    <.link navigate={~p"/house"} class="foyer-btn sm" id="gated-back">
+                <%= if not FoyerWeb.FoyerComponents.manager?(@current_scope) do %>
+                  <div id="compose-gated" class="flex flex-col items-center gap-3 mt-8">
+                    <div class="foyer-mono">Manager view only</div>
+                    <p class="foyer-serif text-xl">Compose is for managers.</p>
+                    <.link navigate={~p"/house"} class="foyer-btn sm">
                       Back to The House
                     </.link>
                   </div>
                 <% else %>
-                  <div class="flex flex-col gap-2">
-                    <FoyerComponents.editorial_heading>
-                      New announcement
-                    </FoyerComponents.editorial_heading>
-                    <p class="text-sm" style="color: var(--foyer-stone-600, #57534e);">
-                      Composing an announcement.
-                      <span class="italic">Reach the right people. Pin if it must be seen.</span>
-                    </p>
-                  </div>
-
-                  <div class="foyer-content-cols" id="compose-form-root">
-                    <div class="flex flex-col gap-5">
-                      <form
+                  <h1 class="foyer-serif text-3xl">New announcement</h1>
+                  <div class="foyer-content-cols">
+                    <div>
+                      <.form
+                        for={@form}
                         id="announcement-new-form"
-                        phx-change="compose_change"
                         phx-submit="compose_submit"
-                        class="flex flex-col gap-5"
+                        phx-change="preview_change"
+                        class="flex flex-col gap-3"
                       >
-                        <div>
-                          <label class="foyer-mono block mb-1">Title</label>
-                          <input
-                            type="text"
-                            name="title"
-                            value={@title}
-                            placeholder="Suite 412 — Allergy protocol in effect"
-                            class="w-full px-4 py-2.5 rounded-lg border text-base"
-                            style="border-color: var(--foyer-rule); background: var(--foyer-cream-deep);"
-                          />
-                        </div>
-
-                        <div>
-                          <label class="foyer-mono block mb-1">Body</label>
-                          <textarea
-                            name="body"
-                            rows="6"
-                            placeholder="What needs to land?"
-                            class="w-full px-4 py-3 rounded-lg border text-sm leading-relaxed"
-                            style="border-color: var(--foyer-rule); background: var(--foyer-cream-deep);"
-                          >{@body}</textarea>
-                          <div class="foyer-mono text-right mt-1">{String.length(@body)} / 800</div>
-                        </div>
-
-                        <div>
-                          <label class="foyer-mono block mb-1">Publish to</label>
-                          <select
-                            name="audience"
-                            class="w-full px-3 py-2 rounded-lg border text-sm"
-                            style="border-color: var(--foyer-rule); background: var(--foyer-cream-deep);"
-                          >
-                            <option
-                              :for={{label, val} <- @channel_options}
-                              value={val}
-                              selected={@channel_id == val}
-                            >
-                              {label}
-                            </option>
-                          </select>
-                        </div>
-
-                        <fieldset class="flex flex-col gap-3">
-                          <legend class="foyer-mono">Options</legend>
-
-                          <label
-                            class="flex items-start gap-3 p-3 rounded-lg cursor-pointer"
-                            style="background: var(--foyer-cream-deep); border: 1px solid var(--foyer-rule);"
-                          >
-                            <input
-                              type="checkbox"
-                              name="pinned"
-                              value="true"
-                              checked={@pinned}
-                              class="mt-1"
-                            />
-                            <div>
-                              <div class="font-medium text-sm">Pin to top of feed</div>
-                              <div class="foyer-mono">Stays pinned until you unpin manually.</div>
-                            </div>
-                          </label>
-
-                          <label
-                            class="flex items-start gap-3 p-3 rounded-lg cursor-pointer"
-                            style="background: var(--foyer-cream-deep); border: 1px solid var(--foyer-rule);"
-                          >
-                            <input
-                              type="checkbox"
-                              name="require_ack"
-                              value="true"
-                              checked={@require_ack}
-                              class="mt-1"
-                            />
-                            <div>
-                              <div class="font-medium text-sm">Require acknowledgement</div>
-                              <div class="foyer-mono">Each reader confirms with a tap.</div>
-                            </div>
-                          </label>
-                        </fieldset>
-
-                        <div class="flex gap-2 pt-4" style="border-top: 1px solid var(--foyer-rule);">
-                          <button type="submit" class="foyer-btn forest" id="publish-button">
-                            Publish now
-                          </button>
-                        </div>
-                      </form>
+                        <.input field={@form[:title]} type="text" label="Title" />
+                        <.input field={@form[:body]} type="textarea" label="The detail" />
+                        <.input
+                          field={@form[:requires_ack]}
+                          type="checkbox"
+                          label="Requires acknowledgement"
+                        />
+                        <.input
+                          field={@form[:channel_id]}
+                          type="select"
+                          label="To · audience"
+                          options={@channel_options}
+                        />
+                        <button class="foyer-btn forest" type="submit">Publish</button>
+                      </.form>
                     </div>
-
-                    <aside id="compose-preview" class="hidden lg:block">
-                      <FoyerComponents.section_label label="Live preview" />
+                    <div class="hidden lg:block" id="announcement-preview-col">
+                      <div class="foyer-mono mb-2">Preview</div>
                       <article
-                        class="rounded-lg p-5 flex flex-col gap-3 max-w-sm"
-                        style="background: var(--foyer-cream-deep); border: 1px solid var(--foyer-rule);"
+                        class="rounded-lg border p-3 flex flex-col gap-2"
+                        style="border-color: var(--foyer-rule);"
                       >
-                        <div class="flex items-center gap-2 flex-wrap">
-                          <FoyerComponents.status_pill :if={@pinned} kind={:pinned} />
-                          <FoyerComponents.status_pill :if={@require_ack} kind={:ack_required} />
-                          <span class="foyer-mono">
-                            {audience_label(@channel_options, @channel_id)}
-                          </span>
-                        </div>
-                        <h2 class="foyer-serif text-xl">
-                          {if @title == "", do: "Untitled", else: @title}
-                        </h2>
-                        <p class="text-sm leading-relaxed">
-                          {if @body == "", do: "Body preview…", else: @body}
+                        <h3 class="foyer-serif text-xl">
+                          {if @preview_title != "", do: @preview_title, else: "Untitled"}
+                        </h3>
+                        <p class="text-sm">
+                          {if @preview_body != "", do: @preview_body, else: "Body will appear here…"}
                         </p>
-                        <div class="foyer-mono pt-1">{@current_scope.user.name} · just now</div>
                       </article>
-                    </aside>
+                    </div>
                   </div>
                 <% end %>
               <% @live_action == :edit and @announcement -> %>
-                <.link
-                  navigate={~p"/announcements/#{@announcement.id}"}
-                  class="foyer-btn ghost sm self-start"
-                  id="back-to-detail"
-                >
-                  <.icon name="hero-arrow-left" class="size-4" /> Back
-                </.link>
-
-                <div class="flex flex-col gap-2">
-                  <FoyerComponents.editorial_heading>
-                    Edit announcement
-                  </FoyerComponents.editorial_heading>
-                  <p
-                    :if={@grace_state == :expired}
-                    class="text-sm font-medium"
-                    style="color: #b45309;"
-                  >
-                    Edit window closed.
-                  </p>
-                </div>
-
-                <div class="foyer-content-cols" id="edit-form-root">
-                  <div class="flex flex-col gap-5">
-                    <form
+                <h1 class="foyer-serif text-3xl">Edit announcement</h1>
+                <div class="foyer-content-cols">
+                  <div>
+                    <.form
+                      for={@form}
                       id="announcement-edit-form"
-                      phx-change="compose_change"
                       phx-submit="edit_submit"
-                      class="flex flex-col gap-5"
+                      phx-change="preview_change"
+                      class="flex flex-col gap-3"
                     >
-                      <div>
-                        <label class="foyer-mono block mb-1">Title</label>
-                        <input
-                          type="text"
-                          name="title"
-                          value={@title}
-                          class="w-full px-4 py-2.5 rounded-lg border text-base"
-                          style="border-color: var(--foyer-rule); background: var(--foyer-cream-deep);"
-                          disabled={@grace_state == :expired}
-                        />
-                      </div>
-
-                      <div>
-                        <label class="foyer-mono block mb-1">Body</label>
-                        <textarea
-                          name="body"
-                          rows="6"
-                          class="w-full px-4 py-3 rounded-lg border text-sm leading-relaxed"
-                          style="border-color: var(--foyer-rule); background: var(--foyer-cream-deep);"
-                          disabled={@grace_state == :expired}
-                        >{@body}</textarea>
-                        <div class="foyer-mono text-right mt-1">{String.length(@body)} / 800</div>
-                      </div>
-
-                      <div>
-                        <label class="foyer-mono block mb-1">Publish to</label>
-                        <select
-                          name="audience"
-                          class="w-full px-3 py-2 rounded-lg border text-sm"
-                          style="border-color: var(--foyer-rule); background: var(--foyer-cream-deep);"
-                          disabled={@grace_state == :expired}
-                        >
-                          <option
-                            :for={{label, val} <- @channel_options}
-                            value={val}
-                            selected={@channel_id == val}
-                          >
-                            {label}
-                          </option>
-                        </select>
-                      </div>
-
-                      <fieldset class="flex flex-col gap-3">
-                        <legend class="foyer-mono">Options</legend>
-
-                        <label
-                          class="flex items-start gap-3 p-3 rounded-lg cursor-pointer"
-                          style="background: var(--foyer-cream-deep); border: 1px solid var(--foyer-rule);"
-                        >
-                          <input
-                            type="checkbox"
-                            name="pinned"
-                            value="true"
-                            checked={@pinned}
-                            class="mt-1"
-                            disabled={@grace_state == :expired}
-                          />
-                          <div>
-                            <div class="font-medium text-sm">Pin to top of feed</div>
-                            <div class="foyer-mono">Stays pinned until you unpin manually.</div>
-                          </div>
-                        </label>
-
-                        <label
-                          class="flex items-start gap-3 p-3 rounded-lg cursor-pointer"
-                          style="background: var(--foyer-cream-deep); border: 1px solid var(--foyer-rule);"
-                        >
-                          <input
-                            type="checkbox"
-                            name="require_ack"
-                            value="true"
-                            checked={@require_ack}
-                            class="mt-1"
-                            disabled={@grace_state == :expired}
-                          />
-                          <div>
-                            <div class="font-medium text-sm">Require acknowledgement</div>
-                            <div class="foyer-mono">Each reader confirms with a tap.</div>
-                          </div>
-                        </label>
-                      </fieldset>
-
-                      <div class="flex gap-2 pt-4" style="border-top: 1px solid var(--foyer-rule);">
-                        <button
-                          type="submit"
-                          class="foyer-btn forest"
-                          id="publish-button"
-                          disabled={@grace_state == :expired}
-                        >
-                          Publish update
-                        </button>
-                        <button
-                          :if={@grace_state == :open}
-                          type="button"
-                          phx-click="remove"
-                          id="remove-button"
-                          class="foyer-btn ghost"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </form>
+                      <.input field={@form[:title]} type="text" label="Title" />
+                      <.input field={@form[:body]} type="textarea" label="The detail" />
+                      <.input
+                        field={@form[:requires_ack]}
+                        type="checkbox"
+                        label="Requires acknowledgement"
+                      />
+                      <.input
+                        field={@form[:channel_id]}
+                        type="select"
+                        label="To · audience"
+                        options={@channel_options}
+                      />
+                      <button class="foyer-btn forest" type="submit">Save changes</button>
+                    </.form>
                   </div>
-
-                  <aside id="edit-preview" class="hidden lg:block">
-                    <FoyerComponents.section_label label="Live preview" />
+                  <div class="hidden lg:block" id="announcement-edit-preview-col">
+                    <div class="foyer-mono mb-2">Preview</div>
                     <article
-                      class="rounded-lg p-5 flex flex-col gap-3 max-w-sm"
-                      style="background: var(--foyer-cream-deep); border: 1px solid var(--foyer-rule);"
+                      class="rounded-lg border p-3 flex flex-col gap-2"
+                      style="border-color: var(--foyer-rule);"
                     >
-                      <div class="flex items-center gap-2 flex-wrap">
-                        <FoyerComponents.status_pill :if={@pinned} kind={:pinned} />
-                        <FoyerComponents.status_pill :if={@require_ack} kind={:ack_required} />
-                        <span class="foyer-mono">
-                          {audience_label(@channel_options, @channel_id)}
-                        </span>
-                      </div>
-                      <h2 class="foyer-serif text-xl">
-                        {if @title == "", do: "Untitled", else: @title}
-                      </h2>
-                      <p class="text-sm leading-relaxed">
-                        {if @body == "", do: "Body preview…", else: @body}
+                      <h3 class="foyer-serif text-xl">
+                        {if @preview_title != "", do: @preview_title, else: "Untitled"}
+                      </h3>
+                      <p class="text-sm">
+                        {if @preview_body != "", do: @preview_body, else: "Body will appear here…"}
                       </p>
-                      <div class="foyer-mono pt-1">{@current_scope.user.name} · just now</div>
                     </article>
-                  </aside>
+                  </div>
                 </div>
               <% @live_action == :show and @announcement -> %>
-                <div class="flex flex-col gap-6" id={"announcement-" <> to_string(@announcement.id)}>
-                  <div class="flex items-start justify-between gap-3">
-                    <.link navigate={~p"/house"} class="foyer-btn ghost sm" id="back-to-house">
-                      <.icon name="hero-arrow-left" class="size-4" /> Back to The House
-                    </.link>
-                    <button
-                      :if={Scope.manager?(@current_scope) and not is_nil(@announcement.pinned_at)}
-                      type="button"
-                      phx-click="unpin"
-                      id="unpin-button"
-                      class="foyer-btn ghost sm shrink-0"
-                    >
-                      Unpin
-                    </button>
-                  </div>
+                <div class="foyer-content-cols">
+                  <article class="flex flex-col gap-3">
+                    <div class="flex items-center gap-2">
+                      <span :if={@announcement.pinned_at} class="foyer-tag claret">Pinned</span>
+                      <span :if={@announcement.requires_ack} class="foyer-tag outline">
+                        Requires acknowledgement
+                      </span>
+                      <span class="foyer-mono ml-auto">
+                        {@announcement.channel && @announcement.channel.name}
+                      </span>
+                    </div>
 
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <FoyerComponents.status_pill
-                      :if={@announcement.requires_ack}
-                      kind={:ack_required}
-                      label="Requires acknowledgement"
-                    />
-                    <FoyerComponents.status_pill :if={@announcement.pinned_at} kind={:pinned} />
-                    <span class="foyer-mono">
-                      {@announcement.channel && @announcement.channel.name}
-                    </span>
-                  </div>
+                    <h1 class="foyer-serif text-3xl">{@announcement.title}</h1>
 
-                  <FoyerComponents.editorial_heading>
-                    {@announcement.title}
-                  </FoyerComponents.editorial_heading>
+                    <div class="flex items-center gap-2">
+                      <FoyerComponents.avatar
+                        :if={@announcement.author}
+                        initials={@announcement.author.initials}
+                        size={:sm}
+                      />
+                      <div>
+                        <div>{@announcement.author && @announcement.author.name}</div>
+                        <div class="foyer-mono">
+                          Audience · {@announcement.channel && @announcement.channel.name}
+                        </div>
+                      </div>
+                      <%= if managed_by?(@announcement, @current_scope) do %>
+                        <.link
+                          navigate={~p"/announcements/#{@announcement.id}/edit"}
+                          class="foyer-btn ghost sm ml-auto"
+                          id="announcement-edit-link"
+                        >
+                          Edit
+                        </.link>
+                      <% end %>
+                    </div>
 
-                  <div class="flex items-center gap-3 text-sm">
-                    <FoyerComponents.avatar
-                      :if={@announcement.author}
-                      initials={@announcement.author.initials}
-                      size={:sm}
-                    />
-                    <span>
-                      {@announcement.author && @announcement.author.name}
-                      {if @announcement.author && @announcement.author.title,
-                        do: " · #{@announcement.author.title}",
-                        else: ""}
-                    </span>
-                    <span aria-hidden="true">·</span>
-                    <time>{FoyerComponents.format_time(@announcement.published_at)}</time>
-                  </div>
+                    <div class="flex flex-wrap gap-2">
+                      <%= if @can_pin? do %>
+                        <button
+                          :if={is_nil(@announcement.pinned_at)}
+                          class="foyer-btn sm"
+                          phx-click="pin"
+                          id="announcement-pin-btn"
+                          type="button"
+                        >
+                          <.icon name="hero-bookmark" class="size-4" /> Pin
+                        </button>
+                        <button
+                          :if={@announcement.pinned_at}
+                          class="foyer-btn sm"
+                          phx-click="unpin"
+                          id="announcement-unpin-btn"
+                          type="button"
+                        >
+                          <.icon name="hero-bookmark-slash" class="size-4" /> Unpin
+                        </button>
+                      <% end %>
+                      <%= if managed_by?(@announcement, @current_scope) and FoyerWeb.LiveDeps.house().within_grace_window?(@announcement) do %>
+                        <button
+                          class="foyer-btn sm"
+                          phx-click="remove"
+                          id="announcement-remove-btn"
+                          type="button"
+                        >
+                          <.icon name="hero-trash" class="size-4" /> Remove
+                        </button>
+                      <% end %>
+                    </div>
 
-                  <article
-                    class="rounded-lg p-6 text-base leading-relaxed"
-                    style="background: var(--foyer-cream-deep); border: 1px solid var(--foyer-rule);"
-                  >
-                    {@announcement.body}
+                    <p class="foyer-serif">{@announcement.body}</p>
+
+                    <%= if @announcement.requires_ack do %>
+                      <div class="foyer-mono">
+                        {length(@announcement.acks)} confirmed
+                      </div>
+
+                      <%= if @acked? do %>
+                        <button class="foyer-btn" disabled id="acked-state">
+                          Acknowledged
+                        </button>
+                      <% else %>
+                        <button
+                          :if={@can_ack?}
+                          class="foyer-btn forest"
+                          phx-click="acknowledge"
+                          id="acknowledge-btn"
+                          type="button"
+                        >
+                          I've read &amp; understood
+                        </button>
+                      <% end %>
+                    <% end %>
                   </article>
 
-                  <section
-                    :if={author?(@announcement, @current_scope) and @grace_state == :open}
-                    id="author-grace-controls"
-                    class="rounded-lg p-4 flex flex-col gap-3"
-                    style="background: var(--foyer-cream-deep); border: 1px solid var(--foyer-rule);"
-                  >
-                    <p class="text-xs italic" style="color: var(--foyer-stone-500, #78716c);">
-                      60s to edit or remove.
-                    </p>
-                    <div class="flex gap-2 flex-wrap">
-                      <.link
-                        navigate={~p"/announcements/#{@announcement.id}/edit"}
-                        class="foyer-btn sm"
-                        id="edit-button"
-                      >
-                        Edit
-                      </.link>
-                      <button
-                        type="button"
-                        phx-click="remove"
-                        id="remove-button"
-                        class="foyer-btn ghost sm"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </section>
-
-                  <div
-                    :if={@grace_state == :expired and author?(@announcement, @current_scope)}
-                    class="foyer-mono"
-                    id="grace-expired-note"
-                  >
-                    Edit window closed.
-                    <.link navigate={~p"/announcements/new"} class="foyer-btn ghost sm">
-                      + Another
-                    </.link>
-                  </div>
-
-                  <div
-                    :if={@announcement.requires_ack}
-                    id="ack-section"
-                    class="flex flex-col gap-3"
-                  >
-                    <%= if @acked? do %>
-                      <div
-                        id="ack-confirmation"
-                        class="rounded-lg p-4 text-sm flex items-center gap-2"
-                        style="background: var(--foyer-cream-deep); border: 1px solid var(--foyer-rule);"
-                      >
-                        <span style="color: #059669;">
-                          <.icon name="hero-check-circle" class="size-5" />
-                        </span>
-                        Acknowledged. Thank you.
+                  <div class="hidden lg:block" id="read-receipts-col">
+                    <div class="foyer-mono mb-2">Read receipts</div>
+                    <div class="flex flex-col gap-2">
+                      <div class="foyer-mono">
+                        {length(@announcement.acks)} confirmed / {length(@announcement.reads)} read
                       </div>
-                    <% else %>
-                      <button
-                        class="foyer-btn forest"
-                        phx-click="acknowledge"
-                        id="acknowledge-btn"
-                        type="button"
-                      >
-                        I've read &amp; understood
-                      </button>
-                    <% end %>
-                  </div>
-
-                  <section
-                    :if={Scope.manager?(@current_scope)}
-                    id="manager-receipts"
-                    class="flex flex-col gap-5 pt-4"
-                    style="border-top: 1px solid var(--foyer-rule);"
-                  >
-                    <div>
-                      <FoyerComponents.section_label label="Read receipts" />
-                      <p class="text-sm" style="color: var(--foyer-stone-600, #57534e);">
-                        {@announcement.channel && @announcement.channel.name} · {pin_state_text(
-                          @announcement
-                        )}
-                      </p>
-                    </div>
-
-                    <section id="receipt-metrics" class="grid grid-cols-2 md:grid-cols-3 gap-3">
-                      <%!-- TODO: audience_count not exposed by foyer_app's HousePort — using read + ack count as approximation --%>
-                      <%= if @announcement.requires_ack do %>
-                        <div
-                          class="rounded-lg p-4"
-                          style="background: var(--foyer-cream-deep); border: 1px solid var(--foyer-rule);"
-                        >
-                          <FoyerComponents.section_label label="Acknowledged" />
-                          <div class="foyer-serif text-3xl mt-1" data-metric-acked>
-                            {length(@announcement.acks)}/{length(@announcement.reads) +
-                              length(@announcement.acks)}
-                          </div>
-                          <div class="foyer-mono">target 100%</div>
-                        </div>
-                        <div
-                          class="rounded-lg p-4"
-                          style="background: var(--foyer-cream-deep); border: 1px solid var(--foyer-rule);"
-                        >
-                          <FoyerComponents.section_label label="Unread" />
-                          <div class="foyer-serif text-3xl mt-1" data-metric-unread>
-                            {unread_count(@announcement)}
-                          </div>
-                        </div>
-                        <div
-                          class="rounded-lg p-4"
-                          style="background: var(--foyer-cream-deep); border: 1px solid var(--foyer-rule);"
-                        >
-                          <FoyerComponents.section_label label="Read · no ack" />
-                          <div class="foyer-serif text-3xl mt-1" data-metric-read>
-                            {length(@announcement.reads)}
-                          </div>
-                          <div class="foyer-mono">Opened but not confirmed.</div>
-                        </div>
-                      <% else %>
-                        <div
-                          class="rounded-lg p-4"
-                          style="background: var(--foyer-cream-deep); border: 1px solid var(--foyer-rule);"
-                        >
-                          <FoyerComponents.section_label label="Read" />
-                          <div class="foyer-serif text-3xl mt-1" data-metric-read>
-                            {length(@announcement.reads)}
-                          </div>
-                        </div>
-                        <div
-                          class="rounded-lg p-4"
-                          style="background: var(--foyer-cream-deep); border: 1px solid var(--foyer-rule);"
-                        >
-                          <FoyerComponents.section_label label="Unread" />
-                          <div class="foyer-serif text-3xl mt-1" data-metric-unread>
-                            {unread_count(@announcement)}
-                          </div>
-                        </div>
-                      <% end %>
-                    </section>
-
-                    <section id="receipt-people" class="flex flex-col gap-2">
-                      <FoyerComponents.section_label label="Per-person status" />
-                      <div
-                        class="flex gap-3 text-xs mb-2 flex-wrap"
-                        id="receipt-legend"
-                        style="color: var(--foyer-stone-500, #78716c);"
-                      >
-                        <%= if @announcement.requires_ack do %>
-                          <span class="flex items-center gap-1">
-                            <span class="size-2 rounded-full bg-emerald-600"></span> Acknowledged
-                          </span>
-                          <span class="flex items-center gap-1">
-                            <span class="size-2 rounded-full bg-amber-500"></span> Read · no ack
-                          </span>
-                          <span class="flex items-center gap-1">
-                            <span class="size-2 rounded-full bg-stone-400"></span> Unread
-                          </span>
-                          <span class="flex items-center gap-1">
-                            <span class="size-2 rounded-full bg-stone-300"></span> Off shift
-                          </span>
-                        <% else %>
-                          <span class="flex items-center gap-1">
-                            <span class="size-2 rounded-full bg-emerald-600"></span> Read
-                          </span>
-                          <span class="flex items-center gap-1">
-                            <span class="size-2 rounded-full bg-amber-500"></span> Unread
-                          </span>
-                          <span class="flex items-center gap-1">
-                            <span class="size-2 rounded-full bg-stone-400"></span> Off shift
-                          </span>
-                        <% end %>
-                      </div>
-                      <ul
-                        class="rounded-lg divide-y"
-                        style="background: var(--foyer-cream-deep); border: 1px solid var(--foyer-rule); divide-color: var(--foyer-rule);"
-                      >
-                        <li
+                      <div class="flex flex-wrap gap-2">
+                        <span
                           :for={ack <- @announcement.acks}
+                          class="foyer-tag moss"
                           id={"ack-badge-#{ack.user_id}"}
-                          class="flex items-center justify-between p-3 text-sm"
-                          data-receipt-row={ack.user_id}
-                          data-status="acked"
                         >
-                          <div class="flex items-center gap-3">
-                            <FoyerComponents.avatar
-                              initials={ack_initials(ack)}
-                              size={:sm}
-                            />
-                            <div>
-                              <div class="font-medium">{ack_name(ack)}</div>
-                            </div>
-                          </div>
-                          <span class="flex items-center gap-2 text-xs">
-                            <span class="size-2 rounded-full bg-emerald-600"></span> Acknowledged
-                          </span>
-                        </li>
-                        <li
-                          :for={read <- unacked_reads(@announcement)}
-                          class="flex items-center justify-between p-3 text-sm"
-                          data-receipt-row={read.user_id}
-                          data-status="read"
+                          {ack_initials(ack)} ✓
+                        </span>
+                      </div>
+                      <%= if @receipts do %>
+                        <section
+                          id="announcement-receipts"
+                          class="rounded-lg border p-3 flex flex-col gap-2"
+                          style="border-color: var(--foyer-rule);"
                         >
-                          <div class="flex items-center gap-3">
-                            <FoyerComponents.avatar
-                              initials={read_initials(read)}
-                              size={:sm}
-                            />
-                            <div>
-                              <div class="font-medium">{read_name(read)}</div>
-                            </div>
-                          </div>
-                          <span class="flex items-center gap-2 text-xs">
-                            <%= if @announcement.requires_ack do %>
-                              <span class="size-2 rounded-full bg-amber-500"></span> Read · no ack
-                            <% else %>
-                              <span class="size-2 rounded-full bg-emerald-600"></span> Read
-                            <% end %>
-                          </span>
-                        </li>
-                      </ul>
-                    </section>
-                  </section>
+                          <div class="foyer-mono">Receipts</div>
+                          <.receipt_group
+                            id="receipts-acknowledged"
+                            label="Acknowledged"
+                            users={@receipts.acknowledged}
+                          />
+                          <.receipt_group
+                            id="receipts-read"
+                            label="Read without acknowledgement"
+                            users={@receipts.read_without_acknowledgement}
+                          />
+                          <.receipt_group
+                            id="receipts-unread"
+                            label="Unread"
+                            users={@receipts.unread}
+                          />
+                          <.receipt_group
+                            id="receipts-off-shift"
+                            label="Off shift"
+                            users={@receipts.off_shift}
+                          />
+                        </section>
+                      <% end %>
+                    </div>
+                  </div>
                 </div>
             <% end %>
 
@@ -844,43 +531,30 @@ defmodule FoyerWeb.AnnouncementLive do
     """
   end
 
-  defp author?(%Announcement{author_id: author_id}, %FoyerWeb.Scope{user: %{id: id}}),
+  defp managed_by?(%Announcement{author_id: author_id}, %FoyerWeb.Scope{user: %{id: id}}),
     do: author_id == id
 
-  defp author?(_, _), do: false
-
-  defp pin_state_text(%Announcement{pinned_at: nil}), do: "Not pinned"
-  defp pin_state_text(%Announcement{}), do: "Pinned"
+  defp managed_by?(_, _), do: false
 
   defp ack_initials(%{user: %{initials: initials}}), do: initials
   defp ack_initials(_), do: "??"
 
-  defp ack_name(%{user: %{name: name}}), do: name
-  defp ack_name(_), do: ""
+  attr :id, :string, required: true
+  attr :label, :string, required: true
+  attr :users, :list, required: true
 
-  defp read_initials(%{user: %{initials: initials}}), do: initials
-  defp read_initials(_), do: "??"
-
-  defp read_name(%{user: %{name: name}}), do: name
-  defp read_name(_), do: ""
-
-  defp unacked_reads(%Announcement{reads: reads, acks: acks})
-       when is_list(reads) and is_list(acks) do
-    acked_user_ids = MapSet.new(acks, & &1.user_id)
-    Enum.reject(reads, fn r -> MapSet.member?(acked_user_ids, r.user_id) end)
+  defp receipt_group(assigns) do
+    ~H"""
+    <div id={@id} class="text-sm">
+      <div class="font-semibold">{@label} · {length(@users)}</div>
+      <div class="foyer-mono">
+        <%= if @users == [] do %>
+          None
+        <% else %>
+          {Enum.map_join(@users, ", ", & &1.name)}
+        <% end %>
+      </div>
+    </div>
+    """
   end
-
-  defp unacked_reads(_), do: []
-
-  defp unread_count(%Announcement{reads: reads, acks: acks})
-       when is_list(reads) and is_list(acks) do
-    # TODO: total audience count not exposed by foyer_app's HousePort
-    # Unread = audience - (reads + acks) — we can't compute this without audience_count
-    # Returning 0 as a placeholder
-    _ = reads
-    _ = acks
-    0
-  end
-
-  defp unread_count(_), do: 0
 end

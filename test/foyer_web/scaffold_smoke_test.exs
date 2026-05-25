@@ -160,6 +160,13 @@ defmodule FoyerWeb.ScaffoldSmokeTest do
       assert render(view) =~ "Acknowledged"
     end
 
+    test "announcement author does not see acknowledgement CTA", ctx do
+      conn = sign_in(ctx.conn, ctx.charlotte)
+      {:ok, view, _html} = live(conn, ~p"/announcements/#{ctx.suite_412.id}")
+
+      refute has_element?(view, "#acknowledge-btn")
+    end
+
     test "edit page opens for the author", ctx do
       conn = sign_in(ctx.conn, ctx.charlotte)
       {:ok, view, _html} = live(conn, ~p"/announcements/#{ctx.suite_412.id}/edit")

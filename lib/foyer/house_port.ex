@@ -17,8 +17,16 @@ defmodule Foyer.HousePort do
   @callback compose_changeset(map()) :: Ecto.Changeset.t()
   @callback change_announcement(Announcement.t(), map()) :: Ecto.Changeset.t()
   @callback create_announcement(User.t(), map()) ::
-              {:ok, Announcement.t()} | {:error, Ecto.Changeset.t() | :not_implemented}
+              {:ok, Announcement.t()} | {:error, Ecto.Changeset.t() | atom()}
   @callback update_announcement(Announcement.t(), User.t(), map()) ::
-              {:ok, Announcement.t()} | {:error, Ecto.Changeset.t() | :not_implemented}
+              {:ok, Announcement.t()} | {:error, Ecto.Changeset.t() | atom()}
+  @callback remove_announcement(Announcement.t(), User.t()) ::
+              {:ok, Announcement.t()} | {:error, Ecto.Changeset.t() | atom()}
+  @callback pin_announcement(Announcement.t(), User.t()) ::
+              {:ok, Announcement.t()} | {:error, Ecto.Changeset.t() | atom()}
+  @callback unpin_announcement(Announcement.t(), User.t()) ::
+              {:ok, Announcement.t()} | {:error, Ecto.Changeset.t() | atom()}
+  @callback receipts_for(Announcement.t(), User.t()) :: {:ok, map()} | {:error, atom()}
+  @callback within_grace_window?(Announcement.t()) :: boolean()
   @callback needs_ack_from(User.t()) :: [Announcement.t()]
 end
