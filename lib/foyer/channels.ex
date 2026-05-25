@@ -43,4 +43,23 @@ defmodule Foyer.Channels do
   @impl true
   @spec get!(integer() | String.t()) :: Channel.t()
   def get!(id), do: Repo.get!(Channel, id)
+
+  @impl true
+  @spec member?(User.t(), Channel.t()) :: boolean()
+  def member?(%User{id: user_id}, %Channel{id: channel_id}) do
+    from(m in Membership,
+      where: m.user_id == ^user_id and m.channel_id == ^channel_id
+    )
+    |> Repo.exists?()
+  end
+
+  @impl true
+  @spec member_count(Channel.t()) :: non_neg_integer()
+  def member_count(%Channel{id: channel_id}) do
+    from(m in Membership,
+      where: m.channel_id == ^channel_id,
+      select: count(m.id)
+    )
+    |> Repo.one()
+  end
 end

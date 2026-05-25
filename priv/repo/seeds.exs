@@ -93,7 +93,7 @@ channel_specs = [
    ]},
   {"f-and-b", "F&B", :department, ["Sebastien Roy", "Elin Larsen"]},
   {"concierge-front-office", "Concierge & Front Office", :department,
-   ["Tomás Ruiz", "Leila Haddad"]},
+   ["Tomás Ruiz", "Leila Haddad", "Rafael Mendes"]},
   {"engineering", "Engineering", :department, ["Hugo Brandt"]},
   {"leadership", "Leadership", :department, ["Charlotte Voss", "Rafael Mendes", "Sebastien Roy"]},
   {"linden-all", "Linden · All staff", :general, Map.keys(users)}
