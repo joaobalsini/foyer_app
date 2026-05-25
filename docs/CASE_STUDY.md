@@ -36,7 +36,7 @@ also make sure you link the newly created AGENTS.MD to our claude.md (agents.md 
 
 ## Session 2 - mobile Ui mocks
 
-### Prompt 1
+### Prompt
 Read the designs and the project files and let's scaffold the Mobile UI. Have a basic version of the UI working, define the contexts, the routes, the models, the DB tables, etc., and continue from there. The data should be mocked at this point, but it will force us to define liveviews, contexts and the data model.
 
 The feature groups I envision are (with matching liveviews and contexts)
@@ -64,9 +64,13 @@ This don't need specs, we should have a single plan created by a opus agent and 
 
 ### Terminal 1 - Desktop Ui mocks
 
+####  Prompt 
+
 Ask sonnet to write a plan for writing a desktop version of the UI based on our designs. We already have a mobile version of it, later ask codex for review, and another sonnet agent to implement.
 
 ### Terminal 2 - Annoucements, Recognitions and Chats (codex)
+
+####  Prompt 
 
 Read from claude.md
 
@@ -82,11 +86,42 @@ We should have different worktrees and branches per feature group and work in pa
 
 ### Terminal 3
 
+####  Prompt 1
+ 
 Develop the channels, today, profile feature groups considering our specs. Trigger one sonnet agent for each, develop it on its own worktrees and branches named after the feature groups.
 
 trigger a sonnet agent to implement each feature group (on their worktrees). We have one branch for each feature group already implemented (or wip) feature/announcements, feature/chat, feature/recognitions, in case you need to see how the interfaces were implemented.
 
+####  Prompt 2
+
+--- continued after session 7 finished
+
+before running the verify pass, pull latest main and rebase. just to recap: we might not have anything else to do right now, besides verifying the sepcs by writing tests.
+  Probably most of the features are already done, so, in case of conflict, consider main correct.
+
 ### Session 4
 
+####  Prompt 
 
+After features were implemented, I started again with codex.
+
+Go to feature/announcements, rebase main, check if the verification (verify.md file inside feature group) was implemented, do a second verification pass, remove the verification file, commit and push
+
+### Session 5
+
+####  Prompt 
+
+feature/announcements was just merged to main. rebase feature/recognitions with main, check if docs/feature-groups/ recognitions/plans/01-recognitions-verify.md was implemented, do a second verification pass, remove ocs/feature-groups/recognitions/plans/01-recognitions-verify.md, commit and push
+
+### Session 6
+
+####  Prompt 
+
+feature/recognitions was just merged to main. rebase feature/chat with main, check if docs/feature-groups/chat/plans/01-chat-verify.mdd was implemented, do a second verification pass, remove docs/feature-groups/chat/plans/01-chat-verify.md, commit and push
+
+### Session 7 
+
+Reviewed UI and functionality for the whole app, made sure tests were as expected. Had a lot of back and forth with codex.
+
+This resulted on branch ui_refactor.
 
