@@ -14,7 +14,15 @@ defmodule Foyer.ProfileScenarios.Simple do
       received: [],
       given: [],
       points: user.points_balance || 0,
-      on_shift?: false
+      on_shift?: false,
+      received_this_month: 0,
+      points_earned: []
     }
   end
+
+  @impl true
+  def own_profile_for(user), do: profile_for(user, user)
+
+  @impl true
+  def rewards_catalog, do: []
 end

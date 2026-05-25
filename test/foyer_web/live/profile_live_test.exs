@@ -24,8 +24,11 @@ defmodule FoyerWeb.ProfileLiveTest do
     F.Profile.21 — house value tags on recognition cards
     F.Profile.22 — bonus points badge
   """
-  use FoyerWeb.ConnCase, async: true
+  use ExUnit.Case, async: true
 
+  @endpoint FoyerWeb.Endpoint
+
+  import Phoenix.ConnTest
   import Phoenix.LiveViewTest
   import Mox
   import FoyerWeb.IsolatedHelpers
@@ -34,6 +37,10 @@ defmodule FoyerWeb.ProfileLiveTest do
 
   setup :verify_on_exit!
   setup :set_mox_from_context
+
+  setup do
+    {:ok, conn: build_conn()}
+  end
 
   # ---------------------------------------------------------------------------
   # F.Profile.1 — Identity header renders user attributes
