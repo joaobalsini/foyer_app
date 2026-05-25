@@ -133,6 +133,7 @@ defmodule FoyerWeb.FoyerComponents do
   attr :current_scope, FoyerWeb.Scope, required: true
   attr :channels, :list, default: []
   attr :property_name, :string, default: "The Linden · Mayfair"
+  attr :chat_unread_count, :integer, default: 0
 
   @doc """
   Fixed left side-rail for desktop widths (`md:+`). Hidden at mobile via CSS
@@ -182,9 +183,10 @@ defmodule FoyerWeb.FoyerComponents do
           <span class="relative inline-flex">
             <.icon name="hero-chat-bubble-left-right" class="size-4" />
             <span
+              :if={@chat_unread_count > 0}
               id="rail-chat-unread"
-              class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-red-500 hidden"
-              aria-hidden="true"
+              class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-[var(--foyer-claret)]"
+              aria-label={"#{@chat_unread_count} unread chat messages"}
             >
             </span>
           </span>
@@ -236,7 +238,7 @@ defmodule FoyerWeb.FoyerComponents do
         </div>
         <.link
           :for={ch <- @channels}
-          navigate={~p"/chat"}
+          navigate={~p"/chat/new?channel_id=#{ch.id}"}
           class="foyer-rail__item pl-6"
           id={"rail-channel-#{ch.id}"}
         >
@@ -513,38 +515,86 @@ defmodule FoyerWeb.FoyerComponents do
   # ---------------------------------------------------------------------------
 
   attr :announcement, Foyer.House.Announcement, required: true
+  attr :current_user_id, :integer, default: nil
 
   def announcement_card(assigns) do
+    assigns =
+      assign(
+        assigns,
+        :ack_state,
+        announcement_ack_state(assigns.announcement, assigns.current_user_id)
+      )
+
     ~H"""
     <article
-      class="rounded-lg border p-3 flex flex-col gap-2"
-      style="border-color: var(--foyer-rule);"
+      class={[
+        "announcement-card",
+        @ack_state == :needs_ack && "needs-ack",
+        @ack_state == :acked && "acked"
+      ]}
+      id={"announcement-card-#{@announcement.id}"}
+      data-ack-state={@ack_state}
     >
-      <div class="flex items-center gap-2">
+      <div class="announcement-card__meta">
         <%= if @announcement.pinned_at do %>
           <span class="foyer-tag claret">Pinned</span>
         <% end %>
-        <%= if @announcement.requires_ack do %>
-          <span class="foyer-tag outline">Action</span>
+        <%= cond do %>
+          <% @ack_state == :needs_ack -> %>
+            <span class="announcement-card__ack-pill urgent">
+              <.icon name="hero-exclamation-circle" class="size-4" /> Needs your ack
+            </span>
+          <% @ack_state == :acked -> %>
+            <span class="announcement-card__ack-pill done">
+              <.icon name="hero-check-circle" class="size-4" /> Acknowledged
+            </span>
+          <% @announcement.requires_ack -> %>
+            <span class="announcement-card__ack-pill">Ack required</span>
+          <% true -> %>
         <% end %>
         <span class="foyer-mono ml-auto">{@announcement.channel && @announcement.channel.name}</span>
       </div>
-      <h3 class="foyer-serif text-xl">{@announcement.title}</h3>
-      <p class="text-sm">{truncate(@announcement.body)}</p>
-      <div class="flex items-center gap-2 mt-1">
+      <h3 class="announcement-card__title">{@announcement.title}</h3>
+      <p class="announcement-card__body">{truncate(@announcement.body)}</p>
+      <div class="announcement-card__footer">
         <.avatar :if={@announcement.author} initials={@announcement.author.initials} size={:sm} />
-        <span class="text-sm">{@announcement.author && @announcement.author.name}</span>
+        <span class="announcement-card__author">
+          {@announcement.author && @announcement.author.name}
+        </span>
+        <span :if={@announcement.requires_ack} class="foyer-mono text-xs ml-auto">
+          {association_count(@announcement.acks)}/{association_count(@announcement.reads) +
+            association_count(@announcement.acks)} acknowledged
+        </span>
         <.link
           navigate={~p"/announcements/#{@announcement.id}"}
-          class="foyer-btn sm ml-auto"
+          class="foyer-btn sm shrink-0"
           id={"announcement-card-link-#{@announcement.id}"}
         >
-          View details
+          View
         </.link>
       </div>
     </article>
     """
   end
+
+  defp announcement_ack_state(%{requires_ack: false}, _), do: :none
+
+  defp announcement_ack_state(%{author_id: user_id}, user_id) when not is_nil(user_id),
+    do: :not_required
+
+  defp announcement_ack_state(%{acks: acks}, user_id)
+       when is_list(acks) and not is_nil(user_id) do
+    if Enum.any?(acks, fn ack -> ack.user_id == user_id end), do: :acked, else: :needs_ack
+  end
+
+  defp announcement_ack_state(%{requires_ack: true}, user_id) when not is_nil(user_id),
+    do: :needs_ack
+
+  defp announcement_ack_state(%{requires_ack: true}, _), do: :requires_ack
+  defp announcement_ack_state(_, _), do: :none
+
+  defp association_count(items) when is_list(items), do: length(items)
+  defp association_count(_), do: 0
 
   defp truncate(nil), do: ""
 

@@ -2,7 +2,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
   @moduledoc """
   Isolated LiveView tests for `FoyerWeb.RecognitionsLive`. Each test pins an
   `F.Recognitions.<N>` clause it asserts. Route gates, on_mount hooks, and the
-  database are out of scope here — see `scaffold_smoke_test.exs` for the e2e
+  database are out of scope here — see `smoke_test.exs` for the route wiring
   layer.
 
   Pattern: `live_isolated/3` + scenario modules via `Mox.stub_with/2`; inline
@@ -20,6 +20,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
 
   import Phoenix.LiveViewTest
   import Mox
+  import FoyerWeb.IsolatedHelpers, only: [mount_isolated_recognitions: 2]
 
   alias Foyer.AccountsScenarios.WithPeople
   alias Foyer.Recognitions.Recognition
@@ -30,7 +31,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
   setup :verify_on_exit!
   # The LiveView runs in its own pid; without `set_mox_from_context` Mox in
   # private mode would not let the LV see test-process stubs. This mirrors
-  # `desktop_smoke_test.exs` and `scaffold_smoke_test.exs`.
+  # `smoke_test.exs`.
   setup :set_mox_from_context
 
   setup %{conn: conn} do
@@ -49,7 +50,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
 
       scope = IsolatedHelpers.build_scope(role: :staff, on_shift?: true)
 
-      {:ok, view, _html} = mount_isolated(conn, action: :new, scope: scope)
+      {:ok, view, _html} = mount_isolated_recognitions(conn, action: :new, scope: scope)
 
       assert has_element?(view, "form#recognize-form")
       assert has_element?(view, "button#recognize-submit", "Send recognition")
@@ -57,7 +58,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
 
     # Off-shift visibility is enforced by the router's `:ensure_on_shift`
     # on_mount hook — see the e2e `F.Recognitions.1` test in
-    # `scaffold_smoke_test.exs` for the matching wiring proof.
+    # `smoke_test.exs` for the matching wiring proof.
   end
 
   # ---------------------------------------------------------------------------
@@ -77,7 +78,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
         {:error, :self_recognition}
       end)
 
-      {:ok, view, _html} = mount_isolated(conn, action: :new, scope: scope)
+      {:ok, view, _html} = mount_isolated_recognitions(conn, action: :new, scope: scope)
 
       view
       |> form("#recognize-form",
@@ -103,7 +104,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
 
       scope = IsolatedHelpers.build_scope(role: :staff, on_shift?: true)
 
-      {:ok, view, _html} = mount_isolated(conn, action: :new, scope: scope)
+      {:ok, view, _html} = mount_isolated_recognitions(conn, action: :new, scope: scope)
 
       html = render(view)
 
@@ -116,6 +117,36 @@ defmodule FoyerWeb.RecognitionsLiveTest do
 
       refute has_element?(view, "input#value-team")
       refute html =~ ">Team<"
+    end
+  end
+
+  describe "F.Recognitions form state" do
+    test "selected recipient remains selected after choosing house values", %{conn: conn} do
+      stub_with(Foyer.RecognitionsMock, RecognitionsScenarios.Empty)
+
+      scope = IsolatedHelpers.build_scope(role: :staff, on_shift?: true)
+
+      {:ok, view, _html} = mount_isolated_recognitions(conn, action: :new, scope: scope)
+
+      view
+      |> form("#recognize-form",
+        recognition: %{
+          "recipient_id" => "3",
+          "values" => ["care"],
+          "body" => "",
+          "public" => "true"
+        }
+      )
+      |> render_change()
+
+      assert has_element?(
+               view,
+               "select#recognition-recipient option[value='3'][selected]",
+               "Aisha Bello"
+             )
+
+      assert has_element?(view, "input#value-care[checked]")
+      refute render(view) =~ ~s(data-value="")
     end
   end
 
@@ -140,7 +171,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
          |> Ecto.Changeset.add_error(:values, "choose at least one value")}
       end)
 
-      {:ok, view, _html} = mount_isolated(conn, action: :new, scope: scope)
+      {:ok, view, _html} = mount_isolated_recognitions(conn, action: :new, scope: scope)
 
       view
       |> form("#recognize-form",
@@ -165,7 +196,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
 
       scope = IsolatedHelpers.build_scope(role: :staff, on_shift?: true)
 
-      {:ok, view, _html} = mount_isolated(conn, action: :new, scope: scope)
+      {:ok, view, _html} = mount_isolated_recognitions(conn, action: :new, scope: scope)
 
       refute has_element?(view, "#bonus-points-fieldset")
       refute has_element?(view, "#bonus-tiers")
@@ -176,7 +207,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
 
       scope = IsolatedHelpers.build_scope(role: :manager, on_shift?: true)
 
-      {:ok, view, _html} = mount_isolated(conn, action: :new, scope: scope)
+      {:ok, view, _html} = mount_isolated_recognitions(conn, action: :new, scope: scope)
 
       assert has_element?(view, "#bonus-points-fieldset")
       assert has_element?(view, "#bonus-tiers")
@@ -192,7 +223,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
 
       scope = IsolatedHelpers.build_scope(role: :manager, on_shift?: true)
 
-      {:ok, view, _html} = mount_isolated(conn, action: :new, scope: scope)
+      {:ok, view, _html} = mount_isolated_recognitions(conn, action: :new, scope: scope)
 
       for pts <- [0, 10, 25, 50, 100] do
         assert has_element?(view, "input#bonus-#{pts}"),
@@ -222,7 +253,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
       |> stub(:within_grace_window?, fn _ -> true end)
 
       {:ok, view, _html} =
-        mount_isolated(conn,
+        mount_isolated_recognitions(conn,
           action: :show,
           scope: scope,
           path: "/recognitions/#{recognition.id}",
@@ -242,7 +273,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
       |> stub(:within_grace_window?, fn _ -> false end)
 
       {:ok, view, _html} =
-        mount_isolated(conn,
+        mount_isolated_recognitions(conn,
           action: :show,
           scope: scope,
           path: "/recognitions/#{recognition.id}",
@@ -271,7 +302,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
       # apply_show/2 rescues the NoResultsError and push_navigates to
       # /recognitions. live_isolated returns the redirect tuple at mount-time.
       assert {:error, {:live_redirect, %{to: "/recognitions"}}} =
-               mount_isolated(conn,
+               mount_isolated_recognitions(conn,
                  action: :show,
                  scope: scope,
                  path: "/recognitions/12345",
@@ -283,38 +314,6 @@ defmodule FoyerWeb.RecognitionsLiveTest do
   # ---------------------------------------------------------------------------
   # Helpers
   # ---------------------------------------------------------------------------
-
-  # Wraps live_isolated/3 with the project-specific scope+session+route plumbing.
-  # `:action` is required (`:index`, `:new`, `:show`, or `:edit`). For `:show`
-  # / `:edit` pass `:path` (e.g. "/recognitions/123") and `:params`
-  # (`%{"id" => "123"}`) so handle_params/3 receives the id it needs.
-  defp mount_isolated(conn, opts) do
-    scope = Keyword.fetch!(opts, :scope)
-    action = Keyword.fetch!(opts, :action)
-    params = Keyword.get(opts, :params, %{})
-    path = Keyword.get(opts, :path, default_path_for(action))
-
-    conn =
-      conn
-      |> Map.put(:params, params)
-      |> IsolatedHelpers.prepare_conn(
-        FoyerWeb.RecognitionsLive,
-        :authenticated_on_shift,
-        path,
-        [{FoyerWeb.UserAuth, :ensure_on_shift}]
-      )
-
-    live_isolated(conn, FoyerWeb.RecognitionsLive,
-      session: IsolatedHelpers.session_for(scope),
-      action: action,
-      router: FoyerWeb.Router
-    )
-  end
-
-  defp default_path_for(:index), do: "/recognitions"
-  defp default_path_for(:new), do: "/recognitions/new"
-  defp default_path_for(:show), do: "/recognitions/1"
-  defp default_path_for(:edit), do: "/recognitions/1/edit"
 
   defp build_recognition(opts) do
     sender_id = Keyword.fetch!(opts, :sender_id)

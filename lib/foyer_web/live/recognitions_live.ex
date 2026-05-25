@@ -19,6 +19,7 @@ defmodule FoyerWeb.RecognitionsLive do
      |> assign(:people, [])
      |> assign(:recognition, nil)
      |> assign(:house_values, Recognition.house_values())
+     |> assign(:preview_recipient_id, "")
      |> assign(:preview_recipient_name, "")
      |> assign(:preview_body, "")
      |> assign(:preview_values, [])
@@ -61,6 +62,7 @@ defmodule FoyerWeb.RecognitionsLive do
      |> assign(:grace_deadline_ms, nil)
      |> assign(:people, FoyerWeb.LiveDeps.accounts().list_people([]))
      |> assign(:form, to_form(FoyerWeb.LiveDeps.recognitions().compose_changeset(%{})))
+     |> assign(:preview_recipient_id, "")
      |> assign(:preview_recipient_name, "")
      |> assign(:preview_body, "")
      |> assign(:preview_values, [])
@@ -209,8 +211,9 @@ defmodule FoyerWeb.RecognitionsLive do
     {:noreply,
      socket
      |> assign(:preview_recipient_name, recipient_name)
+     |> assign(:preview_recipient_id, recipient_id)
      |> assign(:preview_body, Map.get(attrs, "body", ""))
-     |> assign(:preview_values, Map.get(attrs, "values", []))
+     |> assign(:preview_values, clean_values(Map.get(attrs, "values", [])))
      |> assign(:preview_bonus_points, bonus_points)}
   end
 
@@ -229,6 +232,7 @@ defmodule FoyerWeb.RecognitionsLive do
      |> assign(:sent_recognition, nil)
      |> assign(:grace_state, :open)
      |> assign(:grace_deadline_ms, nil)
+     |> assign(:preview_recipient_id, "")
      |> assign(:preview_recipient_name, "")
      |> assign(:preview_body, "")
      |> assign(:preview_values, [])
@@ -241,7 +245,11 @@ defmodule FoyerWeb.RecognitionsLive do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
       <main class="foyer-shell">
-        <FoyerComponents.desktop_rail active={:house} current_scope={@current_scope} />
+        <FoyerComponents.desktop_rail
+          active={:house}
+          current_scope={@current_scope}
+          chat_unread_count={@chat_unread_count}
+        />
         <div class="foyer-content">
           <div class="foyer-scroll" id="recognitions">
             <FoyerComponents.desktop_topbar current_scope={@current_scope} page_title={@page_title} />
@@ -496,7 +504,11 @@ defmodule FoyerWeb.RecognitionsLive do
                           class="w-full px-3 py-2 rounded-lg border border-stone-300 bg-[color:var(--foyer-cream-deep)] text-sm"
                         >
                           <option value="">— Select a colleague —</option>
-                          <option :for={p <- @people} value={p.id}>
+                          <option
+                            :for={p <- @people}
+                            value={p.id}
+                            selected={to_string(p.id) == @preview_recipient_id}
+                          >
                             {p.name}
                           </option>
                         </select>
@@ -670,7 +682,11 @@ defmodule FoyerWeb.RecognitionsLive do
                 </div>
             <% end %>
 
-            <FoyerComponents.bottom_nav active={:house} current_scope={@current_scope} />
+            <FoyerComponents.bottom_nav
+              active={:house}
+              current_scope={@current_scope}
+              chat_unread_count={@chat_unread_count}
+            />
           </div>
         </div>
       </main>
@@ -682,4 +698,7 @@ defmodule FoyerWeb.RecognitionsLive do
     do: sender_id == id
 
   defp managed_by?(_, _), do: false
+
+  defp clean_values(values) when is_list(values), do: Enum.reject(values, &(&1 in [nil, ""]))
+  defp clean_values(_), do: []
 end

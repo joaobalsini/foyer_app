@@ -14,7 +14,7 @@ defmodule FoyerWeb.UserAuth do
   use FoyerWeb, :verified_routes
 
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [put_flash: 3]
+  import Phoenix.LiveView, only: [attach_hook: 4, connected?: 1, put_flash: 3]
 
   alias Foyer.Accounts
   alias Foyer.Shifts
@@ -67,7 +67,7 @@ defmodule FoyerWeb.UserAuth do
          |> Phoenix.LiveView.redirect(to: ~p"/")}
 
       %Scope{} = scope ->
-        {:cont, assign(socket, :current_scope, scope)}
+        {:cont, assign_authenticated_nav(socket, scope)}
     end
   end
 
@@ -86,7 +86,7 @@ defmodule FoyerWeb.UserAuth do
          |> Phoenix.LiveView.redirect(to: ~p"/today")}
 
       %Scope{} = scope ->
-        {:cont, assign(socket, :current_scope, scope)}
+        {:cont, assign_authenticated_nav(socket, scope)}
     end
   end
 
@@ -111,4 +111,47 @@ defmodule FoyerWeb.UserAuth do
   end
 
   defp load_scope(_), do: nil
+
+  defp assign_authenticated_nav(socket, %Scope{} = scope) do
+    socket
+    |> assign(:current_scope, scope)
+    |> assign(:chat_unread_count, chat_unread_count(scope))
+    |> maybe_subscribe_to_chat_unread(scope)
+  end
+
+  defp maybe_subscribe_to_chat_unread(socket, %Scope{on_shift?: true, user: user}) do
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(Foyer.PubSub, "chat:inbox:#{user.id}")
+    end
+
+    attach_hook(socket, :chat_unread_count, :handle_info, fn
+      {:chat_inbox_updated, _conversation_id}, socket ->
+        socket = refresh_chat_unread_count(socket)
+
+        if socket.view == FoyerWeb.ChatLive do
+          {:cont, socket}
+        else
+          {:halt, socket}
+        end
+
+      {:chat_unread_updated, _user_id}, socket ->
+        {:halt, refresh_chat_unread_count(socket)}
+
+      _message, socket ->
+        {:cont, socket}
+    end)
+  end
+
+  defp maybe_subscribe_to_chat_unread(socket, _scope), do: socket
+
+  defp refresh_chat_unread_count(socket) do
+    count = chat_unread_count(socket.assigns.current_scope)
+
+    socket
+    |> assign(:chat_unread_count, count)
+    |> assign(:unread_count, count)
+  end
+
+  defp chat_unread_count(%Scope{on_shift?: true, user: user}), do: Foyer.Chat.unread_count(user)
+  defp chat_unread_count(_scope), do: 0
 end

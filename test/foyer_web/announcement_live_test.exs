@@ -7,7 +7,7 @@ defmodule FoyerWeb.AnnouncementLiveTest do
   dependency is a Mox-backed scenario module under `test/support/scenarios/`,
   the on_mount hook is the synthetic `FoyerWeb.IsolatedHelpers.OnMount`, and
   the routing context is provided by `FoyerWeb.IsolatedRouter`. The route
-  smoke layer (see `test/foyer_web/scaffold_smoke_test.exs`) covers the real
+  smoke layer (see `test/foyer_web/smoke_test.exs`) covers the real
   wiring; this file covers UI-state branches per `docs/TESTING_GUIDE.md`.
 
   Each test pins to a single `F.Announcements.<N>` clause in its name so
@@ -243,11 +243,34 @@ defmodule FoyerWeb.AnnouncementLiveTest do
       assert has_element?(view, "#receipts-read")
       assert has_element?(view, "#receipts-unread")
       assert has_element?(view, "#receipts-off-shift")
+      assert has_element?(view, "#ack-badge-#{Fixtures.other_staff().id}", "AB")
 
       assert html =~ "Acknowledged · 1"
       assert html =~ "Read without acknowledgement · 1"
       assert html =~ "Unread · 0"
       assert html =~ "Off shift · 0"
+      refute html =~ ">?? ✓"
+      refute html =~ "confirmed /"
+    end
+
+    test "staff do not see manager read receipt UI", %{conn: conn} do
+      stub_with(Foyer.HouseMock, Foyer.HouseScenarios.WithUnacked)
+
+      scope = IsolatedHelpers.scope_for(Fixtures.staff(), true)
+
+      {conn, opts} =
+        IsolatedHelpers.prepare_isolated(conn, FoyerWeb.AnnouncementLive, scope,
+          action: :show,
+          params: %{"id" => "100"}
+        )
+
+      {:ok, view, html} = live_isolated(conn, FoyerWeb.AnnouncementLive, opts)
+      Mox.allow(Foyer.HouseMock, self(), view.pid)
+      Mox.allow(Foyer.ChannelsMock, self(), view.pid)
+
+      refute has_element?(view, "#read-receipts-col")
+      refute has_element?(view, "#announcement-receipts")
+      refute html =~ "Read receipts"
     end
   end
 end

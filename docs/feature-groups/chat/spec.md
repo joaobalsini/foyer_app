@@ -108,31 +108,22 @@
   `#chat-room-shift-state` (channel conversations do not render this header
   because the audience is many users)
 
-## Scaffold Gaps
-
-- Implemented in `feature/chat`: direct/channel open helpers, read receipts,
-  unread counts, message sending, inbox enrichment, PubSub room/inbox updates,
-  picker actions, read marking, unread dot rendering, and off-shift indicators.
-- Remaining product follow-ups: inbox timestamp display and richer desktop
-  chat layouts.
-
 ## Test Coverage
 
 - `test/foyer/chat_test.exs` — context-boundary coverage for F.Chat.1 through
-  F.Chat.9 (including F.Chat.1's "one canonical conversation" invariant,
-  which is not directly observable from the LiveView surface).
-- `test/foyer_web/chat_live_test.exs` — route-smoke layer, one happy path per
-  surface plus the off-shift wiring pin: F.Chat.6/F.Chat.10 (room sends and
-  streams), F.Chat.9 (bottom-nav unread dot), F.Chat.11 (picker and room
-  header shift tags). Also re-asserts F.Chat.10 picker redirects.
-- `test/foyer_web/chat_live_isolated_test.exs` — isolated LiveView coverage
+  F.Chat.9, including canonical direct conversations, channel authorization,
+  inbox enrichment, sending, read receipts, unread counts, and read idempotence.
+- `test/foyer_web/chat_live_test.exs` — focused isolated LiveView coverage
   using `live_isolated/3` against scenario modules: F.Chat.5 (empty
   conversations absent from rendered inbox), F.Chat.6 (compose form fires
   `send_message`), F.Chat.7 (`mark_read` triggered on conversation open),
   F.Chat.8 (unread count rendering flips with scenario state), F.Chat.9
-  (inbox enrichment rendering — latest preview, unread dot), F.Chat.10
-  (open-direct / open-channel events redirect), F.Chat.11 (picker off-shift
-  tag, on-shift header rendering branch).
+  (latest preview and unread dot rendering), F.Chat.10 (incoming room message
+  stream append plus open-direct / open-channel picker redirects), and
+  F.Chat.11 (picker off-shift tag and room header shift state).
+- `test/foyer_web/smoke_test.exs` — route wiring only for `/chat`,
+  `/chat/new`, `/chat/:conversation_id`, and the channel deep-link entrypoint
+  used by the desktop rail.
 - Scenario modules live at `test/support/scenarios/chat/`,
   `test/support/scenarios/channels/`, `test/support/scenarios/accounts/`,
   and `test/support/scenarios/shifts/` and implement the corresponding port

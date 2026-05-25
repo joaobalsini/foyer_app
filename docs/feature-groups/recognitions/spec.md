@@ -77,10 +77,3 @@
 - **Then** the recognition is omitted from `received_by/2`/`given_by/2` and `get_recognition!/2`
   raises `Ecto.NoResultsError`. `/people/:id` and `/recognitions/:id` therefore mask the body
   from third parties.
-
-## Scaffold Gaps
-
-- `give/2` and `update_recognition/3` are stubs.
-- `team` is currently included as a recognition value and must be removed.
-- Soft-removal fields and the points ledger table do not exist yet.
-- Profile and feed reads do not yet filter removed recognitions.
