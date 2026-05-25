@@ -24,6 +24,14 @@ defmodule Foyer.ChatScenarios.WithUnread do
   end
 
   @impl true
+  def get_or_create_direct_conversation(user, colleague) do
+    case open_direct(user, colleague) do
+      {:error, :invalid_direct} -> {:error, Foyer.Chat.compose_changeset(%{})}
+      result -> result
+    end
+  end
+
+  @impl true
   def open_channel(_user, channel_id) when is_integer(channel_id) do
     {:ok, %{Fixtures.channel_floor_4() | id: channel_id}}
   end

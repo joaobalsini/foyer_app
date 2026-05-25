@@ -19,6 +19,9 @@ defmodule Foyer.ChatScenarios.EmptyInbox do
   end
 
   @impl true
+  def get_or_create_direct_conversation(user, colleague), do: open_direct(user, colleague)
+
+  @impl true
   def open_channel(_user, channel_id) when is_integer(channel_id) do
     {:ok, %{Fixtures.channel_floor_4() | id: channel_id}}
   end
