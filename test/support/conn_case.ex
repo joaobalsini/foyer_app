@@ -35,4 +35,15 @@ defmodule FoyerWeb.ConnCase do
     Foyer.DataCase.setup_sandbox(tags)
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
+
+  @doc """
+  POC sign-in for tests: puts `current_user_id` in the session so the
+  `:fetch_current_user` plug and `on_mount` hooks have something to load.
+  """
+  @spec sign_in(Plug.Conn.t(), Foyer.Accounts.User.t()) :: Plug.Conn.t()
+  def sign_in(conn, %Foyer.Accounts.User{} = user) do
+    conn
+    |> Phoenix.ConnTest.init_test_session(%{})
+    |> Plug.Conn.put_session(:current_user_id, user.id)
+  end
 end

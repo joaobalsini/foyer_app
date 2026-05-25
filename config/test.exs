@@ -1,5 +1,18 @@
 import Config
 
+# LiveDeps: test points at Mox mocks. Per docs/TESTING_GUIDE.md, tests should
+# use `Mox.stub_with/2` (smoke test) or scenario modules (isolated tests) — NOT
+# `Application.put_env/3`.
+config :foyer,
+  accounts_context: Foyer.AccountsMock,
+  shifts_context: Foyer.ShiftsMock,
+  channels_context: Foyer.ChannelsMock,
+  house_context: Foyer.HouseMock,
+  recognitions_context: Foyer.RecognitionsMock,
+  chat_context: Foyer.ChatMock,
+  profile_context: Foyer.ProfileMock,
+  today_context: Foyer.TodayMock
+
 # Database is configured at runtime via TEST_DATABASE_URL (see config/runtime.exs).
 # No credentials are stored here.
 

@@ -13,7 +13,7 @@ defmodule FoyerWeb.LiveDeps do
   ## Usage
 
       house = FoyerWeb.LiveDeps.house()
-      result = house.some_query(user)
+      result = house.feed_for(user)
 
   ## Adding a new context
 
@@ -26,4 +26,28 @@ defmodule FoyerWeb.LiveDeps do
   5. Configure `:foyer, :some_context` in `config/dev.exs` and
      `config/test.exs` (pointing at the real module and the mock respectively).
   """
+
+  @spec accounts() :: module()
+  def accounts, do: Application.fetch_env!(:foyer, :accounts_context)
+
+  @spec shifts() :: module()
+  def shifts, do: Application.fetch_env!(:foyer, :shifts_context)
+
+  @spec channels() :: module()
+  def channels, do: Application.fetch_env!(:foyer, :channels_context)
+
+  @spec house() :: module()
+  def house, do: Application.fetch_env!(:foyer, :house_context)
+
+  @spec recognitions() :: module()
+  def recognitions, do: Application.fetch_env!(:foyer, :recognitions_context)
+
+  @spec chat() :: module()
+  def chat, do: Application.fetch_env!(:foyer, :chat_context)
+
+  @spec profile() :: module()
+  def profile, do: Application.fetch_env!(:foyer, :profile_context)
+
+  @spec today() :: module()
+  def today, do: Application.fetch_env!(:foyer, :today_context)
 end

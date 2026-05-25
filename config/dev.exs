@@ -1,5 +1,16 @@
 import Config
 
+# LiveDeps: dev points at the real context modules.
+config :foyer,
+  accounts_context: Foyer.Accounts,
+  shifts_context: Foyer.Shifts,
+  channels_context: Foyer.Channels,
+  house_context: Foyer.House,
+  recognitions_context: Foyer.Recognitions,
+  chat_context: Foyer.Chat,
+  profile_context: Foyer.Profile,
+  today_context: Foyer.Today
+
 # Database is configured at runtime via DATABASE_URL (see config/runtime.exs).
 # No credentials are stored here.
 

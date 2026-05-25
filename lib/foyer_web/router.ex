@@ -1,6 +1,8 @@
 defmodule FoyerWeb.Router do
   use FoyerWeb, :router
 
+  import FoyerWeb.UserAuth, only: [fetch_current_user: 2]
+
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
@@ -8,6 +10,7 @@ defmodule FoyerWeb.Router do
     plug :put_root_layout, html: {FoyerWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug :fetch_current_user
   end
 
   pipeline :api do
@@ -17,21 +20,50 @@ defmodule FoyerWeb.Router do
   scope "/", FoyerWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
-  end
+    # POC user picker — unauthenticated landing.
+    live_session :public,
+      on_mount: [{FoyerWeb.UserAuth, :mount_public}] do
+      live "/", UserPickerLive, :index
+    end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", FoyerWeb do
-  #   pipe_through :api
-  # end
+    # Authenticated but off-shift allowed: Today only.
+    live_session :authenticated_today,
+      on_mount: [{FoyerWeb.UserAuth, :ensure_authenticated}] do
+      live "/today", TodayLive, :index
+      live "/today/end-shift", TodayLive, :end_shift
+    end
+
+    # Authenticated AND on shift. Off-shift users are redirected to /today.
+    live_session :authenticated_on_shift,
+      on_mount: [{FoyerWeb.UserAuth, :ensure_on_shift}] do
+      live "/house", HouseLive, :index
+
+      live "/announcements/new", AnnouncementLive, :new
+      live "/announcements/:id", AnnouncementLive, :show
+      live "/announcements/:id/edit", AnnouncementLive, :edit
+
+      live "/chat", ChatLive, :inbox
+      live "/chat/new", ChatLive, :new_message
+      live "/chat/:conversation_id", ChatLive, :show
+
+      live "/recognitions", RecognitionsLive, :index
+      live "/recognitions/new", RecognitionsLive, :new
+      live "/recognitions/:id", RecognitionsLive, :show
+      live "/recognitions/:id/edit", RecognitionsLive, :edit
+
+      live "/me", ProfileLive, :me
+      live "/people", PeopleLive, :index
+      live "/people/:id", PeopleLive, :show
+    end
+
+    # POC session helpers — controllers, not LiveViews, because they mutate
+    # the session and then redirect.
+    post "/session/pick/:user_id", SessionController, :pick
+    delete "/session", SessionController, :sign_out
+  end
 
   # Enable LiveDashboard in development
   if Application.compile_env(:foyer, :dev_routes) do
-    # If you want to use the LiveDashboard in production, you should put
-    # it behind authentication and allow only admins to access it.
-    # If your application does not have an admins-only section yet,
-    # you can use Plug.BasicAuth to set up some basic authentication
-    # as long as you are also using SSL (which you should anyway).
     import Phoenix.LiveDashboard.Router
 
     scope "/dev" do
