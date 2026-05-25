@@ -259,6 +259,42 @@ defmodule Foyer.House do
     |> Repo.all()
   end
 
+  # Owned by feature/announcements; this branch carries a local copy until that branch lands on main.
+  @impl true
+  @spec authored_by(User.t()) :: [Announcement.t()]
+  def authored_by(%User{id: user_id}) do
+    from(a in Announcement,
+      where: a.author_id == ^user_id and not is_nil(a.published_at),
+      order_by: [desc: a.published_at],
+      preload: [:channel]
+    )
+    |> Repo.all()
+  end
+
+  # Owned by feature/announcements; this branch carries a local copy until that branch lands on main.
+  @impl true
+  @spec unacked_since(User.t(), DateTime.t() | nil) :: non_neg_integer()
+  def unacked_since(%User{id: user_id}, since) do
+    query =
+      from(a in Announcement,
+        join: m in Membership,
+        on: m.channel_id == a.channel_id and m.user_id == ^user_id,
+        left_join: ack in AnnouncementAck,
+        on: ack.announcement_id == a.id and ack.user_id == ^user_id,
+        where: a.requires_ack == true and is_nil(ack.id),
+        select: count(a.id)
+      )
+
+    query =
+      if is_nil(since) do
+        query
+      else
+        from([a, _m, _ack] in query, where: a.published_at > ^since)
+      end
+
+    Repo.one!(query)
+  end
+
   defp update_pin(%Announcement{} = announcement, %User{} = manager, pinned_at, event) do
     with :ok <- ensure_not_removed(announcement),
          :ok <- ensure_manager(manager),

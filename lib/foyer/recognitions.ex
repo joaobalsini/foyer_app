@@ -271,4 +271,24 @@ defmodule Foyer.Recognitions do
   defp preload_recognition(%Recognition{} = recognition) do
     Repo.preload(recognition, [:sender, :recipient])
   end
+
+  # Owned by feature/recognitions; this branch carries a local copy until that branch lands on main.
+  @impl true
+  @spec private_received_since(User.t(), DateTime.t() | nil) :: non_neg_integer()
+  def private_received_since(%User{id: user_id}, since) do
+    query =
+      from(r in Recognition,
+        where: r.recipient_id == ^user_id and r.public == false,
+        select: count(r.id)
+      )
+
+    query =
+      if is_nil(since) do
+        query
+      else
+        from(r in query, where: r.inserted_at > ^since)
+      end
+
+    Repo.one!(query)
+  end
 end
