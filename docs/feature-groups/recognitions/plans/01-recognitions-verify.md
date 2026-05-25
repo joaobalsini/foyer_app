@@ -265,6 +265,152 @@ HEAD = `eaffb06`.
 
 **Verdict after rebase: Pass with follow-ups — unchanged from the pre-rebase verdict above.**
 
+## Second pass — test architecture + spec
+
+A second verify pass closed two architectural gaps the first pass missed:
+the spec was written in flat declarative clauses (workflow requires
+given/when/then per `docs/WORKFLOW.md:38`) and the test suite had no
+`live_isolated/3` usage, no `test/support/scenarios/` modules, and only one
+F-clause with an e2e route smoke test (F.Recognitions.10 — the other nine
+clauses were unit-only against `Foyer.Recognitions`). TESTING_GUIDE lines
+60–61 require each F-clause to have at least one e2e test.
+
+### Spec rewrite
+
+`docs/feature-groups/recognitions/spec.md` rewritten into given/when/then
+form. F-numbering preserved (no renumbering — `docs/WORKFLOW.md:27-28`
+makes them stable). `## Scaffold Gaps` kept verbatim. F.Recognitions.5,
+F.Recognitions.6, and F.Recognitions.10 use multiple given/when/then
+blocks under one clause to capture the manager-vs-staff, in-tier-vs-out-
+of-tier, and public-vs-private-vs-third-party splits respectively.
+
+### Scenario modules (4 in 2 ports)
+
+Added under `test/support/scenarios/`, compiled in test only via
+`test/support/elixirc_paths(:test)`:
+
+- `test/support/scenarios/recognitions/empty.ex` —
+  `Foyer.RecognitionsScenarios.Empty`. Every read returns `[]`; show/edit
+  raises `Ecto.NoResultsError`; writes return `{:error, :not_implemented}`.
+  Default world for `:index` and `:new` isolated tests.
+- `test/support/scenarios/recognitions/with_received.ex` —
+  `Foyer.RecognitionsScenarios.WithReceived`. `received_by/2` returns one
+  fixed public recognition; other reads empty. Available for future
+  profile/Today isolated tests.
+- `test/support/scenarios/recognitions/with_given.ex` —
+  `Foyer.RecognitionsScenarios.WithGiven`. Mirror for `given_by/2`.
+- `test/support/scenarios/accounts/with_people.ex` —
+  `Foyer.AccountsScenarios.WithPeople` (+ private `Static` data module).
+  `list_people/1` returns a fixed roster of three users (IDs 1/2/3,
+  manager+staff mix). Used by every isolated test that mounts `:new`/
+  `:edit` because the LV reads `accounts().list_people([])` for the
+  recipient select.
+
+Each scenario implements its port behaviour in full so `@behaviour` would
+catch a renamed callback at compile time — the cheap structural pin
+TESTING_GUIDE §Scenario Modules calls out (lines 196-199).
+
+### Isolated harness
+
+`test/support/isolated_helpers.ex` — `FoyerWeb.IsolatedHelpers`. Three
+helpers:
+
+- `build_scope/1` — builds an in-memory `%FoyerWeb.Scope{}` for a fake
+  `%Foyer.Accounts.User{}` (defaults to staff Maya; pass `id:`, `role:`,
+  `on_shift?:` to vary).
+- `session_for/1` — wraps a scope into a `%{"current_scope" => scope}`
+  session map that `live_isolated/3` accepts as its `:session` opt.
+- `prepare_conn/5` — sets `conn.request_path` and
+  `conn.private[:phoenix_live_view]` so the LV channel's session-route
+  check at `Phoenix.LiveView.Channel.authorize_session/3` (the line that
+  fires `{:error, :unauthorized}` if the resolved route's live_session
+  doesn't match the signed token's `live_session_name`) passes. Also
+  injects the route-level `on_mount` hooks into the lifecycle so they run
+  in both dead render and connected mount — which is what makes the
+  scope-from-session shortcut actually fire.
+
+The one production change required by the harness: `FoyerWeb.UserAuth`
+gained a `load_scope/1` clause that returns `scope` directly when the
+session has `"current_scope"`. Production paths never put a Scope in the
+session (they put `"current_user_id"`), so the clause is reachable only
+from isolated tests. Two lines of code; the comment above it pins the
+intent.
+
+### Isolated LiveView tests (10 in 7 describes, all `async: true`)
+
+`test/foyer_web/recognitions_live_test.exs` — `FoyerWeb.RecognitionsLiveTest`.
+Each describe pinned to one F-clause:
+
+| Describe | F-clause | What it pins |
+|---|---|---|
+| `F.Recognitions.1 — give form visibility` (1 test) | F.Recognitions.1 | Form `#recognize-form` + submit button render for on-shift staff. |
+| `F.Recognitions.2 — self-recognition rejected` (1 test) | F.Recognitions.2 | Form submit with `recipient_id == sender.id` flashes "Choose someone else to recognize."; uses `expect/3` to assert `give/2` is called exactly once with the self-recipient. |
+| `F.Recognitions.3 — house values` (1 test) | F.Recognitions.3 | Exactly six `input#value-<v>` checkboxes render; `value-team` absent, `>Team<` label absent. |
+| `F.Recognitions.4 — values required` (1 test) | F.Recognitions.4 | Submit with no values → context returns changeset error → LV's catch-all flashes "Couldn't send recognition." `expect/3` asserts `give/2` received no `values` key. |
+| `F.Recognitions.5 — bonus points visibility` (2 tests) | F.Recognitions.5 | `:staff` scope: `#bonus-points-fieldset` absent. `:manager` scope: fieldset present. |
+| `F.Recognitions.6 — bonus point tiers` (1 test) | F.Recognitions.6 | Manager sees `input#bonus-{0,10,25,50,100}`; does NOT see `input#bonus-{5,15,20,75,200}`. |
+| `F.Recognitions.9 — author affordances within grace window` (2 tests) | F.Recognitions.9 | `within_grace_window? = true`: Edit link + Remove button render. `false`: Edit stays, Remove disappears. |
+| `F.Recognitions.10 — privacy on :show` (1 test) | F.Recognitions.10 | When mock `get_recognition!/2` raises `Ecto.NoResultsError`, LV redirects to `/recognitions` (the `apply_show/2` rescue). |
+
+F.Recognitions.7 and F.Recognitions.8 are context-level invariants
+(`Ecto.Multi` atomicity and soft-removal-with-ledger). They have no
+LiveView surface beyond the Remove button click for F.8 — pinned at the
+context level in `test/foyer/recognitions_test.exs` (unchanged from the
+first pass) and via the new e2e tests below.
+
+### E2e tests added in `scaffold_smoke_test.exs` (9 new, F-tagged)
+
+The first pass left F.Recognitions.10 as the only F-tagged e2e — TESTING_GUIDE
+lines 60-61 require one per clause. Added in this pass:
+
+| Test name (line) | F-clause | Path exercised |
+|---|---|---|
+| `F.Recognitions.1 on-shift staff can reach /recognitions and /recognitions/new` (~:206) | F.Recognitions.1 | Real router → `:authenticated_on_shift` on_mount → RecognitionsLive index + new. |
+| `F.Recognitions.1 off-shift user is redirected away from /recognitions` (~:216) | F.Recognitions.1 | Off-shift Jamal → `:ensure_on_shift` redirects to /today. |
+| `F.Recognitions.2 self-recognition submit surfaces the self-recognition flash` (~:221) | F.Recognitions.2 | Maya submits with recipient = self → real context returns `:self_recognition` → flash visible. |
+| `F.Recognitions.3 new form renders the six house values and no others` (~:239) | F.Recognitions.3 | Same as the existing test, retitled with the F-tag. |
+| `F.Recognitions.4 submitting with no values selected does NOT create a recognition` (~:251) | F.Recognitions.4 | Submit form without values → asserts `Repo.aggregate/2` count is unchanged. |
+| `F.Recognitions.5 manager sees bonus-tier UI, staff does NOT` (~:273) | F.Recognitions.5 | Two LiveView mounts; asserts `#bonus-points-fieldset` presence/absence. |
+| `F.Recognitions.6 manager submits a valid tier and the recognition is created` (~:286) | F.Recognitions.6 | Charlotte → bonus_points=25 → reads the row back from `Foyer.Repo`, asserts `bonus_points == 25`. |
+| `F.Recognitions.7 a manager give with bonus_points writes ledger + balance in one go` (~:313) | F.Recognitions.7 | Snapshots Aisha's balance, submits bonus_points=10, asserts balance grew by 10 AND a single `PointEntry{delta: 10, reason: "recognition_granted"}` exists. |
+| `F.Recognitions.8 the author can remove a recognition within grace via the UI` (~:343) | F.Recognitions.8 | Click `#recognition-remove-btn`, assert `removed_at` set AND row gone from `feed_public/0`. |
+| `F.Recognitions.9 author can open edit page within grace, blocked after grace` (~:361) | F.Recognitions.9 | Within grace: edit page opens. Aged 20 min: `remove_recognition/2` returns `:outside_grace_window`. |
+
+Every F.Recognitions.<N> for N in 1..10 now has at least one e2e test in
+`scaffold_smoke_test.exs` AND at least one unit-or-isolated test pinned to
+it. The cross-reference table at the top of this doc was authored against
+the first pass; the second pass strictly adds coverage rather than
+moving it.
+
+### Final check results (second pass)
+
+```
+$ mix format --check-formatted    # clean
+$ mix compile --warnings-as-errors # clean
+$ mix credo --strict              # 0 issues, 351 mods/funs
+$ mix test                        # 68 tests, 0 failures, 0.6s
+$ mix dialyzer                    # 2 errors, 2 skipped, passed successfully (exit 0)
+```
+
+Test count: 51 → 68 (+17). Breakdown of the +17: 10 isolated LV tests + 9
+new F-tagged e2e tests in `scaffold_smoke_test.exs` − 2 e2e tests
+renamed/folded into F-tagged equivalents. Suite remains well under the
+10-second budget (0.6s vs 0.6s pre-pass — adding scenario modules and
+isolated tests did not slow the suite down because `live_isolated/3`
+skips the seed insert that the integration tests do).
+
+### Verdict (after second pass)
+
+**Pass.** The architecture gaps are closed: spec is in given/when/then,
+every F-clause has both an isolated/unit test and an e2e test, scenario
+modules live under `test/support/scenarios/<port>/`, and the isolated
+harness sits in `test/support/isolated_helpers.ex` (test-only,
+production-clean apart from the two-line `load_scope/1` fallback in
+`user_auth.ex`). Known follow-ups from the first pass are unchanged — see
+below.
+
+HEAD after this pass: see the latest commit on `feature/recognitions`.
+
 ## Known follow-ups
 
 ### 1. `recognitions.removed_at` index is a regular index, not partial

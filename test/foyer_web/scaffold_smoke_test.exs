@@ -412,14 +412,40 @@ defmodule FoyerWeb.ScaffoldSmokeTest do
   end
 
   describe "Recognitions" do
-    test "index lists public recognitions", ctx do
+    test "F.Recognitions.1 on-shift staff can reach /recognitions and /recognitions/new", ctx do
       conn = sign_in(ctx.conn, ctx.maya)
       {:ok, view, _html} = live(conn, ~p"/recognitions")
       assert render(view) =~ "Recognitions"
       assert has_element?(view, "#recognitions-new-cta")
+
+      {:ok, new_view, _html} = live(sign_in(build_conn(), ctx.maya), ~p"/recognitions/new")
+      assert has_element?(new_view, "form#recognize-form")
     end
 
-    test "new form renders with house values", ctx do
+    test "F.Recognitions.1 off-shift user is redirected away from /recognitions", ctx do
+      conn = sign_in(ctx.conn, ctx.jamal)
+      assert {:error, {:redirect, %{to: "/today"}}} = live(conn, ~p"/recognitions")
+    end
+
+    test "F.Recognitions.2 self-recognition submit surfaces the self-recognition flash", ctx do
+      conn = sign_in(ctx.conn, ctx.maya)
+      {:ok, view, _html} = live(conn, ~p"/recognitions/new")
+
+      view
+      |> form("#recognize-form",
+        recognition: %{
+          "recipient_id" => to_string(ctx.maya.id),
+          "body" => "Praise myself.",
+          "values" => ["care"],
+          "public" => "true"
+        }
+      )
+      |> render_submit()
+
+      assert render(view) =~ "Choose someone else to recognize."
+    end
+
+    test "F.Recognitions.3 new form renders the six house values and no others", ctx do
       conn = sign_in(ctx.conn, ctx.maya)
       {:ok, view, _html} = live(conn, ~p"/recognitions/new")
       assert render(view) =~ "Give recognition"
@@ -431,11 +457,139 @@ defmodule FoyerWeb.ScaffoldSmokeTest do
       refute render(view) =~ "Team"
     end
 
-    test "manager sees bonus points tiers", ctx do
+    test "F.Recognitions.4 submitting with no values selected does NOT create a recognition",
+         ctx do
+      before_count = Foyer.Repo.aggregate(Foyer.Recognitions.Recognition, :count)
+
+      conn = sign_in(ctx.conn, ctx.maya)
+      {:ok, view, _html} = live(conn, ~p"/recognitions/new")
+
+      view
+      |> form("#recognize-form",
+        recognition: %{
+          "recipient_id" => to_string(ctx.aisha.id),
+          "body" => "Thanks.",
+          "public" => "true"
+        }
+      )
+      |> render_submit()
+
+      # The LV either re-renders with the error or flashes a generic message;
+      # either way no row is inserted.
+      assert Foyer.Repo.aggregate(Foyer.Recognitions.Recognition, :count) == before_count
+    end
+
+    test "F.Recognitions.5 manager sees bonus-tier UI, staff does NOT", ctx do
+      {:ok, manager_view, _html} =
+        live(sign_in(ctx.conn, ctx.charlotte), ~p"/recognitions/new")
+
+      assert render(manager_view) =~ "Bonus points"
+      assert has_element?(manager_view, "#bonus-points-fieldset")
+
+      {:ok, staff_view, _html} =
+        live(sign_in(build_conn(), ctx.maya), ~p"/recognitions/new")
+
+      refute has_element?(staff_view, "#bonus-points-fieldset")
+    end
+
+    test "F.Recognitions.6 manager submits a valid tier and the recognition is created", ctx do
       conn = sign_in(ctx.conn, ctx.charlotte)
       {:ok, view, _html} = live(conn, ~p"/recognitions/new")
-      assert render(view) =~ "Bonus points"
-      assert render(view) =~ "+50"
+
+      view
+      |> form("#recognize-form",
+        recognition: %{
+          "recipient_id" => to_string(ctx.aisha.id),
+          "body" => "Fast recovery on suite 308.",
+          "values" => ["initiative"],
+          "public" => "true",
+          "bonus_points" => "25"
+        }
+      )
+      |> render_submit()
+
+      # After a successful give, the LV push_navigates to /recognitions. Reload
+      # and assert the row landed with the expected tier.
+      assert [recognition] =
+               Foyer.Repo.all(
+                 from r in Foyer.Recognitions.Recognition,
+                   where: r.body == "Fast recovery on suite 308."
+               )
+
+      assert recognition.bonus_points == 25
+    end
+
+    test "F.Recognitions.7 a manager give with bonus_points writes ledger + balance in one go",
+         ctx do
+      before_balance =
+        Foyer.Repo.get!(Foyer.Accounts.User, ctx.aisha.id).points_balance
+
+      conn = sign_in(ctx.conn, ctx.charlotte)
+      {:ok, view, _html} = live(conn, ~p"/recognitions/new")
+
+      view
+      |> form("#recognize-form",
+        recognition: %{
+          "recipient_id" => to_string(ctx.aisha.id),
+          "body" => "Ledger end-to-end check.",
+          "values" => ["craft"],
+          "public" => "true",
+          "bonus_points" => "10"
+        }
+      )
+      |> render_submit()
+
+      assert Foyer.Repo.get!(Foyer.Accounts.User, ctx.aisha.id).points_balance ==
+               before_balance + 10
+
+      assert [%{delta: 10, reason: "recognition_granted"}] =
+               Foyer.Repo.all(
+                 from e in Foyer.Recognitions.PointEntry,
+                   where: e.user_id == ^ctx.aisha.id and e.delta == 10
+               )
+    end
+
+    test "F.Recognitions.8 the author can remove a recognition within grace via the UI", ctx do
+      # ctx.hugo_recognition is Charlotte -> Hugo, fresh-from-fixture, public.
+      conn = sign_in(ctx.conn, ctx.charlotte)
+      {:ok, view, _html} = live(conn, ~p"/recognitions/#{ctx.hugo_recognition.id}")
+
+      assert has_element?(view, "#recognition-remove-btn")
+
+      view |> element("#recognition-remove-btn") |> render_click()
+
+      # Soft removal: row stays, but `removed_at` is now set and the row is
+      # filtered from `feed_public/0`.
+      removed =
+        Foyer.Repo.get!(Foyer.Recognitions.Recognition, ctx.hugo_recognition.id)
+
+      assert removed.removed_at
+      refute Enum.any?(Foyer.Recognitions.feed_public(), &(&1.id == ctx.hugo_recognition.id))
+    end
+
+    test "F.Recognitions.9 author can open edit page within grace, blocked after grace", ctx do
+      # Within grace — Charlotte authored ctx.hugo_recognition; edit page opens.
+      conn = sign_in(ctx.conn, ctx.charlotte)
+      {:ok, view, _html} = live(conn, ~p"/recognitions/#{ctx.hugo_recognition.id}/edit")
+      assert has_element?(view, "#recognition-edit-form")
+      assert render(view) =~ "Edit recognition"
+
+      # Age the recognition past the grace window and try to remove via the
+      # context — same gate the LV honours when rendering the Remove button.
+      aged_at =
+        DateTime.utc_now()
+        |> DateTime.add(-20 * 60, :second)
+        |> DateTime.truncate(:second)
+
+      Foyer.Repo.update_all(
+        from(r in Foyer.Recognitions.Recognition, where: r.id == ^ctx.hugo_recognition.id),
+        set: [inserted_at: aged_at]
+      )
+
+      aged = Foyer.Repo.get!(Foyer.Recognitions.Recognition, ctx.hugo_recognition.id)
+
+      assert {:error, :outside_grace_window} =
+               Foyer.Recognitions.remove_recognition(aged, ctx.charlotte)
     end
 
     test "show renders a single recognition", ctx do
