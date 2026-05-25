@@ -14,29 +14,41 @@ defmodule Foyer.Today do
   alias Foyer.Shifts
   alias Foyer.Today.Briefing
 
+  @type deps :: %{
+          shifts: module(),
+          house: module(),
+          recognitions: module(),
+          chat: module()
+        }
+
   @impl true
   @spec brief_for(User.t()) :: Briefing.t()
   def brief_for(%User{} = user) do
-    shift = Shifts.current_shift_for(user)
+    brief_for(user, default_deps())
+  end
+
+  @spec brief_for(User.t(), deps()) :: Briefing.t()
+  def brief_for(%User{} = user, deps) do
+    shift = deps.shifts.current_shift_for(user)
     on_shift? = not is_nil(shift)
 
-    needs_ack = if on_shift?, do: House.needs_ack_from(user), else: []
-    handoff = if on_shift?, do: Shifts.last_handoff_for(user), else: nil
+    needs_ack = if on_shift?, do: deps.house.needs_ack_from(user), else: []
+    handoff = if on_shift?, do: deps.shifts.last_handoff_for(user), else: nil
 
     recent_recognitions =
       if on_shift? do
-        Recognitions.received_by(user, user) |> Enum.take(3)
+        deps.recognitions.received_by(user, user) |> Enum.take(3)
       else
         []
       end
 
     own_announcements =
       if on_shift? and manager?(user),
-        do: House.authored_by(user),
+        do: deps.house.authored_by(user),
         else: []
 
     last_shift_ended_at =
-      case Shifts.last_ended_shift_for(user) do
+      case deps.shifts.last_ended_shift_for(user) do
         nil -> nil
         s -> s.ended_at
       end
@@ -44,7 +56,7 @@ defmodule Foyer.Today do
     {w_ann, w_msg, w_rec} =
       if on_shift?,
         do: {0, 0, 0},
-        else: waiting_counts(user, last_shift_ended_at)
+        else: waiting_counts(user, last_shift_ended_at, deps)
 
     %Briefing{
       user: user,
@@ -61,13 +73,23 @@ defmodule Foyer.Today do
     }
   end
 
-  @spec waiting_counts(User.t(), DateTime.t() | nil) ::
+  @spec waiting_counts(User.t(), DateTime.t() | nil, deps()) ::
           {non_neg_integer(), non_neg_integer(), non_neg_integer()}
-  defp waiting_counts(user, since) do
-    ann = House.unacked_since(user, since)
-    msg = Chat.unread_since(user, since)
-    rec = Recognitions.private_received_since(user, since)
+  defp waiting_counts(user, since, deps) do
+    ann = deps.house.unacked_since(user, since)
+    msg = deps.chat.unread_since(user, since)
+    rec = deps.recognitions.private_received_since(user, since)
     {ann, msg, rec}
+  end
+
+  @spec default_deps() :: deps()
+  defp default_deps do
+    %{
+      shifts: Shifts,
+      house: House,
+      recognitions: Recognitions,
+      chat: Chat
+    }
   end
 
   @spec manager?(User.t()) :: boolean()

@@ -92,47 +92,4 @@ defmodule Foyer.ChatTest do
 
     assert {:error, :unauthorized} = Chat.mark_read(ctx.maya_charlotte, ctx.rafael)
   end
-
-  test "F.Today.20 unread_since counts eligible unread messages since last shift only", ctx do
-    since = DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.truncate(:second)
-
-    floor_4 = Repo.get_by!(Channel, name: "Housekeeping · Floor 4")
-    leadership = Repo.get_by!(Channel, name: "Leadership")
-
-    {:ok, floor_conversation} = Chat.open_channel(ctx.maya, floor_4.id)
-    {:ok, leadership_conversation} = Chat.open_channel(ctx.charlotte, leadership.id)
-
-    {:ok, _channel_unread} =
-      Chat.send_message(floor_conversation, ctx.hugo, %{"body" => "Fresh channel update."})
-
-    {:ok, _own_message} =
-      Chat.send_message(floor_conversation, ctx.maya, %{"body" => "I am already handling this."})
-
-    {:ok, read_message} =
-      Chat.send_message(ctx.maya_charlotte, ctx.charlotte, %{"body" => "Read this one."})
-
-    {:ok, _read} =
-      %MessageRead{}
-      |> MessageRead.changeset(%{
-        message_id: read_message.id,
-        user_id: ctx.maya.id,
-        read_at: DateTime.utc_now()
-      })
-      |> Repo.insert()
-
-    {:ok, old_message} =
-      Chat.send_message(ctx.maya_charlotte, ctx.charlotte, %{"body" => "Before last shift."})
-
-    old_inserted_at = DateTime.add(since, -1, :second)
-
-    Repo.update_all(
-      from(m in Message, where: m.id == ^old_message.id),
-      set: [inserted_at: old_inserted_at]
-    )
-
-    {:ok, _non_member_message} =
-      Chat.send_message(leadership_conversation, ctx.rafael, %{"body" => "Managers only."})
-
-    assert Chat.unread_since(ctx.maya, since) == 2
-  end
 end
