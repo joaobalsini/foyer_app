@@ -140,6 +140,10 @@ defmodule FoyerWeb.IsolatedHelpers do
   @doc """
   Builds a `FoyerWeb.Scope` for an in-memory user. Pass `:role`, `:on_shift?`,
   and any other `User` field as keyword overrides.
+
+  ## Examples
+
+      scope = build_scope(id: 1, name: "Maya", role: :staff, on_shift?: true)
   """
   @spec build_scope(keyword()) :: Scope.t()
   def build_scope(opts \\ []) do
@@ -153,7 +157,7 @@ defmodule FoyerWeb.IsolatedHelpers do
       |> Keyword.put_new(:initials, "MO")
       |> Keyword.put_new(:role, :staff)
       |> Keyword.put_new(:department, "Housekeeping")
-      |> Keyword.put_new(:title, "Senior Housekeeper")
+      |> Keyword.put_new(:title, "Senior Housekeeper · Floor 4")
       |> Keyword.put_new(:languages, ["EN"])
       |> Keyword.put_new(:points_balance, 0)
 

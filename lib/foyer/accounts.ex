@@ -30,12 +30,31 @@ defmodule Foyer.Accounts do
 
   @impl true
   @spec list_people(keyword()) :: [User.t()]
-  def list_people(_opts \\ []) do
-    from(u in User,
-      order_by: [asc: u.name],
-      preload: [memberships: :channel]
-    )
+  def list_people(opts \\ []) do
+    base =
+      from(u in User,
+        order_by: [asc: u.name],
+        preload: [memberships: :channel]
+      )
+
+    base
+    |> maybe_filter_by_channel(opts[:channel_id])
     |> Repo.all()
+  end
+
+  @spec maybe_filter_by_channel(Ecto.Queryable.t(), String.t() | integer() | nil) ::
+          Ecto.Queryable.t()
+  defp maybe_filter_by_channel(query, nil), do: query
+
+  defp maybe_filter_by_channel(query, channel_id) when is_binary(channel_id) do
+    maybe_filter_by_channel(query, String.to_integer(channel_id))
+  end
+
+  defp maybe_filter_by_channel(query, channel_id) when is_integer(channel_id) do
+    from(u in query,
+      join: m in Foyer.Channels.Membership,
+      on: m.user_id == u.id and m.channel_id == ^channel_id
+    )
   end
 
   @spec current_shift_for(User.t()) :: Foyer.Shifts.Shift.t() | nil
