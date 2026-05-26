@@ -8,5 +8,9 @@ defmodule Foyer.Today.Behavior do
   alias Foyer.Accounts.User
   alias Foyer.Today.Briefing
 
+  @doc """
+  Builds the Today briefing for the given user from shift, announcement, and
+  recognition state.
+  """
   @callback brief_for(User.t()) :: Briefing.t()
 end

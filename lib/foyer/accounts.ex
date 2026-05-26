@@ -21,12 +21,15 @@ defmodule Foyer.Accounts do
   end
 
   @impl true
-  @spec get_user!(integer() | String.t()) :: User.t()
-  def get_user!(id), do: Repo.get!(User, id)
-
-  @impl true
   @spec get_user(integer() | String.t()) :: User.t() | nil
-  def get_user(id), do: Repo.get(User, id)
+  def get_user(id) when is_integer(id), do: Repo.get(User, id)
+
+  def get_user(id) when is_binary(id) do
+    case Integer.parse(id) do
+      {int, ""} -> get_user(int)
+      _ -> nil
+    end
+  end
 
   @impl true
   @spec list_people(keyword()) :: [User.t()]

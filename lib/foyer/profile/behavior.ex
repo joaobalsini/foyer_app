@@ -13,7 +13,19 @@ defmodule Foyer.Profile.Behavior do
   alias Foyer.Profile.Card
   alias Foyer.Profile.RewardItem
 
+  @doc """
+  Builds a profile card for `subject` as seen by `viewer`, applying visibility
+  rules for private recognitions and given recognitions.
+  """
   @callback profile_for(subject :: User.t(), viewer :: User.t()) :: Card.t()
+
+  @doc """
+  Builds the full self-service profile card for the given user.
+  """
   @callback own_profile_for(User.t()) :: Card.t()
+
+  @doc """
+  Returns reward catalog items shown on the user's own profile.
+  """
   @callback rewards_catalog() :: [RewardItem.t()]
 end

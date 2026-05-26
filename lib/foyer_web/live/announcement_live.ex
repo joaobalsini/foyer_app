@@ -2,9 +2,9 @@ defmodule FoyerWeb.AnnouncementLive do
   @moduledoc """
   Announcement surface — `/announcements/new`, `/announcements/:id`, and
   `/announcements/:id/edit`. Membership-authorized via
-  `Foyer.House.get_announcement!/2`; an unauthorized user (e.g. Maya trying to
-  open a Leadership-only announcement) is redirected back to `/house` with a
-  flash.
+  `Foyer.House.get_announcement/2`; an unauthorized user (e.g. Maya trying to
+  open a Leadership-only announcement) receives no record and is redirected
+  back to `/house` with a flash.
 
   Compose (`/announcements/new`) is manager-gated in `apply_new/1` — staff
   are redirected back to `/house` with a flash, defending in depth on top of
@@ -70,59 +70,44 @@ defmodule FoyerWeb.AnnouncementLive do
   defp apply_show(socket, %{"id" => id}) do
     scope = socket.assigns.current_scope
 
-    try do
-      a = FoyerWeb.LiveDeps.house().get_announcement!(id, scope.user)
-      FoyerWeb.LiveDeps.house().mark_read(a, scope.user)
+    case FoyerWeb.LiveDeps.house().get_announcement(id, scope.user) do
+      %Announcement{} = a ->
+        _ = FoyerWeb.LiveDeps.house().mark_read(a, scope.user)
+        apply_loaded_show(socket, a, scope)
 
-      {:noreply,
-       socket
-       |> assign(:announcement, a)
-       |> assign(:acked?, acked_by?(a, scope.user.id))
-       |> assign(:can_ack?, can_ack?(a, scope.user))
-       |> assign(:can_pin?, can_pin?(a, scope.user))
-       |> assign(:within_grace?, FoyerWeb.LiveDeps.house().within_grace_window?(a))
-       |> assign(:receipts, load_receipts(a, scope))
-       |> assign(:page_title, a.title)}
-    rescue
-      Ecto.NoResultsError ->
-        {:noreply,
-         socket
-         |> put_flash(:error, "That announcement is not available to you.")
-         |> push_navigate(to: ~p"/house")}
+      nil ->
+        unavailable_announcement(socket)
     end
   end
 
   defp apply_edit(socket, %{"id" => id}) do
     scope = socket.assigns.current_scope
 
-    try do
-      a = FoyerWeb.LiveDeps.house().get_announcement!(id, scope.user)
-      channels = FoyerWeb.LiveDeps.channels().list_for_user(scope.user)
+    case FoyerWeb.LiveDeps.house().get_announcement(id, scope.user) do
+      %Announcement{} = a ->
+        channels = FoyerWeb.LiveDeps.channels().list_for_user(scope.user)
 
-      if managed_by?(a, scope) and FoyerWeb.LiveDeps.house().within_grace_window?(a) do
-        {:noreply,
-         socket
-         |> assign(:announcement, a)
-         |> assign(:form, to_form(FoyerWeb.LiveDeps.house().change_announcement(a, %{})))
-         |> assign(:channel_options, Enum.map(channels, &{&1.name, &1.id}))
-         |> assign(:preview_title, a.title || "")
-         |> assign(:preview_body, a.body || "")
-         |> assign(:preview_channel_id, a.channel_id)
-         |> assign(:preview_requires_ack, a.requires_ack)
-         |> assign(:preview_pinned, not is_nil(a.pinned_at))
-         |> assign(:page_title, "Edit · " <> a.title)}
-      else
-        {:noreply,
-         socket
-         |> put_flash(:error, "That announcement can no longer be edited.")
-         |> push_navigate(to: ~p"/announcements/#{a.id}")}
-      end
-    rescue
-      Ecto.NoResultsError ->
-        {:noreply,
-         socket
-         |> put_flash(:error, "That announcement is not available to you.")
-         |> push_navigate(to: ~p"/house")}
+        if managed_by?(a, scope) and FoyerWeb.LiveDeps.house().within_grace_window?(a) do
+          {:noreply,
+           socket
+           |> assign(:announcement, a)
+           |> assign(:form, to_form(FoyerWeb.LiveDeps.house().change_announcement(a, %{})))
+           |> assign(:channel_options, Enum.map(channels, &{&1.name, &1.id}))
+           |> assign(:preview_title, a.title || "")
+           |> assign(:preview_body, a.body || "")
+           |> assign(:preview_channel_id, a.channel_id)
+           |> assign(:preview_requires_ack, a.requires_ack)
+           |> assign(:preview_pinned, not is_nil(a.pinned_at))
+           |> assign(:page_title, "Edit · " <> a.title)}
+        else
+          {:noreply,
+           socket
+           |> put_flash(:error, "That announcement can no longer be edited.")
+           |> push_navigate(to: ~p"/announcements/#{a.id}")}
+        end
+
+      nil ->
+        unavailable_announcement(socket)
     end
   end
 
@@ -210,14 +195,18 @@ defmodule FoyerWeb.AnnouncementLive do
 
     case FoyerWeb.LiveDeps.house().acknowledge(a, scope.user) do
       {:ok, _} ->
-        refreshed = FoyerWeb.LiveDeps.house().get_announcement!(a.id, scope.user)
+        case FoyerWeb.LiveDeps.house().get_announcement(a.id, scope.user) do
+          %Announcement{} = refreshed ->
+            {:noreply,
+             socket
+             |> assign(:announcement, refreshed)
+             |> assign(:acked?, true)
+             |> assign(:can_ack?, can_ack?(refreshed, scope.user))
+             |> put_flash(:info, "Acknowledged.")}
 
-        {:noreply,
-         socket
-         |> assign(:announcement, refreshed)
-         |> assign(:acked?, true)
-         |> assign(:can_ack?, can_ack?(refreshed, scope.user))
-         |> put_flash(:info, "Acknowledged.")}
+          nil ->
+            unavailable_announcement(socket)
+        end
 
       {:error, :not_required} ->
         {:noreply, put_flash(socket, :error, "No acknowledgement is required from you.")}
@@ -255,6 +244,25 @@ defmodule FoyerWeb.AnnouncementLive do
       {:error, _} ->
         {:noreply, put_flash(socket, :error, "Couldn't update pin.")}
     end
+  end
+
+  defp apply_loaded_show(socket, %Announcement{} = a, scope) do
+    {:noreply,
+     socket
+     |> assign(:announcement, a)
+     |> assign(:acked?, acked_by?(a, scope.user.id))
+     |> assign(:can_ack?, can_ack?(a, scope.user))
+     |> assign(:can_pin?, can_pin?(a, scope.user))
+     |> assign(:within_grace?, FoyerWeb.LiveDeps.house().within_grace_window?(a))
+     |> assign(:receipts, load_receipts(a, scope))
+     |> assign(:page_title, a.title)}
+  end
+
+  defp unavailable_announcement(socket) do
+    {:noreply,
+     socket
+     |> put_flash(:error, "That announcement is not available to you.")
+     |> push_navigate(to: ~p"/house")}
   end
 
   defp acked_by?(%{acks: acks}, user_id) when is_list(acks) do

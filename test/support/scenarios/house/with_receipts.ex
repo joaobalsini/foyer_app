@@ -25,7 +25,7 @@ defmodule Foyer.HouseScenarios.WithReceipts do
   def list_pinned_for(_user), do: [announcement_with_acks()]
 
   @impl true
-  def get_announcement!(_id, _user), do: announcement_with_acks()
+  def get_announcement(_id, _user), do: announcement_with_acks()
 
   @impl true
   def acknowledge(_announcement, _user), do: {:error, :not_required}

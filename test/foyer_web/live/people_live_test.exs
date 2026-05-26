@@ -160,7 +160,7 @@ defmodule FoyerWeb.PeopleLiveTest do
 
   describe "F.Profile.8 — staff cannot access another user's profile view" do
     setup do
-      stub(Foyer.AccountsMock, :get_user!, fn _id ->
+      stub(Foyer.AccountsMock, :get_user, fn _id ->
         ProfileScenarios.user_maya()
       end)
 
@@ -178,7 +178,7 @@ defmodule FoyerWeb.PeopleLiveTest do
 
   describe "F.Profile.19 — managers can open full People profiles" do
     setup do
-      stub(Foyer.AccountsMock, :get_user!, fn _id ->
+      stub(Foyer.AccountsMock, :get_user, fn _id ->
         ProfileScenarios.user_maya()
       end)
 

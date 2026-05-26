@@ -85,21 +85,6 @@ defmodule Foyer.AccountsScenarios.WithPeople do
   end
 
   @impl true
-  def get_user!(id) when is_integer(id) do
-    case get_user(id) do
-      nil -> raise Ecto.NoResultsError, queryable: User
-      user -> user
-    end
-  end
-
-  def get_user!(id) when is_binary(id) do
-    case Integer.parse(id) do
-      {int, ""} -> get_user!(int)
-      _ -> raise Ecto.NoResultsError, queryable: User
-    end
-  end
-
-  @impl true
   def get_user(id) when is_integer(id), do: Enum.find(@people, fn p -> p.id == id end)
 
   def get_user(id) when is_binary(id) do
@@ -108,8 +93,6 @@ defmodule Foyer.AccountsScenarios.WithPeople do
       _ -> nil
     end
   end
-
-  def get_user(_), do: nil
 
   @spec people() :: [User.t()]
   def people, do: @people

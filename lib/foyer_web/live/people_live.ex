@@ -15,6 +15,7 @@ defmodule FoyerWeb.PeopleLive do
   """
   use FoyerWeb, :live_view
 
+  alias Foyer.Accounts.User
   alias FoyerWeb.FoyerComponents
   alias FoyerWeb.Scope
 
@@ -94,7 +95,7 @@ defmodule FoyerWeb.PeopleLive do
     current_user = socket.assigns.current_scope.user
 
     with {user_id, ""} <- Integer.parse(user_id_str),
-         other_user <- FoyerWeb.LiveDeps.accounts().get_user!(user_id),
+         %User{} = other_user <- FoyerWeb.LiveDeps.accounts().get_user(user_id),
          {:ok, conv} <-
            FoyerWeb.LiveDeps.chat().get_or_create_direct_conversation(current_user, other_user) do
       {:noreply, push_navigate(socket, to: ~p"/chat/#{conv.id}")}
@@ -123,40 +124,50 @@ defmodule FoyerWeb.PeopleLive do
   end
 
   defp apply_show(socket, %{"id" => id}) do
-    target = FoyerWeb.LiveDeps.accounts().get_user!(id)
+    scope = socket.assigns.current_scope
 
-    if can_view_full_profile?(socket.assigns.current_scope, target) do
-      own_profile? = own_profile?(socket.assigns.current_scope, target)
-      profile = FoyerWeb.LiveDeps.profile()
-      card = profile.own_profile_for(target)
-
-      rewards =
-        if own_profile? do
-          profile.rewards_catalog()
-        else
-          []
-        end
-
-      target_channels = FoyerWeb.LiveDeps.channels().list_for_user(target)
-
-      {:noreply,
-       socket
-       |> assign(:card, card)
-       |> assign(:profile_rewards, rewards)
-       |> assign(:target_channels, target_channels)
-       |> assign(:page_title, target.name)}
+    with %User{} = target <- FoyerWeb.LiveDeps.accounts().get_user(id),
+         true <- can_view_full_profile?(scope, target) do
+      show_profile(socket, scope, target)
     else
-      {:noreply,
-       socket
-       |> put_flash(:error, "Only managers can view another colleague's full profile.")
-       |> push_navigate(to: ~p"/people")}
+      nil -> unknown_user(socket)
+      false -> unauthorized_profile(socket)
     end
-  rescue
-    Ecto.NoResultsError ->
-      {:noreply,
-       socket
-       |> put_flash(:error, "Unknown user.")
-       |> push_navigate(to: ~p"/people")}
+  end
+
+  defp show_profile(socket, scope, %User{} = target) do
+    profile = FoyerWeb.LiveDeps.profile()
+    card = profile.own_profile_for(target)
+    target_channels = FoyerWeb.LiveDeps.channels().list_for_user(target)
+
+    {:noreply,
+     socket
+     |> assign(:card, card)
+     |> assign(:profile_rewards, profile_rewards(profile, scope, target))
+     |> assign(:target_channels, target_channels)
+     |> assign(:page_title, target.name)}
+  end
+
+  defp profile_rewards(profile, scope, target) do
+    if own_profile?(scope, target) do
+      profile.rewards_catalog()
+    else
+      []
+    end
+  end
+
+  defp unknown_user(socket) do
+    {:noreply,
+     socket
+     |> put_flash(:error, "Unknown user.")
+     |> push_navigate(to: ~p"/people")}
+  end
+
+  defp unauthorized_profile(socket) do
+    {:noreply,
+     socket
+     |> put_flash(:error, "Only managers can view another colleague's full profile.")
+     |> push_navigate(to: ~p"/people")}
   end
 
   defp can_view_full_profile?(%Scope{user: %{id: user_id}}, %{id: user_id}), do: true

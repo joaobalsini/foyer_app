@@ -12,6 +12,7 @@ defmodule FoyerWeb.ChatLive do
   """
   use FoyerWeb, :live_view
 
+  alias Foyer.Accounts.User
   alias FoyerWeb.FoyerComponents
 
   @impl true
@@ -117,17 +118,22 @@ defmodule FoyerWeb.ChatLive do
 
   def handle_event("open_direct", %{"user_id" => user_id}, socket) do
     scope = socket.assigns.current_scope
-    colleague = FoyerWeb.LiveDeps.accounts().get_user!(user_id)
 
-    case FoyerWeb.LiveDeps.chat().open_direct(scope.user, colleague) do
-      {:ok, conversation} ->
-        {:noreply, push_navigate(socket, to: ~p"/chat/#{conversation.id}")}
+    case FoyerWeb.LiveDeps.accounts().get_user(user_id) do
+      %User{} = colleague ->
+        case FoyerWeb.LiveDeps.chat().open_direct(scope.user, colleague) do
+          {:ok, conversation} ->
+            {:noreply, push_navigate(socket, to: ~p"/chat/#{conversation.id}")}
 
-      {:error, :invalid_direct} ->
+          {:error, :invalid_direct} ->
+            {:noreply, put_flash(socket, :error, "Choose a colleague to start a direct message.")}
+
+          {:error, _changeset} ->
+            {:noreply, put_flash(socket, :error, "Couldn't open that conversation.")}
+        end
+
+      nil ->
         {:noreply, put_flash(socket, :error, "Choose a colleague to start a direct message.")}
-
-      {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Couldn't open that conversation.")}
     end
   end
 

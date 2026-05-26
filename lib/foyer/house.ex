@@ -7,9 +7,8 @@ defmodule Foyer.House do
   reads and writes) is enforced **in this module**, not only at the route
   layer — see `F.Announcements.10`.
 
-  `get_announcement!/2` bakes membership authorization into the query — a
-  user who is not a member of the announcement's channel raises
-  `Ecto.NoResultsError`.
+  `get_announcement/2` bakes membership authorization into the query — a
+  user who is not a member of the announcement's channel receives `nil`.
   """
   @behaviour Foyer.House.Behavior
 
@@ -53,8 +52,15 @@ defmodule Foyer.House do
   end
 
   @impl true
-  @spec get_announcement!(integer() | String.t(), User.t()) :: Announcement.t()
-  def get_announcement!(id, %User{id: user_id}) do
+  @spec get_announcement(integer() | String.t(), User.t()) :: Announcement.t() | nil
+  def get_announcement(id, %User{} = user) when is_binary(id) do
+    case Integer.parse(id) do
+      {int, ""} -> get_announcement(int, user)
+      _ -> nil
+    end
+  end
+
+  def get_announcement(id, %User{id: user_id}) do
     # `acks: :user` is preloaded so the desktop read-receipts panel can render
     # ack badges with the acking user's initials without a per-ack N+1. One
     # extra join per page load — backed by index(:announcement_acks,
@@ -68,7 +74,7 @@ defmodule Foyer.House do
       where: is_nil(a.removed_at),
       preload: [:author, :channel, :reads, acks: :user]
     )
-    |> Repo.one!()
+    |> Repo.one()
   end
 
   @impl true

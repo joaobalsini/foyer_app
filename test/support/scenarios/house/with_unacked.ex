@@ -28,7 +28,7 @@ defmodule Foyer.HouseScenarios.WithUnacked do
   def list_pinned_for(_user), do: [Fixtures.announcement()]
 
   @impl true
-  def get_announcement!(_id, _user), do: Fixtures.announcement()
+  def get_announcement(_id, _user), do: Fixtures.announcement()
 
   @impl true
   def acknowledge(announcement, %{id: user_id}) do

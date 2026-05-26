@@ -125,7 +125,7 @@ defmodule FoyerWeb.AnnouncementLiveTest do
       # Each callback runs twice — once during the static render in the test
       # process, once during the channel mount in the LiveView process — so
       # the expected counts are 2.
-      Mox.expect(Foyer.HouseMock, :get_announcement!, 2, fn _id, _user ->
+      Mox.expect(Foyer.HouseMock, :get_announcement, 2, fn _id, _user ->
         Fixtures.announcement()
       end)
 
@@ -491,14 +491,14 @@ defmodule FoyerWeb.AnnouncementLiveTest do
       # Empty scenario returns within_grace_window? = false, so apply_edit/2
       # hits the else branch and push_navigates to the detail page. The
       # author's identity is satisfied (managed_by? compares author_id), but
-      # we need get_announcement! to return a real fixture so the conditional
+      # we need get_announcement to return a real fixture so the conditional
       # is reached at all.
       stub_with(Foyer.HouseMock, Foyer.HouseScenarios.Empty)
 
-      # Empty.get_announcement!/2 raises; override so apply_edit/2 reaches
+      # Empty.get_announcement/2 returns nil; override so apply_edit/2 reaches
       # the conditional. within_grace_window?/1 stays false (from Empty), so
       # the else branch fires and push_navigates back to the detail page.
-      Mox.stub(Foyer.HouseMock, :get_announcement!, fn _id, _u -> Fixtures.announcement() end)
+      Mox.stub(Foyer.HouseMock, :get_announcement, fn _id, _u -> Fixtures.announcement() end)
 
       scope = IsolatedHelpers.scope_for(Fixtures.manager(), true)
 

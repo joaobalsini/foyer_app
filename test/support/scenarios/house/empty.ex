@@ -3,9 +3,8 @@ defmodule Foyer.HouseScenarios.Empty do
   House port scenario: no announcements in the world.
 
   `feed_for/2`, `list_pinned_for/1`, and `needs_ack_from/1` all return `[]`.
-  Anything that requires looking up an announcement by id raises
-  `Ecto.NoResultsError` (the same way the real context does for a missing or
-  unauthorized id).
+  Anything that requires looking up an announcement by id returns `nil` (the
+  same way the real context does for a missing or unauthorized id).
 
   Used by isolated LiveView tests that want to render the empty/no-data
   branches of the announcement surface.
@@ -22,7 +21,7 @@ defmodule Foyer.HouseScenarios.Empty do
   def list_pinned_for(_user), do: []
 
   @impl true
-  def get_announcement!(_id, _user), do: raise(Ecto.NoResultsError, queryable: Announcement)
+  def get_announcement(_id, _user), do: nil
 
   @impl true
   def acknowledge(_announcement, _user), do: {:error, :not_required}

@@ -1,7 +1,7 @@
 defmodule Foyer.AccountsScenarios.PeopleWithOffShift do
   @moduledoc """
   Accounts scenario: returns four pickable people — Maya, Charlotte, Hugo, and
-  Jamal — and resolves `get_user!/1` for the same set. Jamal is the off-shift
+  Jamal — and resolves `get_user/1` for the same set. Jamal is the off-shift
   colleague (driven by `Foyer.ShiftsScenarios.MayaCharlotteHugoOn`).
   """
   @behaviour Foyer.Accounts.Behavior
@@ -15,19 +15,16 @@ defmodule Foyer.AccountsScenarios.PeopleWithOffShift do
   def list_people(_opts), do: people()
 
   @impl true
-  def get_user!(id) when is_integer(id) do
-    Enum.find(people(), fn u -> u.id == id end) ||
-      raise Ecto.NoResultsError, queryable: Foyer.Accounts.User
-  end
-
-  def get_user!(id) when is_binary(id), do: get_user!(String.to_integer(id))
-
-  @impl true
   def get_user(id) when is_integer(id) do
     Enum.find(people(), fn u -> u.id == id end)
   end
 
-  def get_user(id) when is_binary(id), do: get_user(String.to_integer(id))
+  def get_user(id) when is_binary(id) do
+    case Integer.parse(id) do
+      {int, ""} -> get_user(int)
+      _ -> nil
+    end
+  end
 
   defp people, do: [Fixtures.maya(), Fixtures.charlotte(), Fixtures.hugo(), Fixtures.jamal()]
 end

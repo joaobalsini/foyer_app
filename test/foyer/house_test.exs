@@ -89,6 +89,11 @@ defmodule Foyer.HouseTest do
   end
 
   describe "receipts and membership authorization" do
+    test "get_announcement/2 returns nil for invalid ids", ctx do
+      assert House.get_announcement("not-an-id", ctx.maya) == nil
+      assert House.get_announcement(-1, ctx.maya) == nil
+    end
+
     test "F.Announcements.9 managers can view receipt groups", ctx do
       assert {:ok, _} = House.mark_read(ctx.suite_412, ctx.maya)
       assert {:ok, receipts} = House.receipts_for(ctx.suite_412, ctx.charlotte)
