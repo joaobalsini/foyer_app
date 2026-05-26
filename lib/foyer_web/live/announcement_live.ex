@@ -125,7 +125,10 @@ defmodule FoyerWeb.AnnouncementLive do
 
     case FoyerWeb.LiveDeps.house().create_announcement(scope.user, attrs) do
       {:ok, _announcement} ->
-        {:noreply, push_navigate(socket, to: ~p"/house")}
+        {:noreply,
+         socket
+         |> put_flash(:info, "Announcement published.")
+         |> push_navigate(to: ~p"/house")}
 
       {:error, :unauthorized} ->
         {:noreply, put_flash(socket, :error, "Only managers can publish announcements.")}

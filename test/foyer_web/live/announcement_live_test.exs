@@ -317,7 +317,7 @@ defmodule FoyerWeb.AnnouncementLiveTest do
       assert render(view) =~ "Roof access"
       assert render(view) =~ "Roof closed for inspection until 14:00."
 
-      assert {:error, {:live_redirect, %{to: "/house"}}} =
+      assert {:error, {:live_redirect, %{to: "/house", flash: flash}}} =
                view
                |> form("#announcement-new-form",
                  announcement: %{
@@ -328,6 +328,12 @@ defmodule FoyerWeb.AnnouncementLiveTest do
                  }
                )
                |> render_submit()
+
+      assert is_binary(flash)
+
+      assert Phoenix.LiveView.Utils.verify_flash(@endpoint, flash) == %{
+               "info" => "Announcement published."
+             }
     end
 
     test "compose submit surfaces flashes for :unauthorized and changeset errors",
