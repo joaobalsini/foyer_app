@@ -421,10 +421,10 @@ defmodule FoyerWeb.AnnouncementLive do
                       <%= if managed_by?(@announcement, @current_scope) do %>
                         <.link
                           navigate={~p"/announcements/#{@announcement.id}/edit"}
-                          class="foyer-btn ghost sm ml-auto"
+                          class="foyer-btn sm ml-auto"
                           id="announcement-edit-link"
                         >
-                          Edit
+                          <.icon name="hero-pencil-square" class="size-4" /> Edit
                         </.link>
                       <% end %>
                     </div>

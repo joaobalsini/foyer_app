@@ -101,7 +101,7 @@ defmodule FoyerWeb.AnnouncementLiveTest do
       # The author (the manager from Fixtures) is within grace
       # (`within_grace_window?/1` returns true on this scenario), so the
       # Edit link is rendered.
-      assert has_element?(view, "#announcement-edit-link")
+      assert has_element?(view, "#announcement-edit-link.foyer-btn:not(.ghost)", "Edit")
     end
 
     test "author outside grace does not see the Remove button", %{conn: conn} do
