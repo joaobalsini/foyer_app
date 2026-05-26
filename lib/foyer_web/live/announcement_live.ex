@@ -303,7 +303,7 @@ defmodule FoyerWeb.AnnouncementLive do
         <div class="foyer-content">
           <div class="foyer-scroll" id="announcement">
             <.link navigate={~p"/house"} class="foyer-btn ghost sm self-start" id="back-to-house">
-              <.icon name="hero-arrow-left" class="size-4" /> Back
+              <.icon name="hero-arrow-left" class="size-4" /> Back to The House
             </.link>
 
             <%= cond do %>

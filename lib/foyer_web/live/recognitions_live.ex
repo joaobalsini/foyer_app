@@ -232,7 +232,7 @@ defmodule FoyerWeb.RecognitionsLive do
                   class="foyer-btn ghost sm self-start"
                   id="back-to-recognitions"
                 >
-                  <.icon name="hero-arrow-left" class="size-4" /> Back
+                  <.icon name="hero-arrow-left" class="size-4" /> Back to The House
                 </.link>
 
                 <div class="announcement-detail">
