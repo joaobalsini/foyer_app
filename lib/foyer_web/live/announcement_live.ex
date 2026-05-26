@@ -301,6 +301,7 @@ defmodule FoyerWeb.AnnouncementLive do
           chat_unread_count={@chat_unread_count}
         />
         <div class="foyer-content">
+          <FoyerComponents.desktop_topbar current_scope={@current_scope} page_title={@page_title} />
           <div class="foyer-scroll" id="announcement">
             <.link navigate={~p"/house"} class="foyer-btn ghost sm self-start" id="back-to-house">
               <.icon name="hero-arrow-left" class="size-4" /> Back to The House

@@ -98,6 +98,7 @@ defmodule FoyerWeb.AnnouncementLiveTest do
       Mox.allow(Foyer.HouseMock, self(), view.pid)
       Mox.allow(Foyer.ChannelsMock, self(), view.pid)
 
+      assert has_element?(view, "#desktop-topbar")
       assert has_element?(view, "#announcement-edit-link.foyer-btn:not(.ghost)", "Edit")
       assert has_element?(view, "#announcement-remove-btn:not([disabled])", "Remove")
 
