@@ -299,7 +299,8 @@ defmodule FoyerWeb.AnnouncementLiveTest do
   end
 
   describe "F.Announcements.1 — compose submit" do
-    test "manager submitting a valid compose form is redirected to /house", %{conn: conn} do
+    test "manager submitting a valid compose form is redirected to the announcement show page",
+         %{conn: conn} do
       stub_with(Foyer.HouseMock, Foyer.HouseScenarios.WithReceipts)
 
       scope = IsolatedHelpers.scope_for(Fixtures.manager(), true)
@@ -313,7 +314,7 @@ defmodule FoyerWeb.AnnouncementLiveTest do
 
       # Drive preview_change first so the live preview path is exercised
       # before the submit, then assert the submit triggers a push_navigate
-      # to /house via the {:ok, _announcement} branch of create_announcement.
+      # to the detail page via the {:ok, announcement} branch of create_announcement.
       view
       |> form("#announcement-new-form",
         announcement: %{
@@ -328,7 +329,7 @@ defmodule FoyerWeb.AnnouncementLiveTest do
       assert render(view) =~ "Roof access"
       assert render(view) =~ "Roof closed for inspection until 14:00."
 
-      assert {:error, {:live_redirect, %{to: "/house", flash: flash}}} =
+      assert {:error, {:live_redirect, %{to: "/announcements/100", flash: flash}}} =
                view
                |> form("#announcement-new-form",
                  announcement: %{

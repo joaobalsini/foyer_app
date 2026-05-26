@@ -24,10 +24,6 @@ defmodule FoyerWeb.RecognitionsLive do
      |> assign(:preview_body, "")
      |> assign(:preview_values, [])
      |> assign(:preview_bonus_points, nil)
-     |> assign(:sent?, false)
-     |> assign(:sent_recognition, nil)
-     |> assign(:grace_state, :open)
-     |> assign(:grace_deadline_ms, nil)
      |> stream_configure(:recognitions, dom_id: &"recognition-#{&1.id}")
      |> stream(:recognitions, [])
      |> assign(:page_title, "Recognitions")}
@@ -56,10 +52,6 @@ defmodule FoyerWeb.RecognitionsLive do
     {:noreply,
      socket
      |> assign(:recognition, nil)
-     |> assign(:sent?, false)
-     |> assign(:sent_recognition, nil)
-     |> assign(:grace_state, :open)
-     |> assign(:grace_deadline_ms, nil)
      |> assign(:people, FoyerWeb.LiveDeps.accounts().list_people([]))
      |> assign(:form, to_form(FoyerWeb.LiveDeps.recognitions().compose_changeset(%{})))
      |> assign(:preview_recipient_id, "")
@@ -79,6 +71,7 @@ defmodule FoyerWeb.RecognitionsLive do
       {:noreply,
        socket
        |> assign(:recognition, r)
+       |> assign(:within_grace?, FoyerWeb.LiveDeps.recognitions().within_grace_window?(r))
        |> assign(:page_title, "Recognition for " <> ((r.recipient && r.recipient.name) || ""))}
     rescue
       Ecto.NoResultsError ->
@@ -116,21 +109,10 @@ defmodule FoyerWeb.RecognitionsLive do
 
     case FoyerWeb.LiveDeps.recognitions().give(scope.user, attrs) do
       {:ok, recognition} ->
-        recipient_name =
-          socket.assigns.people
-          |> Enum.find(fn p -> p.id == recognition.recipient_id end)
-          |> case do
-            %{name: name} -> name
-            _ -> ""
-          end
-
         {:noreply,
          socket
-         |> assign(:sent?, true)
-         |> assign(:sent_recognition, recognition)
-         |> assign(:grace_state, :open)
-         |> assign(:grace_deadline_ms, nil)
-         |> assign(:preview_recipient_name, recipient_name)}
+         |> put_flash(:info, "Recognition sent.")
+         |> push_navigate(to: ~p"/recognitions/#{recognition.id}")}
 
       {:error, :self_recognition} ->
         {:noreply, put_flash(socket, :error, "Choose someone else to recognize.")}
@@ -225,21 +207,6 @@ defmodule FoyerWeb.RecognitionsLive do
     {:noreply, assign(socket, :preview_bonus_points, String.to_integer(bonus))}
   end
 
-  def handle_event("new_recognition", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:sent?, false)
-     |> assign(:sent_recognition, nil)
-     |> assign(:grace_state, :open)
-     |> assign(:grace_deadline_ms, nil)
-     |> assign(:preview_recipient_id, "")
-     |> assign(:preview_recipient_name, "")
-     |> assign(:preview_body, "")
-     |> assign(:preview_values, [])
-     |> assign(:preview_bonus_points, nil)
-     |> assign(:form, to_form(FoyerWeb.LiveDeps.recognitions().compose_changeset(%{})))}
-  end
-
   @impl true
   def render(assigns) do
     ~H"""
@@ -295,50 +262,96 @@ defmodule FoyerWeb.RecognitionsLive do
                   <.icon name="hero-arrow-left" class="size-4" /> Back
                 </.link>
 
-                <article id="recognition-detail" class="flex flex-col gap-3">
-                  <div class="foyer-mono">
-                    For {@recognition.recipient && @recognition.recipient.name}
-                  </div>
-                  <p class="foyer-serif text-2xl">{@recognition.body}</p>
-                  <div class="flex items-center gap-2">
-                    <FoyerComponents.avatar
-                      :if={@recognition.sender}
-                      initials={@recognition.sender.initials}
-                      size={:sm}
-                    />
-                    <span>{@recognition.sender && @recognition.sender.name}</span>
-                    <%= if managed_by?(@recognition, @current_scope) do %>
-                      <.link
-                        navigate={~p"/recognitions/#{@recognition.id}/edit"}
-                        class="foyer-btn ghost sm ml-auto"
-                        id="recognition-edit-link"
-                      >
-                        Edit
-                      </.link>
-                    <% end %>
-                  </div>
-                  <div class="flex flex-wrap gap-2">
-                    <span :for={value <- @recognition.values} class="foyer-tag outline">
-                      {String.capitalize(value)}
-                    </span>
-                    <span :if={!@recognition.public} class="foyer-tag outline">Private</span>
-                    <button
-                      :if={
-                        managed_by?(@recognition, @current_scope) and
-                          FoyerWeb.LiveDeps.recognitions().within_grace_window?(@recognition)
-                      }
-                      class="foyer-btn sm ml-auto"
-                      phx-click="remove"
-                      id="recognition-remove-btn"
-                      type="button"
+                <div class="announcement-detail">
+                  <article id="recognition-detail" class="announcement-detail__article">
+                    <div class="flex items-center gap-2">
+                      <span class="foyer-tag outline">Recognition</span>
+                      <span :if={!@recognition.public} class="foyer-tag outline">Private</span>
+                      <span class="foyer-mono ml-auto">
+                        For {@recognition.recipient && @recognition.recipient.name}
+                      </span>
+                    </div>
+
+                    <h1 class="foyer-serif text-3xl leading-tight">{@recognition.body}</h1>
+
+                    <div class="flex items-center gap-2">
+                      <FoyerComponents.avatar
+                        :if={@recognition.sender}
+                        initials={@recognition.sender.initials}
+                        size={:sm}
+                      />
+                      <div>
+                        <div>{@recognition.sender && @recognition.sender.name}</div>
+                        <div class="foyer-mono">
+                          Sent to {@recognition.recipient && @recognition.recipient.name}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      :if={managed_by?(@recognition, @current_scope)}
+                      class="flex flex-wrap gap-2"
                     >
-                      <.icon name="hero-trash" class="size-4" /> Remove
-                    </button>
-                  </div>
-                  <%= if @recognition.bonus_points > 0 do %>
-                    <span class="foyer-tag outline">+{@recognition.bonus_points} pts</span>
-                  <% end %>
-                </article>
+                      <%= if @within_grace? do %>
+                        <.link
+                          navigate={~p"/recognitions/#{@recognition.id}/edit"}
+                          class="foyer-btn sm"
+                          id="recognition-edit-link"
+                        >
+                          <.icon name="hero-pencil-square" class="size-4" /> Edit
+                        </.link>
+                      <% else %>
+                        <span
+                          class="inline-flex"
+                          title="Editing and removal are only available for 15 minutes after sending."
+                        >
+                          <button
+                            class="foyer-btn sm"
+                            id="recognition-edit-link"
+                            type="button"
+                            disabled
+                          >
+                            <.icon name="hero-pencil-square" class="size-4" /> Edit
+                          </button>
+                        </span>
+                      <% end %>
+
+                      <%= if @within_grace? do %>
+                        <button
+                          class="foyer-btn sm"
+                          phx-click="remove"
+                          id="recognition-remove-btn"
+                          type="button"
+                        >
+                          <.icon name="hero-trash" class="size-4" /> Remove
+                        </button>
+                      <% else %>
+                        <span
+                          class="inline-flex"
+                          title="Editing and removal are only available for 15 minutes after sending."
+                        >
+                          <button
+                            class="foyer-btn sm"
+                            id="recognition-remove-btn"
+                            type="button"
+                            disabled
+                          >
+                            <.icon name="hero-trash" class="size-4" /> Remove
+                          </button>
+                        </span>
+                      <% end %>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2">
+                      <span :for={value <- @recognition.values} class="foyer-tag outline">
+                        {String.capitalize(value)}
+                      </span>
+                      <span :if={@recognition.bonus_points > 0} class="foyer-tag claret">
+                        +{@recognition.bonus_points} pts
+                      </span>
+                    </div>
+                  </article>
+                </div>
               <% @live_action == :edit and @recognition -> %>
                 <.link
                   navigate={~p"/recognitions/#{@recognition.id}"}
@@ -407,73 +420,6 @@ defmodule FoyerWeb.RecognitionsLive do
                     Save changes
                   </button>
                 </.form>
-              <% @live_action == :new and @sent? -> %>
-                <%!-- Sent / grace-window state --%>
-                <div
-                  id="post-send"
-                  class="card-parchment p-6 space-y-3 border-l-4 border-[color:var(--foyer-forest)]"
-                >
-                  <%!-- TODO: wire JS GraceCountdown hook once context exposes inserted_at --%>
-                  <FoyerComponents.editorial_heading>
-                    Recognition sent.
-                  </FoyerComponents.editorial_heading>
-                  <p class="text-sm text-stone-600">
-                    Recognition for <span class="font-medium">{@preview_recipient_name}</span>
-                    <span :if={
-                      (Scope.manager?(@current_scope) and
-                         @preview_bonus_points) && @preview_bonus_points > 0
-                    }>
-                      {" · #{@preview_bonus_points} Foyer points"}
-                    </span>
-                    — delivered.
-                  </p>
-                  <p
-                    :if={@grace_state == :open}
-                    id="grace-countdown"
-                    class="text-xs text-stone-500 italic"
-                  >
-                    60s to edit or remove.
-                  </p>
-                  <p
-                    :if={@grace_state == :expired}
-                    data-grace-expired
-                    class="text-xs text-stone-500 italic"
-                  >
-                    Edit window closed.
-                  </p>
-                  <div :if={@grace_state == :open} class="flex gap-2 pt-2">
-                    <.link
-                      :if={@sent_recognition}
-                      navigate={~p"/recognitions/#{@sent_recognition.id}/edit"}
-                      class="foyer-btn sm"
-                      id="edit-recognition"
-                    >
-                      Edit
-                    </.link>
-                    <button
-                      :if={@sent_recognition}
-                      type="button"
-                      class="foyer-btn ghost sm"
-                      id="remove-recognition"
-                      disabled
-                    >
-                      Remove
-                    </button>
-                    <.link navigate={~p"/recognitions"} class="foyer-btn ghost sm">
-                      See it in the feed
-                    </.link>
-                  </div>
-                  <div :if={@grace_state == :expired} class="flex gap-2 pt-2">
-                    <p class="text-xs text-stone-500 italic">Edit window closed.</p>
-                    <button
-                      type="button"
-                      phx-click="new_recognition"
-                      class="foyer-btn ghost sm"
-                    >
-                      + Another
-                    </button>
-                  </div>
-                </div>
               <% @live_action == :new -> %>
                 <div class="space-y-4">
                   <div>

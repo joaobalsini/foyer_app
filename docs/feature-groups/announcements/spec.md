@@ -51,8 +51,8 @@ all backed by `FoyerWeb.AnnouncementLive` and the `Foyer.House` context.
 **Given** a manager who is a member of channel X  \
 **When** they publish an announcement to channel X  \
 **Then** the announcement is created with the manager as author, scoped to channel X, and
-persists with the requested `requires_ack` setting. The user is redirected to `/house` with an
-info toast confirming the announcement was published.
+persists with the requested `requires_ack` setting. The user is redirected to the new announcement's
+show page with an info toast confirming the announcement was published.
 
 ### F.Announcements.2 — Staff cannot compose announcements
 
@@ -66,7 +66,8 @@ the attempt with `{:error, :unauthorized}` so no announcement is persisted.
 
 **Given** the author of an announcement published less than 5 minutes ago  \
 **When** they edit the title, body, audience, or `requires_ack` setting  \
-**Then** the update succeeds and the new values are persisted.
+**Then** the update succeeds, the new values are persisted, and the user is redirected back to the
+announcement show page.
 
 ### F.Announcements.4 — Edit and remove are rejected after grace or by non-authors
 

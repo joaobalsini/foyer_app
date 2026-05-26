@@ -12,7 +12,7 @@ defmodule FoyerWeb.AnnouncementLive do
   (`F.Announcements.2`). The "I've read & understood" CTA writes an
   `AnnouncementAck` row (`F.Announcements.7`, `F.Announcements.8`). Pin /
   unpin / remove buttons render only for the author or a channel manager
-  within the 15-minute grace window (`F.Announcements.3` – .5).
+  within the 5-minute grace window (`F.Announcements.3` – .5).
   """
   use FoyerWeb, :live_view
 
@@ -125,11 +125,11 @@ defmodule FoyerWeb.AnnouncementLive do
     scope = socket.assigns.current_scope
 
     case FoyerWeb.LiveDeps.house().create_announcement(scope.user, attrs) do
-      {:ok, _announcement} ->
+      {:ok, announcement} ->
         {:noreply,
          socket
          |> put_flash(:info, "Announcement published.")
-         |> push_navigate(to: ~p"/house")}
+         |> push_navigate(to: ~p"/announcements/#{announcement.id}")}
 
       {:error, :unauthorized} ->
         {:noreply, put_flash(socket, :error, "Only managers can publish announcements.")}

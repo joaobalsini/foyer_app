@@ -34,11 +34,9 @@ defmodule FoyerWeb.RecognitionsLiveTest do
     F.Recognitions.10 — third-party privacy on :show / :edit (NoResultsError rescue)
 
   Additional non-clause coverage:
-    * give_submit happy path renders the post-send card with recipient name
-      and bonus-points line for managers
+    * give_submit happy path redirects to the created recognition detail page
     * preview_change updates recipient/body/values/bonus-points assigns
     * set_bonus tier and clear events flip the preview ribbon
-    * new_recognition event resets the compose form
     * :show renders the bonus-points tag when the recognition carries one
   """
   use ExUnit.Case, async: true
@@ -269,9 +267,12 @@ defmodule FoyerWeb.RecognitionsLiveTest do
 
       assert has_element?(view, "a#recognition-edit-link", "Edit")
       assert has_element?(view, "button#recognition-remove-btn", "Remove")
+      assert has_element?(view, ".announcement-detail #recognition-detail")
+      assert has_element?(view, "#recognition-detail .foyer-tag", "Recognition")
     end
 
-    test "author sees Edit link but NO Remove button outside grace window", %{conn: conn} do
+    test "author outside grace sees disabled Edit and Remove buttons with tooltip copy",
+         %{conn: conn} do
       scope = IsolatedHelpers.build_scope(id: 42, role: :staff, on_shift?: true)
       recognition = build_recognition(id: 8002, sender_id: 42, recipient_id: 7)
 
@@ -287,8 +288,15 @@ defmodule FoyerWeb.RecognitionsLiveTest do
           params: %{"id" => to_string(recognition.id)}
         )
 
-      assert has_element?(view, "a#recognition-edit-link", "Edit")
-      refute has_element?(view, "button#recognition-remove-btn")
+      tooltip = "Editing and removal are only available for 15 minutes after sending."
+
+      assert has_element?(view, "[title='#{tooltip}'] #recognition-edit-link[disabled]", "Edit")
+
+      assert has_element?(
+               view,
+               "[title='#{tooltip}'] #recognition-remove-btn[disabled]",
+               "Remove"
+             )
     end
   end
 
@@ -316,45 +324,38 @@ defmodule FoyerWeb.RecognitionsLiveTest do
   end
 
   # ---------------------------------------------------------------------------
-  # F.Recognitions.1 — give_submit happy path renders post-send card
+  # F.Recognitions.1 — give_submit happy path redirects to detail
   # ---------------------------------------------------------------------------
   describe "F.Recognitions.1 — give_submit happy path" do
-    test "manager sees recipient name and bonus-points line on the post-send card",
+    test "manager is redirected to the created recognition detail page",
          %{conn: conn} do
       stub_with(Foyer.RecognitionsMock, RecognitionsScenarios.Empty)
 
       scope = IsolatedHelpers.build_scope(id: 99, role: :manager, on_shift?: true)
-      # Hugo Brandt has id 2 in WithPeople — that name should appear on the
-      # post-send card once the LV resolves recipient_id back to a person.
       sent = build_recognition(id: 8100, sender_id: 99, recipient_id: 2)
 
       expect(Foyer.RecognitionsMock, :give, fn _sender, _attrs -> {:ok, sent} end)
 
       {:ok, view, _html} = mount_isolated_recognitions(conn, action: :new, scope: scope)
 
-      # Prime the preview pipeline so :preview_bonus_points is set before we
-      # submit — the post-send view reads that assign verbatim.
       render_hook(view, "set_bonus", %{"bonus" => "25"})
 
-      view
-      |> form("#recognize-form",
-        recognition: %{
-          "recipient_id" => "2",
-          "body" => "Saved the late check-in.",
-          "values" => ["care"],
-          "public" => "true",
-          "bonus_points" => "25"
-        }
-      )
-      |> render_submit()
+      assert {:error, {:live_redirect, %{to: "/recognitions/8100", flash: flash}}} =
+               view
+               |> form("#recognize-form",
+                 recognition: %{
+                   "recipient_id" => "2",
+                   "body" => "Saved the late check-in.",
+                   "values" => ["care"],
+                   "public" => "true",
+                   "bonus_points" => "25"
+                 }
+               )
+               |> render_submit()
 
-      html = render(view)
-      assert html =~ ~s(id="post-send")
-      assert html =~ "Hugo Brandt"
-      assert html =~ "25 Foyer points"
-      assert has_element?(view, "#grace-countdown")
-      assert has_element?(view, "a#edit-recognition")
-      assert has_element?(view, "button#remove-recognition")
+      assert Phoenix.LiveView.Utils.verify_flash(@endpoint, flash) == %{
+               "info" => "Recognition sent."
+             }
     end
   end
 
@@ -390,7 +391,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
   end
 
   # ---------------------------------------------------------------------------
-  # preview_change + set_bonus + new_recognition (no spec clause)
+  # preview_change + set_bonus (no spec clause)
   # ---------------------------------------------------------------------------
   describe "preview-side event handlers" do
     test "preview_change + set_bonus drive the manager preview ribbon end-to-end",
@@ -460,37 +461,6 @@ defmodule FoyerWeb.RecognitionsLiveTest do
       html = render(view)
       refute html =~ "+50 pts"
       # Form is still rendered (no crash from bad recipient_id)
-      assert has_element?(view, "form#recognize-form")
-    end
-
-    test "new_recognition event resets the post-send state back to the compose form",
-         %{conn: conn} do
-      stub_with(Foyer.RecognitionsMock, RecognitionsScenarios.Empty)
-
-      scope = IsolatedHelpers.build_scope(id: 99, role: :manager, on_shift?: true)
-      sent = build_recognition(id: 8200, sender_id: 99, recipient_id: 2)
-
-      expect(Foyer.RecognitionsMock, :give, fn _sender, _attrs -> {:ok, sent} end)
-
-      {:ok, view, _html} = mount_isolated_recognitions(conn, action: :new, scope: scope)
-
-      view
-      |> form("#recognize-form",
-        recognition: %{
-          "recipient_id" => "2",
-          "body" => "Thanks!",
-          "values" => ["care"],
-          "public" => "true"
-        }
-      )
-      |> render_submit()
-
-      assert has_element?(view, "#post-send")
-
-      # handle_event("new_recognition", _, socket) — line 228.
-      render_hook(view, "new_recognition", %{})
-
-      refute has_element?(view, "#post-send")
       assert has_element?(view, "form#recognize-form")
     end
   end

@@ -65,7 +65,8 @@ body, and one or more house values
 
 **Then** the recognition is created with `sender_id` set to the current
 user, the recipient is the named colleague, and the row becomes visible
-according to its `public` flag.
+according to its `public` flag. The sender is redirected to the recognition's
+show page with a confirmation toast.
 
 ### F.Recognitions.2 — Self-recognition is rejected
 
@@ -149,8 +150,11 @@ ledger keeps both rows for audit.
 
 **Then** the author can call `update_recognition/3` or
 `remove_recognition/2`; when 15 minutes or more have passed, both calls
-return `{:error, :outside_grace_window}` and the recognition is unchanged.
-Non-authors always get `{:error, :unauthorized}`.
+return `{:error, :outside_grace_window}` and the recognition is unchanged. Successful edits
+redirect back to the recognition show page.
+On the detail page, the author still sees the Edit and Remove actions after
+the grace window, but they are disabled with a tooltip explaining the
+15-minute limit. Non-authors always get `{:error, :unauthorized}`.
 
 ### F.Recognitions.10 — Public / private visibility is enforced at the boundary
 
