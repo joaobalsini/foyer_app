@@ -459,6 +459,8 @@ defmodule FoyerWeb.SmokeTest do
       assert has_element?(view, "#back-to-people")
       assert render(view) =~ "Aisha Bello"
       assert has_element?(view, "#recognitions-given")
+      refute has_element?(view, "#rewards")
+      refute has_element?(view, "#profile-settings")
       assert render(view) =~ ctx.private_recognition.body
     end
 

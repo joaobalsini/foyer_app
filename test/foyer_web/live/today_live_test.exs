@@ -200,6 +200,8 @@ defmodule FoyerWeb.TodayLiveTest do
       # Scenario has 2 live posts (IDs 11 and 12)
       assert has_element?(view, "#live-post-11")
       assert has_element?(view, "#live-post-12")
+      assert has_element?(view, "#live-post-11 #announcement-card-11")
+      assert has_element?(view, "#live-post-12 #announcement-card-12")
     end
   end
 

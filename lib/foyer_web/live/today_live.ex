@@ -236,16 +236,16 @@ defmodule FoyerWeb.TodayLive do
 
                   <div :if={@briefing.own_announcements != []} id="manager-live-posts">
                     <div class="foyer-mono">Your live posts</div>
-                    <.link
+                    <div
                       :for={a <- @briefing.own_announcements}
-                      navigate={~p"/announcements/#{a.id}"}
                       id={"live-post-#{a.id}"}
-                      class="block rounded-lg border p-3 mt-2 min-h-[44px]"
-                      style="border-color: var(--foyer-rule);"
+                      class="mt-2"
                     >
-                      <span :if={a.pinned_at} class="foyer-tag claret">Pinned</span>
-                      <div class="foyer-serif mt-1">{a.title}</div>
-                    </.link>
+                      <FoyerComponents.announcement_card
+                        announcement={a}
+                        current_user_id={@current_scope.user.id}
+                      />
+                    </div>
                   </div>
 
                   <div :if={@briefing.recent_recognitions != []} id="recent-recognition">

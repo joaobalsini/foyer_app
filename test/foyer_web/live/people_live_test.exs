@@ -178,7 +178,6 @@ defmodule FoyerWeb.PeopleLiveTest do
         Foyer.ProfileScenarios.LineStaff.own_profile_for(ProfileScenarios.user_maya())
       end)
 
-      stub(Foyer.ProfileMock, :rewards_catalog, fn -> ProfileScenarios.sample_rewards() end)
       stub(Foyer.ChannelsMock, :list_for_user, fn _user -> [] end)
 
       :ok
@@ -194,7 +193,8 @@ defmodule FoyerWeb.PeopleLiveTest do
       assert html =~ "Maya Okafor"
       assert has_element?(view, "#recognitions-received")
       assert has_element?(view, "#recognitions-given")
-      assert has_element?(view, "#rewards")
+      refute has_element?(view, "#rewards")
+      refute has_element?(view, "#profile-settings")
       assert html =~ "Private: handled a sensitive situation"
     end
   end

@@ -126,9 +126,17 @@ defmodule FoyerWeb.PeopleLive do
     target = FoyerWeb.LiveDeps.accounts().get_user!(id)
 
     if can_view_full_profile?(socket.assigns.current_scope, target) do
+      own_profile? = own_profile?(socket.assigns.current_scope, target)
       profile = FoyerWeb.LiveDeps.profile()
       card = profile.own_profile_for(target)
-      rewards = profile.rewards_catalog()
+
+      rewards =
+        if own_profile? do
+          profile.rewards_catalog()
+        else
+          []
+        end
+
       target_channels = FoyerWeb.LiveDeps.channels().list_for_user(target)
 
       {:noreply,
@@ -153,6 +161,8 @@ defmodule FoyerWeb.PeopleLive do
 
   defp can_view_full_profile?(%Scope{user: %{id: user_id}}, %{id: user_id}), do: true
   defp can_view_full_profile?(%Scope{} = scope, _target), do: Scope.manager?(scope)
+  defp own_profile?(%Scope{user: %{id: user_id}}, %{id: user_id}), do: true
+  defp own_profile?(%Scope{}, _target), do: false
 
   @impl true
   def render(assigns) do
@@ -176,7 +186,12 @@ defmodule FoyerWeb.PeopleLive do
                 >
                   <.icon name="hero-arrow-left" class="size-4" /> Back
                 </.link>
-                <FoyerComponents.profile_card card={@card} viewer={:self} rewards={@profile_rewards} />
+                <FoyerComponents.profile_card
+                  card={@card}
+                  viewer={:self}
+                  rewards={@profile_rewards}
+                  self_service={own_profile?(@current_scope, @card.user)}
+                />
                 <%= if @target_channels != [] do %>
                   <div class="mt-4">
                     <div class="foyer-mono mb-2">Channels</div>

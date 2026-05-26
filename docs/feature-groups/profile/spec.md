@@ -175,8 +175,10 @@ by the `:ensure_on_shift` on_mount hook.
 `View profile` action
 **When** the page loads for a valid colleague id
 **Then** `PeopleLive` renders the same full `profile_card` treatment used by `/me`,
-including received recognitions, private recognitions, given recognitions, points, and
-rewards. Non-manager staff do not see `View profile` actions for other users.
+including received recognitions, private recognitions, given recognitions, and points. The
+"Trade your points" rewards catalog and inert Settings controls remain hidden for other users'
+profiles, even though redemptions/settings are not active. Non-manager staff do not see
+`View profile` actions for other users.
 
 ### F.Profile.20 — Empty recognitions state
 **Given** a user has received no recognitions

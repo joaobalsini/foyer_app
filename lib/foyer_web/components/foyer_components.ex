@@ -694,12 +694,15 @@ defmodule FoyerWeb.FoyerComponents do
   attr :card, Foyer.Profile.Card, required: true
   attr :viewer, :atom, default: :other, values: [:self, :other]
   attr :rewards, :list, default: []
+  attr :self_service, :boolean, default: nil
 
   def profile_card(assigns) do
     # F.Profile.25 — property code from application config. All v1 users share
     # one property; per-user property codes are a v2 concern.
     assigns =
-      assign(assigns, :property_code, Application.get_env(:foyer, :property_code, "LDN·MAY"))
+      assigns
+      |> assign(:property_code, Application.get_env(:foyer, :property_code, "LDN·MAY"))
+      |> assign(:self_service, self_service?(assigns))
 
     ~H"""
     <div class="flex flex-col gap-4" id="profile-card">
@@ -824,7 +827,7 @@ defmodule FoyerWeb.FoyerComponents do
       </section>
 
       <%!-- Rewards catalog — own profile only (F.Profile.13, F.Profile.14, F.Profile.15) --%>
-      <%= if @viewer == :self and @rewards != [] do %>
+      <%= if @self_service and @rewards != [] do %>
         <section id="rewards">
           <div class="foyer-mono mb-2">Trade your points</div>
           <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -851,7 +854,7 @@ defmodule FoyerWeb.FoyerComponents do
       <% end %>
 
       <%!-- Settings links — own profile only, inert (F.Profile.14, v2 nit) --%>
-      <%= if @viewer == :self do %>
+      <%= if @self_service do %>
         <section id="profile-settings">
           <div class="foyer-mono mb-2">Settings</div>
           <div class="flex flex-col gap-1">
@@ -870,6 +873,9 @@ defmodule FoyerWeb.FoyerComponents do
     </div>
     """
   end
+
+  defp self_service?(%{self_service: nil, viewer: viewer}), do: viewer == :self
+  defp self_service?(%{self_service: self_service}), do: self_service
 
   attr :recognition, Foyer.Recognitions.Recognition, required: true
   attr :show_recipient, :boolean, default: false

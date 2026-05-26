@@ -156,7 +156,8 @@ recognition) follows the same rules as for staff.
 **When** the manager has one or more published, non-removed announcements they authored  
 **Then** a "Your live posts" section is rendered below the needs-ack section, listing those
 announcements ordered newest-first by `published_at`; only announcements with a non-null
-`published_at` are included.
+`published_at` are included. Each live post uses the shared `announcement_card` component so the
+announcement treatment matches the House feed.
 
 ### F.Today.15 — No PubSub: Today does not auto-refresh
 

@@ -241,7 +241,7 @@ defmodule Foyer.House do
     from(a in Announcement,
       where: a.author_id == ^user_id and not is_nil(a.published_at),
       order_by: [desc: a.published_at],
-      preload: [:channel]
+      preload: [:author, :channel, :reads, :acks]
     )
     |> Repo.all()
   end
