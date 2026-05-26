@@ -1,4 +1,4 @@
-defmodule Foyer.RecognitionsPort do
+defmodule Foyer.Recognitions.Behavior do
   @moduledoc """
   Behaviour for `Foyer.Recognitions`. `give/2` is stubbed until the
   Recognitions feature group lands.

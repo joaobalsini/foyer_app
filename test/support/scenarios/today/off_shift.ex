@@ -2,7 +2,7 @@ defmodule Today.Scenarios.OffShift do
   @moduledoc """
   Scenario: off-shift user, no prior shifts, waiting counts all zero.
   """
-  @behaviour Foyer.TodayPort
+  @behaviour Foyer.Today.Behavior
 
   alias Foyer.Accounts.User
   alias Foyer.Today.Briefing

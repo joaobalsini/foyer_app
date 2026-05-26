@@ -4,7 +4,7 @@ defmodule Foyer.AccountsScenarios.PeopleWithOffShift do
   Jamal — and resolves `get_user!/1` for the same set. Jamal is the off-shift
   colleague (driven by `Foyer.ShiftsScenarios.MayaCharlotteHugoOn`).
   """
-  @behaviour Foyer.AccountsPort
+  @behaviour Foyer.Accounts.Behavior
 
   alias Foyer.ChatScenarios.Fixtures
 

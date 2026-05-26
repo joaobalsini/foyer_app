@@ -4,7 +4,7 @@ defmodule Foyer.Accounts do
   picker (`/`) calls `list_pickable_users/0`; the on-mount hook calls
   `get_user/1` to build the scope.
   """
-  @behaviour Foyer.AccountsPort
+  @behaviour Foyer.Accounts.Behavior
 
   import Ecto.Query, warn: false
 

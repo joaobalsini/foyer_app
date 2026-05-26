@@ -12,7 +12,7 @@ defmodule Foyer.Profile do
   NOTE: `received_this_month` counts against UTC month boundaries in v1. A future
   iteration may pass the property timezone via runtime config.
   """
-  @behaviour Foyer.ProfilePort
+  @behaviour Foyer.Profile.Behavior
 
   alias Foyer.Accounts.User
   alias Foyer.Profile.Card

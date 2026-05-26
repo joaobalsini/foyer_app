@@ -3,7 +3,7 @@ defmodule Foyer.ShiftsScenarios.WithOnShift do
   Shifts world where users 1 and 3 are on shift (ids from AccountsScenarios.WithPeople).
   User 2 (Hugo) is NOT on shift.
   """
-  @behaviour Foyer.ShiftsPort
+  @behaviour Foyer.Shifts.Behavior
 
   alias Foyer.Shifts.Shift
 

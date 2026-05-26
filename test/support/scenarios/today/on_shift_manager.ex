@@ -2,7 +2,7 @@ defmodule Today.Scenarios.OnShiftManager do
   @moduledoc """
   Scenario: on-shift manager, 1 needs-ack, 2 live posts.
   """
-  @behaviour Foyer.TodayPort
+  @behaviour Foyer.Today.Behavior
 
   alias Foyer.Accounts.User
   alias Foyer.Channels.Channel

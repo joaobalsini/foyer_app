@@ -1,6 +1,6 @@
-defmodule Foyer.ShiftsPort do
+defmodule Foyer.Shifts.Behavior do
   @moduledoc """
-  Behaviour for `Foyer.Shifts`. See `Foyer.AccountsPort` for the rationale.
+  Behaviour for `Foyer.Shifts`. See `Foyer.Accounts.Behavior` for the rationale.
   """
 
   alias Foyer.Accounts.User

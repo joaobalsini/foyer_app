@@ -16,7 +16,7 @@ defmodule Foyer.HouseScenarios.WithUnacked do
   `unpin_announcement/2`, `acknowledge/2`, …) return success values shaped
   like the real context so the LiveView can update its assigns.
   """
-  @behaviour Foyer.HousePort
+  @behaviour Foyer.House.Behavior
 
   alias Foyer.House.Announcement
   alias Foyer.HouseScenarios.Fixtures

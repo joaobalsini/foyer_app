@@ -7,7 +7,7 @@ defmodule Foyer.RecognitionsScenarios.Empty do
   `/house`. Use this scenario when the test renders the `:new` form or any
   state that doesn't depend on existing recognitions.
   """
-  @behaviour Foyer.RecognitionsPort
+  @behaviour Foyer.Recognitions.Behavior
 
   alias Foyer.Recognitions.Recognition
 

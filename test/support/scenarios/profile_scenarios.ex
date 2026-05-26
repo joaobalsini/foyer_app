@@ -1,6 +1,6 @@
 defmodule Foyer.ProfileScenarios do
   @moduledoc """
-  Scenario modules for `Foyer.ProfilePort`. Wired via `Mox.stub_with/2` in
+  Scenario modules for `Foyer.Profile.Behavior`. Wired via `Mox.stub_with/2` in
   isolated LiveView tests. Each module describes one variation of the world.
 
   Convention: names describe the *situation* (Empty, LineStaff, Manager,
@@ -129,7 +129,7 @@ defmodule Foyer.ProfileScenarios do
 
   defmodule Empty do
     @moduledoc "A profile with no recognitions and zero points balance."
-    @behaviour Foyer.ProfilePort
+    @behaviour Foyer.Profile.Behavior
 
     @impl true
     def profile_for(subject, _viewer) do
@@ -163,7 +163,7 @@ defmodule Foyer.ProfileScenarios do
 
   defmodule LineStaff do
     @moduledoc "Maya Okafor — on shift, mix of public and private recognitions."
-    @behaviour Foyer.ProfilePort
+    @behaviour Foyer.Profile.Behavior
 
     alias Foyer.ProfileScenarios
 
@@ -201,7 +201,7 @@ defmodule Foyer.ProfileScenarios do
 
   defmodule Manager do
     @moduledoc "Charlotte Voss — manager, on shift, with given recognitions."
-    @behaviour Foyer.ProfilePort
+    @behaviour Foyer.Profile.Behavior
 
     alias Foyer.ProfileScenarios
 
@@ -238,7 +238,7 @@ defmodule Foyer.ProfileScenarios do
 
   defmodule OffShift do
     @moduledoc "A staff member who is currently off shift."
-    @behaviour Foyer.ProfilePort
+    @behaviour Foyer.Profile.Behavior
 
     alias Foyer.ProfileScenarios
 

@@ -11,7 +11,7 @@ defmodule Foyer.House do
   user who is not a member of the announcement's channel raises
   `Ecto.NoResultsError`.
   """
-  @behaviour Foyer.HousePort
+  @behaviour Foyer.House.Behavior
 
   import Ecto.Query, warn: false
   require Logger

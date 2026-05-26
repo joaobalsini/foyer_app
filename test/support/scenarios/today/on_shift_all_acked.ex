@@ -2,7 +2,7 @@ defmodule Today.Scenarios.OnShiftAllAcked do
   @moduledoc """
   Scenario: on-shift staff, needs-ack list empty (all acknowledged).
   """
-  @behaviour Foyer.TodayPort
+  @behaviour Foyer.Today.Behavior
 
   alias Foyer.Accounts.User
   alias Foyer.Shifts.Shift

@@ -1,4 +1,4 @@
-defmodule Foyer.ProfilePort do
+defmodule Foyer.Profile.Behavior do
   @moduledoc """
   Behaviour for `Foyer.Profile`. Read-only orchestrator that wraps Accounts +
   Recognitions + Shifts and returns a typed `Foyer.Profile.Card` DTO.

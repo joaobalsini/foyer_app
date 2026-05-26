@@ -1,4 +1,4 @@
-defmodule Foyer.AccountsPort do
+defmodule Foyer.Accounts.Behavior do
   @moduledoc """
   Behaviour for `Foyer.Accounts`. LiveViews call accounts through
   `FoyerWeb.LiveDeps.accounts/0`, which resolves to either the real context or

@@ -3,7 +3,7 @@ defmodule Foyer.RecognitionsScenarios.WithGiven do
   Recognitions world where the target user has given exactly one public
   recognition. Mirror of `WithReceived` for the `given_by/2` callback.
   """
-  @behaviour Foyer.RecognitionsPort
+  @behaviour Foyer.Recognitions.Behavior
 
   alias Foyer.Accounts.User
   alias Foyer.Recognitions.Recognition

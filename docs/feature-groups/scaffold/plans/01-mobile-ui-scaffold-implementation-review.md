@@ -31,7 +31,7 @@ is fully green, including `mix dialyzer`.
   rewritten with the `.foyer-*` vocabulary on a warm-cream / forest-green / brass
   palette. `core_components.ex` keeps the `<.button>` / `<.input>` / `<.flash>`
   API per AGENTS.md.
-- Every context exposes a `@behaviour Foyer.<Ctx>Port`; LiveViews call through
+- Every context exposes a `@behaviour Foyer.<Ctx>.Behavior`; LiveViews call through
   `FoyerWeb.LiveDeps` (one accessor per context).
 
 ## Critical issues (resolved this session)
@@ -96,7 +96,7 @@ ticket.
 
 ### C. Architecture rules
 
-- ✓ All 8 contexts have port behaviours and `@behaviour` declarations
+- ✓ All 8 contexts have context behaviors and `@behaviour` declarations
 - ✓ `config/test.exs` points LiveDeps at mocks (`Foyer.AccountsMock`, etc.)
 - ✓ LiveViews call through `FoyerWeb.LiveDeps`, never the concrete context
 - ✓ No `Application.put_env/3` anywhere in `test/`
@@ -131,7 +131,7 @@ $ mix precommit                   # 23 tests, 0 failures
 1. **Dialyzer warnings on stubbed writes** — original framing was "precommit
    passes, dialyzer is separate". Reviewer rejected per `docs/WORKFLOW.md`; fix
    applied in this session (return `{:error, :not_implemented}` instead of
-   raising; port callbacks widened; LiveViews pattern-match). ✓ Accepted.
+   raising; behavior callbacks widened; LiveViews pattern-match). ✓ Accepted.
 2. **Zero-byte font placeholders** — reviewer rejected. Fix applied in this
    session (removed `@font-face` block + empty files; system fallback stack is
    now the active path). ✓ Accepted.

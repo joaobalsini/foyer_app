@@ -3,7 +3,7 @@ defmodule Foyer.ChatScenarios.EmptyInbox do
   Chat scenario: the inbox is empty (no conversations with messages yet).
   Pins F.Chat.5 — empty conversations are excluded from the rendered inbox.
   """
-  @behaviour Foyer.ChatPort
+  @behaviour Foyer.Chat.Behavior
 
   alias Foyer.ChatScenarios.Fixtures
 

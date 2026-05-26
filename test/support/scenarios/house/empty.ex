@@ -10,7 +10,7 @@ defmodule Foyer.HouseScenarios.Empty do
   Used by isolated LiveView tests that want to render the empty/no-data
   branches of the announcement surface.
   """
-  @behaviour Foyer.HousePort
+  @behaviour Foyer.House.Behavior
 
   alias Foyer.House.Announcement
   alias Foyer.HouseScenarios.Fixtures

@@ -66,7 +66,7 @@ real Postgres-backed seeds and a real Phoenix router, so that:
 
 - Every LiveView module exists at its final route with its final name.
 - Every Ecto schema is migrated, indexed, and carries an explicit `@type t`.
-- Every context has a port behaviour, a real implementation that reads from Repo, and
+- Every context has a context behavior, a real implementation that reads from Repo, and
   a Mox mock wired through `FoyerWeb.LiveDeps`.
 - The bottom-nav (Today / House / Chat / Me) and desktop side-rail surfaces all render
   the design's warm-cream + forest visual language — not the default daisyUI demo.
@@ -1081,11 +1081,11 @@ schema change.
 
 ---
 
-## 6. Contexts & port behaviours
+## 6. Contexts & context behaviors
 
 Every context module lives at `lib/foyer/<context>.ex`, schemas under
 `lib/foyer/<context>/<schema>.ex`. Every port lives at
-`lib/foyer/<context>_port.ex`.
+`lib/foyer/<context>/behavior.ex`.
 
 For each context, the plan documents:
 
@@ -1097,10 +1097,10 @@ For each context, the plan documents:
   <X>"). Reads are real; most writes are stubs except shift start/end and
   announcement ack/read, which the smoke test exercises.
 
-### 6.1 Foyer.Accounts — `lib/foyer/accounts.ex` + `lib/foyer/accounts_port.ex`
+### 6.1 Foyer.Accounts — `lib/foyer/accounts.ex` + `lib/foyer/accounts/behavior.ex`
 
 ```elixir
-defmodule Foyer.AccountsPort do
+defmodule Foyer.Accounts.Behavior do
   alias Foyer.Accounts.User
 
   @callback list_pickable_users() :: [User.t()]
@@ -1110,7 +1110,7 @@ defmodule Foyer.AccountsPort do
 end
 
 defmodule Foyer.Accounts do
-  @behaviour Foyer.AccountsPort
+  @behaviour Foyer.Accounts.Behavior
 
   @spec list_pickable_users() :: [Accounts.User.t()]   # :real — for /
   @spec get_user!(integer() | String.t()) :: Accounts.User.t()  # :real
@@ -1143,10 +1143,10 @@ open shifts, and the template checks `MapSet.member?(on_shift_ids, p.id)`.
 This keeps the people query simple and avoids a complex `left_join` to
 `shifts` with a `WHERE ended_at IS NULL`.
 
-### 6.2 Foyer.Shifts — `lib/foyer/shifts.ex` + `lib/foyer/shifts_port.ex`
+### 6.2 Foyer.Shifts — `lib/foyer/shifts.ex` + `lib/foyer/shifts/behavior.ex`
 
 ```elixir
-defmodule Foyer.ShiftsPort do
+defmodule Foyer.Shifts.Behavior do
   alias Foyer.Accounts.User
   alias Foyer.Shifts.Shift
 
@@ -1179,10 +1179,10 @@ end
 
 Both writes ARE implemented (not stubbed) because the smoke test toggles them.
 
-### 6.3 Foyer.Channels — `lib/foyer/channels.ex` + `lib/foyer/channels_port.ex`
+### 6.3 Foyer.Channels — `lib/foyer/channels.ex` + `lib/foyer/channels/behavior.ex`
 
 ```elixir
-defmodule Foyer.ChannelsPort do
+defmodule Foyer.Channels.Behavior do
   alias Foyer.Accounts.User
   alias Foyer.Channels.Channel
 
@@ -1198,10 +1198,10 @@ tuples `{%Channel{}, count}` from a single query joining `channels` to a
 grouped `channel_memberships` subquery, since `member_count` is no longer
 denormalised on the schema (see §5.3).
 
-### 6.4 Foyer.House — `lib/foyer/house.ex` + `lib/foyer/house_port.ex`
+### 6.4 Foyer.House — `lib/foyer/house.ex` + `lib/foyer/house/behavior.ex`
 
 ```elixir
-defmodule Foyer.HousePort do
+defmodule Foyer.House.Behavior do
   alias Foyer.Accounts.User
   alias Foyer.House.Announcement
 
@@ -1257,10 +1257,10 @@ end
 - `needs_ack_from/1` — :real. Subquery for Today's "Needs your
   acknowledgement" section.
 
-### 6.5 Foyer.Recognitions — `lib/foyer/recognitions.ex` + `lib/foyer/recognitions_port.ex`
+### 6.5 Foyer.Recognitions — `lib/foyer/recognitions.ex` + `lib/foyer/recognitions/behavior.ex`
 
 ```elixir
-defmodule Foyer.RecognitionsPort do
+defmodule Foyer.Recognitions.Behavior do
   alias Foyer.Accounts.User
   alias Foyer.Recognitions.Recognition
 
@@ -1278,10 +1278,10 @@ end
 - `compose_changeset/1` — :real.
 - `give/2` — **:stub**. Same reasoning as `create_announcement/2`.
 
-### 6.6 Foyer.Chat — `lib/foyer/chat.ex` + `lib/foyer/chat_port.ex`
+### 6.6 Foyer.Chat — `lib/foyer/chat.ex` + `lib/foyer/chat/behavior.ex`
 
 ```elixir
-defmodule Foyer.ChatPort do
+defmodule Foyer.Chat.Behavior do
   alias Foyer.Accounts.User
   alias Foyer.Chat.{Conversation, Message}
 
@@ -1364,7 +1364,7 @@ end
 - `compose_changeset/1` — :real, returns Message changeset.
 - `send_message/3` — **:stub**.
 
-### 6.7 Foyer.Profile — `lib/foyer/profile.ex` + `lib/foyer/profile_port.ex`
+### 6.7 Foyer.Profile — `lib/foyer/profile.ex` + `lib/foyer/profile/behavior.ex`
 
 Profile context is **read-only** and **wraps Accounts + Recognitions**, so the
 ProfileLive doesn't have to depend on two contexts directly (keeps LiveView
@@ -1396,7 +1396,7 @@ end
 ```
 
 ```elixir
-defmodule Foyer.ProfilePort do
+defmodule Foyer.Profile.Behavior do
   alias Foyer.Accounts.User
   alias Foyer.Profile.Card
 
@@ -1408,7 +1408,7 @@ end
 `Recognitions.received_by`, `Recognitions.given_by`, and
 `Shifts.current_shift_for`, then builds a `%Card{}`.
 
-### 6.8 Foyer.Today — `lib/foyer/today.ex` + `lib/foyer/today_port.ex`
+### 6.8 Foyer.Today — `lib/foyer/today.ex` + `lib/foyer/today/behavior.ex`
 
 `Foyer.Today` is the **read-only orchestrator** for the morning-briefing
 surface. It is the only context in the codebase that calls cousin contexts
@@ -1454,7 +1454,7 @@ end
 ```
 
 ```elixir
-defmodule Foyer.TodayPort do
+defmodule Foyer.Today.Behavior do
   alias Foyer.Accounts.User
   alias Foyer.Today.Briefing
 
@@ -2443,28 +2443,28 @@ end
 ExUnit.start()
 Ecto.Adapters.SQL.Sandbox.mode(Foyer.Repo, :manual)
 
-# Mox mocks — one per port behaviour. config/test.exs (§11.3) points LiveDeps
+# Mox mocks — one per context behavior. config/test.exs (§11.3) points LiveDeps
 # at THESE mocks; tests use Mox.stub_with/2 to bind a real context or a
 # scenario module per scope. Tests MUST NOT mutate :foyer, :*_context with
 # Application.put_env/3 (forbidden by TESTING_GUIDE.md).
-Mox.defmock(Foyer.AccountsMock, for: Foyer.AccountsPort)
-Mox.defmock(Foyer.ShiftsMock, for: Foyer.ShiftsPort)
-Mox.defmock(Foyer.ChannelsMock, for: Foyer.ChannelsPort)
-Mox.defmock(Foyer.HouseMock, for: Foyer.HousePort)
-Mox.defmock(Foyer.RecognitionsMock, for: Foyer.RecognitionsPort)
-Mox.defmock(Foyer.ChatMock, for: Foyer.ChatPort)
-Mox.defmock(Foyer.ProfileMock, for: Foyer.ProfilePort)
-Mox.defmock(Foyer.TodayMock, for: Foyer.TodayPort)
+Mox.defmock(Foyer.AccountsMock, for: Foyer.Accounts.Behavior)
+Mox.defmock(Foyer.ShiftsMock, for: Foyer.Shifts.Behavior)
+Mox.defmock(Foyer.ChannelsMock, for: Foyer.Channels.Behavior)
+Mox.defmock(Foyer.HouseMock, for: Foyer.House.Behavior)
+Mox.defmock(Foyer.RecognitionsMock, for: Foyer.Recognitions.Behavior)
+Mox.defmock(Foyer.ChatMock, for: Foyer.Chat.Behavior)
+Mox.defmock(Foyer.ProfileMock, for: Foyer.Profile.Behavior)
+Mox.defmock(Foyer.TodayMock, for: Foyer.Today.Behavior)
 
 # Scenario placeholder folders are NOT created yet — they will be added by
 # feature-group plans as the first isolated test for that group is written.
 # Folder convention (per docs/TESTING_GUIDE.md):
 #
-#   test/support/scenarios/<port>/empty.ex
-#   test/support/scenarios/<port>/busy.ex
+#   test/support/scenarios/<context>/empty.ex
+#   test/support/scenarios/<context>/busy.ex
 #   ...
 #
-# Each scenario module implements the corresponding port behaviour and is
+# Each scenario module implements the corresponding context behavior and is
 # wired via `Mox.stub_with(Foyer.XMock, MyScenario)`. See feature-group
 # plans for the first usage.
 ```
@@ -2599,8 +2599,8 @@ fixes the issue before moving on.
 | 4 | Add the two woff2 font files under `priv/static/fonts/`. | `priv/static/fonts/instrument-serif-regular.woff2`, `…-italic.woff2`, `jetbrains-mono-regular.woff2` | font requests resolve at `/fonts/*` |
 | 5 | Create all migrations (§5.13) in chronological order: `mix ecto.gen.migration create_users`, etc. Write each `change/0` body. **Use `mix ecto.migrate`, not `mix ecto.reset`** — the existing seeds file is still the generated one until step 17, and `ecto.reset` would run it after a table-shape change and crash. | `priv/repo/migrations/*` | `mix ecto.migrate` |
 | 6 | Create all Ecto schemas (§5.1–§5.12), the `Foyer.Today.Briefing` DTO, and the `Foyer.Profile.Card` DTO. Each module includes its `@type t` (schemas) or `typedstruct` (DTOs). | `lib/foyer/accounts/user.ex`, `lib/foyer/channels/{channel,membership}.ex`, `lib/foyer/shifts/shift.ex`, `lib/foyer/house/{announcement,announcement_read,announcement_ack}.ex`, `lib/foyer/recognitions/recognition.ex`, `lib/foyer/chat/{conversation,participant,message,message_read}.ex`, `lib/foyer/today/briefing.ex`, `lib/foyer/profile/card.ex` | `mix compile --warnings-as-errors` |
-| 7 | Create port behaviours (§6.1–§6.8). One file each. | `lib/foyer/{accounts,shifts,channels,house,recognitions,chat,profile,today}_port.ex` | `mix compile --warnings-as-errors` |
-| 8 | Implement real context modules. Each `@behaviour Foyer.XPort`. Reads are real Repo queries with preloads + membership auth on `get_*!/2`; writes for shift start/end and announcement ack/read are real; others raise the `"TODO: feature-group <X>"` runtime error. Every public function has `@spec`. | `lib/foyer/{accounts,shifts,channels,house,recognitions,chat,profile,today}.ex` | `mix compile --warnings-as-errors`, `mix credo --strict` |
+| 7 | Create context behaviors (§6.1–§6.8). One file each. | `lib/foyer/{accounts,shifts,channels,house,recognitions,chat,profile,today}/behavior.ex` | `mix compile --warnings-as-errors` |
+| 8 | Implement real context modules. Each `@behaviour Foyer.X.Behavior`. Reads are real Repo queries with preloads + membership auth on `get_*!/2`; writes for shift start/end and announcement ack/read are real; others raise the `"TODO: feature-group <X>"` runtime error. Every public function has `@spec`. | `lib/foyer/{accounts,shifts,channels,house,recognitions,chat,profile,today}.ex` | `mix compile --warnings-as-errors`, `mix credo --strict` |
 | 9 | Wire `LiveDeps` accessors (§6.9), add `:foyer, :*_context` config to `config/dev.exs` (real contexts) and `config/test.exs` (Mox mocks). | `lib/foyer_web/live_deps.ex`, `config/dev.exs`, `config/test.exs` | `mix compile --warnings-as-errors`, `iex -S mix` → `FoyerWeb.LiveDeps.house()` returns `Foyer.House` in dev |
 | 10 | Create `FoyerWeb.Scope` and `FoyerWeb.UserAuth` (the three `on_mount` clauses + `fetch_current_user/2` plug). | `lib/foyer_web/scope.ex`, `lib/foyer_web/user_auth.ex` | `mix compile --warnings-as-errors` |
 | 11 | Create `FoyerWeb.SessionController` (pick/sign_out actions). | `lib/foyer_web/controllers/session_controller.ex` | `mix compile --warnings-as-errors` |

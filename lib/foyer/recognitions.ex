@@ -6,7 +6,7 @@ defmodule Foyer.Recognitions do
   validation helpers (self-recognition guard, bonus-point tier, grace
   window, …).
   """
-  @behaviour Foyer.RecognitionsPort
+  @behaviour Foyer.Recognitions.Behavior
 
   import Ecto.Query, warn: false
 

@@ -212,9 +212,9 @@ end
 
 `Today` is the only context permitted to call cousins — see §10 for the trade-off discussion.
 
-### 4.2 Port change: Foyer.TodayPort
+### 4.2 Port change: Foyer.Today.Behavior
 
-`lib/foyer/today_port.ex` — no change to callback signature. The port stays:
+`lib/foyer/today/behavior.ex` — no change to callback signature. The port stays:
 
 ```elixir
 @callback brief_for(User.t()) :: Briefing.t()
@@ -230,7 +230,7 @@ calls them; this plan documents their exact signatures as a contract. The isolat
 Today scenario modules that return fixed counts (real data is not needed for unit/isolated tests).
 See §4.4 for the cross-group dependency and sequencing declaration.
 
-#### Foyer.House — additions (`lib/foyer/house.ex` + `lib/foyer/house_port.ex`)
+#### Foyer.House — additions (`lib/foyer/house.ex` + `lib/foyer/house/behavior.ex`)
 
 ```elixir
 @callback authored_by(User.t()) :: [Announcement.t()]
@@ -244,7 +244,7 @@ See §4.4 for the cross-group dependency and sequencing declaration.
 @spec unacked_since(User.t(), DateTime.t() | nil) :: non_neg_integer()
 ```
 
-#### Foyer.Chat — additions (`lib/foyer/chat.ex` + `lib/foyer/chat_port.ex`)
+#### Foyer.Chat — additions (`lib/foyer/chat.ex` + `lib/foyer/chat/behavior.ex`)
 
 ```elixir
 @callback unread_since(User.t(), DateTime.t() | nil) :: non_neg_integer()
@@ -260,7 +260,7 @@ See §4.4 for the cross-group dependency and sequencing declaration.
 @spec unread_since(User.t(), DateTime.t() | nil) :: non_neg_integer()
 ```
 
-#### Foyer.Recognitions — additions (`lib/foyer/recognitions.ex` + `lib/foyer/recognitions_port.ex`)
+#### Foyer.Recognitions — additions (`lib/foyer/recognitions.ex` + `lib/foyer/recognitions/behavior.ex`)
 
 ```elixir
 @callback private_received_since(User.t(), DateTime.t() | nil) :: non_neg_integer()
@@ -269,7 +269,7 @@ See §4.4 for the cross-group dependency and sequencing declaration.
 @spec private_received_since(User.t(), DateTime.t() | nil) :: non_neg_integer()
 ```
 
-#### Foyer.Shifts — additions (`lib/foyer/shifts.ex` + `lib/foyer/shifts_port.ex`)
+#### Foyer.Shifts — additions (`lib/foyer/shifts.ex` + `lib/foyer/shifts/behavior.ex`)
 
 ```elixir
 @callback last_ended_shift_for(User.t()) :: Shift.t() | nil
@@ -561,7 +561,7 @@ Per `docs/TESTING_GUIDE.md`: isolated tests for UI states, route smoke tests for
 
 ### 8.1 Scenario modules
 
-Create under `test/support/scenarios/today/`. Each module implements `Foyer.TodayPort`:
+Create under `test/support/scenarios/today/`. Each module implements `Foyer.Today.Behavior`:
 
 | Module | Scenario |
 |---|---|
@@ -574,7 +574,7 @@ Create under `test/support/scenarios/today/`. Each module implements `Foyer.Toda
 | `Today.Scenarios.AfterClockOut` | off-shift, `just_clocked_out: true`, shift-complete variant |
 
 Each scenario returns a `%Foyer.Today.Briefing{}` with the relevant shape. The `@behaviour
-Foyer.TodayPort` annotation catches any struct-shape drift at compile time.
+Foyer.Today.Behavior` annotation catches any struct-shape drift at compile time.
 
 ### 8.2 Isolated LiveView tests (`test/foyer_web/live/today_live_test.exs`)
 
@@ -631,8 +631,8 @@ documents the dependency.
    with `waiting_announcements`, `waiting_messages`, `waiting_recognitions`,
    `last_shift_ended_at`, and `own_announcements`. Add `Briefing.waiting_total/1`.
 
-2. **Add port callbacks** for the five delta functions on House, Chat, Recognitions, and Shifts
-   (their `_port.ex` files). The real implementations are owned by those feature groups (see §4.4);
+2. **Add behavior callbacks** for the five delta functions on House, Chat, Recognitions, and Shifts
+   (their `/behavior.ex` files). The real implementations are owned by those feature groups (see §4.4);
    do not add stub implementations. The Mox mocks in tests will satisfy the callbacks.
 
 3. **Add Mox mock stubs** in `test/test_helper.exs` for the new callbacks on the four port mocks

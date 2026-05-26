@@ -5,7 +5,7 @@ defmodule FoyerWeb.TodayLiveTest do
 
   Uses `live_isolated/3` with `FoyerWeb.IsolatedHelpers.prepare_isolated/4`
   to mount the LiveView without the router or `on_mount` hooks. The
-  `Foyer.TodayPort` collaborator is swapped per test via `Mox.stub_with/2`
+  `Foyer.Today.Behavior` collaborator is swapped per test via `Mox.stub_with/2`
   with named scenario modules. No DB access — the tests run in plain
   `ExUnit.Case` to avoid the `ConnCase` sandbox cost.
 

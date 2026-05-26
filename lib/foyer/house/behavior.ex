@@ -1,4 +1,4 @@
-defmodule Foyer.HousePort do
+defmodule Foyer.House.Behavior do
   @moduledoc """
   Behaviour for `Foyer.House`. All callbacks (read-side feed/pinned/detail,
   acknowledge/mark_read, create/update/remove, pin/unpin, receipts,

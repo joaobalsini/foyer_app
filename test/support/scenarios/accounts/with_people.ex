@@ -6,7 +6,7 @@ defmodule Foyer.AccountsScenarios.WithPeople do
   The user with id 1 is on-shift; id 2 is off-shift; id 3 is on-shift. Tests
   use the shifts scenario to control on-shift state.
   """
-  @behaviour Foyer.AccountsPort
+  @behaviour Foyer.Accounts.Behavior
 
   alias Foyer.Accounts.User
   alias Foyer.Channels.Channel

@@ -1,4 +1,4 @@
-defmodule Foyer.TodayPort do
+defmodule Foyer.Today.Behavior do
   @moduledoc """
   Behaviour for `Foyer.Today`. Read-only orchestrator across Shifts, House,
   and Recognitions — returns a typed `Foyer.Today.Briefing`. See plan §6.8 for

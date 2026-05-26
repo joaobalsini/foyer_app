@@ -3,7 +3,7 @@ defmodule Foyer.ShiftsScenarios.MayaCharlotteHugoOn do
   Shifts scenario: Maya, Charlotte, and Hugo are on shift; Jamal is off shift.
   Pins the F.Chat.11 picker tag rendering branch.
   """
-  @behaviour Foyer.ShiftsPort
+  @behaviour Foyer.Shifts.Behavior
 
   alias Foyer.ChatScenarios.Fixtures
 

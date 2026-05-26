@@ -3,7 +3,7 @@ defmodule Foyer.ChannelsScenarios.MayaMembership do
   Channels scenario: Maya is a member of the housekeeping floor 4 channel only.
   Drives the chat picker's channel list and the side-rail channel list.
   """
-  @behaviour Foyer.ChannelsPort
+  @behaviour Foyer.Channels.Behavior
 
   alias Foyer.ChatScenarios.Fixtures
 

@@ -1,4 +1,4 @@
-defmodule Foyer.ChatPort do
+defmodule Foyer.Chat.Behavior do
   @moduledoc """
   Behaviour for `Foyer.Chat`.
   """

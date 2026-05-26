@@ -2,7 +2,7 @@ defmodule Today.Scenarios.OnShiftStaff do
   @moduledoc """
   Scenario: on-shift staff, handoff present, 1 needs-ack, 2 recognitions.
   """
-  @behaviour Foyer.TodayPort
+  @behaviour Foyer.Today.Behavior
 
   alias Foyer.Accounts.User
   alias Foyer.Channels.Channel

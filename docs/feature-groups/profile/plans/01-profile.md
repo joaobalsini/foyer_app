@@ -9,7 +9,7 @@ Spec: [`../spec.md`](../spec.md)
 
 **v2 — addressed Codex review of 2026-05-25.** Key changes:
 
-- **§4.1 / §4.2 (top blocker):** `ProfilePort.profile_for/1` replaced with
+- **§4.1 / §4.2 (top blocker):** `Profile.Behavior.profile_for/1` replaced with
   `profile_for/2 (subject, viewer)` and a new `own_profile_for/1`. Private-recognition
   and given-list filtering is now enforced at the context/port boundary, not in
   `PeopleLive`. `§4.3` updated to remove the caller-patch pattern and preserve
@@ -150,7 +150,7 @@ view, that is a Recognitions group concern, not Profile.
 
 ## 4. Context API
 
-### 4.1 `Foyer.ProfilePort` — additions (v2 delta)
+### 4.1 `Foyer.Profile.Behavior` — additions (v2 delta)
 
 The original `profile_for/1` is replaced with a viewer-aware two-argument callback.
 A `own_profile_for/1` convenience is also added. **v2 change:** the port now enforces
@@ -158,7 +158,7 @@ the F.Profile.6 privacy boundary — callers cannot accidentally expose private
 recognitions.
 
 ```elixir
-defmodule Foyer.ProfilePort do
+defmodule Foyer.Profile.Behavior do
   alias Foyer.Accounts.User
   alias Foyer.Profile.Card
   alias Foyer.Profile.RewardItem
@@ -451,7 +451,7 @@ Rationale:
 3. FOYER.md v1 explicitly defers redemption; the catalog is illustrative, not
    operational. Storing illustrative copy in a DB table adds no value until the
    redemption flow exists.
-4. A `typed_struct` list is still typed and testable in isolation — the port callback
+4. A `typed_struct` list is still typed and testable in isolation — the behavior callback
    `rewards_catalog/0` lets tests swap in a controlled list.
 
 The module constant in `Foyer.Profile` uses Heroicon names (v2 change — no Unicode
@@ -503,7 +503,7 @@ wiring; unit tests for context logic.
 
 ### 8.2 Scenario modules — `test/support/scenarios/profile_scenarios.ex`
 
-Define scenario modules implementing `Foyer.ProfilePort`:
+Define scenario modules implementing `Foyer.Profile.Behavior`:
 
 ```
 ProfileScenarios.Empty        — user with no recognitions, 0 points
@@ -575,7 +575,7 @@ PostgreSQL sandbox and cannot run in parallel with other DB-touching tests.
 2. **Extend `Foyer.Profile.Card`** — add `received_this_month: integer()` and
    `points_earned: [Recognition.t()]` fields. Keep `enforce: true`.
 
-3. **Update `Foyer.ProfilePort`** — replace `@callback profile_for(User.t()) :: Card.t()`
+3. **Update `Foyer.Profile.Behavior`** — replace `@callback profile_for(User.t()) :: Card.t()`
    with `@callback profile_for(User.t(), User.t()) :: Card.t()` and add
    `@callback own_profile_for(User.t()) :: Card.t()` and
    `@callback rewards_catalog() :: [RewardItem.t()]`. (v2 change.)
@@ -618,7 +618,7 @@ PostgreSQL sandbox and cannot run in parallel with other DB-touching tests.
 
 11. **Write scenario modules** — `test/support/scenarios/profile_scenarios.ex` per
     §8.2. Update `test/test_helper.exs` to add
-    `Mox.defmock(Foyer.ProfileMock, for: Foyer.ProfilePort)` if not already present
+    `Mox.defmock(Foyer.ProfileMock, for: Foyer.Profile.Behavior)` if not already present
     (confirm: scaffold may have added it already).
 
 12. **Write isolated LiveView tests** — `test/foyer_web/live/profile_live_test.exs`
@@ -741,9 +741,9 @@ not change this function. The private-visibility rule lives in
 
 ### `ProfileMock` must be updated atomically
 
-Changing `ProfilePort.profile_for/1` to `profile_for/2` means all existing
+Changing `Profile.Behavior.profile_for/1` to `profile_for/2` means all existing
 `ProfileMock` stubs, `Mox.stub_with/2` calls, and isolated LiveView tests across
-Profile and Channels that mock `ProfilePort` must be updated in the same execution
+Profile and Channels that mock `Profile.Behavior` must be updated in the same execution
 window. The executing agent should grep for `ProfileMock` and `profile_for` across
 `test/` before finishing.
 

@@ -5,7 +5,7 @@ defmodule Foyer.Shifts do
   "at most one open shift per user" via the
   `shifts_one_open_shift_per_user` partial unique index.
   """
-  @behaviour Foyer.ShiftsPort
+  @behaviour Foyer.Shifts.Behavior
 
   import Ecto.Query, warn: false
 

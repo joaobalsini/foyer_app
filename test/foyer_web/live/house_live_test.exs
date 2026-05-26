@@ -5,7 +5,7 @@ defmodule FoyerWeb.HouseLiveTest do
 
   Uses `live_isolated/3` with `FoyerWeb.IsolatedHelpers.prepare_isolated/4`
   to mount the LiveView without the production router or `on_mount` hooks.
-  Collaborators (`Foyer.HousePort`, `Foyer.RecognitionsPort`) are swapped
+  Collaborators (`Foyer.House.Behavior`, `Foyer.Recognitions.Behavior`) are swapped
   per test via `Mox.stub_with/2` for the default world and per-call
   `Mox.stub/3` for tests that pin specific feed shapes (date branches,
   non-pinned items, …).

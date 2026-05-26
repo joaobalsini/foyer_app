@@ -3,7 +3,7 @@ defmodule Foyer.ProfileScenarios.Simple do
   Profile world that returns a minimal Card for any user. Used by isolated
   PeopleLive `:show` tests that don't need to assert on recognition details.
   """
-  @behaviour Foyer.ProfilePort
+  @behaviour Foyer.Profile.Behavior
 
   alias Foyer.Profile.Card
 

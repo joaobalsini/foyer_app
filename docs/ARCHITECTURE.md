@@ -20,7 +20,7 @@ isolation and keeps LiveView tests focused on rendering and event handling.
 
 ## Contexts are behaviours
 
-Each context that LiveViews depend on defines a port behaviour (`Foyer.HousePort`, `Foyer.ChatPort`, …). The
+Each context that LiveViews depend on defines a context behavior (`Foyer.House.Behavior`, `Foyer.Chat.Behavior`, …). The
 real context implements the port; tests swap in scenario modules via Mox to exercise any data shape without
 touching seeds. See [TESTING_GUIDE.md](TESTING_GUIDE.md) for the full pattern.
 

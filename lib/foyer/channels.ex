@@ -3,7 +3,7 @@ defmodule Foyer.Channels do
   Channels (audience units). Reads only in the scaffold — channel mutation is
   deferred to the Channels feature group.
   """
-  @behaviour Foyer.ChannelsPort
+  @behaviour Foyer.Channels.Behavior
 
   import Ecto.Query, warn: false
 

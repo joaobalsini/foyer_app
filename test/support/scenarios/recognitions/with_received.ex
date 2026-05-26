@@ -9,7 +9,7 @@ defmodule Foyer.RecognitionsScenarios.WithReceived do
   third-party-filter rule should use `Mox.expect/3` inline (see
   TESTING_GUIDE §"When to keep expect/3 instead").
   """
-  @behaviour Foyer.RecognitionsPort
+  @behaviour Foyer.Recognitions.Behavior
 
   alias Foyer.Accounts.User
   alias Foyer.Recognitions.Recognition

@@ -2,7 +2,7 @@ defmodule Today.Scenarios.OffShiftWithWaiting do
   @moduledoc """
   Scenario: off-shift user, 3 announcements + 2 messages + 1 private rec waiting.
   """
-  @behaviour Foyer.TodayPort
+  @behaviour Foyer.Today.Behavior
 
   alias Foyer.Accounts.User
   alias Foyer.Today.Briefing

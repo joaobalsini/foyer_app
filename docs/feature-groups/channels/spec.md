@@ -21,7 +21,7 @@ lets on-shift staff see who is in each channel.
   a filterable list of staff, department filter options backed by channel membership counts,
   on-shift state, and channel membership pills on the colleague detail view.
 - Slug uniqueness and `kind`-dependent structural constraints.
-- `ChannelsPort` behaviour and `ChannelsMock` Mox double wired through `FoyerWeb.LiveDeps`.
+- `Channels.Behavior` behaviour and `ChannelsMock` Mox double wired through `FoyerWeb.LiveDeps`.
 - Isolated and route smoke tests for all clauses.
 
 **Out of scope (other groups or v2)**

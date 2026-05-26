@@ -1,7 +1,7 @@
 # Plan 01 — Channels feature group
 
 Status: revised after review (v2)
-Scope: `Foyer.Channels` context, `ChannelsPort` behaviour, `PeopleLive` finishing, seeds,
+Scope: `Foyer.Channels` context, `Channels.Behavior` behaviour, `PeopleLive` finishing, seeds,
 tests for all `F.Channels.*` clauses
 Spec: [`../spec.md`](../spec.md)
 
@@ -47,7 +47,7 @@ Solidify `Foyer.Channels` from the scaffold-era stub into a fully tested, spec-c
 that all other feature groups can depend on without surprises. Concretely:
 
 - Complete the context API with `member?/2` and `member_count/1` (both missing from the scaffold).
-- Add those two callbacks to `ChannelsPort`.
+- Add those two callbacks to `Channels.Behavior`.
 - Confirm `list_for_user/1`, `list_all_with_member_counts/0`, and `get!/1` match their spec clauses
   with real integration tests.
 - Write isolated unit tests for `Channel.changeset/2` and `Membership.changeset/2` covering all
@@ -181,13 +181,13 @@ needed.
 
 ## 4. Context API
 
-### 4.1 Port behaviour — `lib/foyer/channels_port.ex`
+### 4.1 Behavior — `lib/foyer/channels/behavior.ex`
 
 Delta: add two new callbacks (`member?/2` and `member_count/1`) to the existing port. The three
 scaffold callbacks (`list_for_user/1`, `list_all_with_member_counts/0`, `get!/1`) are unchanged.
 
 ```elixir
-defmodule Foyer.ChannelsPort do
+defmodule Foyer.Channels.Behavior do
   @moduledoc """
   Behaviour for `Foyer.Channels`. All LiveViews that need channel data resolve
   this via `FoyerWeb.LiveDeps.channels()`.
@@ -214,7 +214,7 @@ All five functions are `:real` (Repo-backed). Full signatures:
 
 ```elixir
 defmodule Foyer.Channels do
-  @behaviour Foyer.ChannelsPort
+  @behaviour Foyer.Channels.Behavior
 
   @spec list_for_user(User.t()) :: [Channel.t()]
   # Existing implementation — unchanged.
@@ -263,10 +263,10 @@ end
 The scaffold already registers the mock:
 
 ```elixir
-Mox.defmock(Foyer.ChannelsMock, for: Foyer.ChannelsPort)
+Mox.defmock(Foyer.ChannelsMock, for: Foyer.Channels.Behavior)
 ```
 
-With the two new callbacks added to `ChannelsPort`, the mock automatically requires them to be
+With the two new callbacks added to `Channels.Behavior`, the mock automatically requires them to be
 stubbed or expected. No change to `test_helper.exs` beyond confirming it is already present.
 **If it is absent, add it.**
 
@@ -351,7 +351,7 @@ happens server-side by re-fetching with the appropriate filter and calling `stre
 **`Accounts.list_people/1` filter semantics dependency:**
 
 The `filter_channel` event handler calls `list_people(channel_id: channel_id)`. This requires
-`Accounts.list_people/1` (and `AccountsPort`) to support a `channel_id:` keyword option that
+`Accounts.list_people/1` (and `Accounts.Behavior`) to support a `channel_id:` keyword option that
 joins `channel_memberships` and filters by `channel_id`. This is a cross-group dependency on
 the Accounts context — see the "Cross-group dependencies" section below.
 
@@ -576,7 +576,7 @@ Use scenario modules under `test/support/scenarios/`:
 
 ```elixir
 defmodule Foyer.ChannelsScenarios.TwoChannels do
-  @behaviour Foyer.ChannelsPort
+  @behaviour Foyer.Channels.Behavior
 
   def list_for_user(_user), do: [build_channel("Floor 4"), build_channel("All Housekeeping")]
   def list_all_with_member_counts(), do: [{build_channel("Floor 4"), 4}, {build_channel("All Housekeeping"), 7}]
@@ -608,13 +608,13 @@ Tests:
    `"concierge-front-office"` member list per §7.2. Verify via iex sanity check in §7.3.
    No Elixir module changes.
 
-2. **Extend `ChannelsPort`** (`lib/foyer/channels_port.ex`). Add
+2. **Extend `Channels.Behavior`** (`lib/foyer/channels/behavior.ex`). Add
    `@callback member?(User.t(), Channel.t()) :: boolean()` and
    `@callback member_count(Channel.t()) :: non_neg_integer()`.
 
 3. **Implement `member?/2` and `member_count/1`** in `lib/foyer/channels.ex`. Use
    `Repo.exists?/1` for `member?/2`. Add `@impl true` and `@spec` for both. Run
-   `mix dialyzer` after this step — the port behaviour will fail if signatures don't match.
+   `mix dialyzer` after this step — the context behavior will fail if signatures don't match.
 
 4. **Confirm `Accounts.list_people/1` filter semantics** are available (cross-group dependency).
    If the `channel_id:` keyword filter is not yet implemented in the Accounts context, coordinate
@@ -632,7 +632,7 @@ Tests:
    (not global seeds). Confirm `F.Channels.12–14` pass.
 
 8. **Add scenario modules** (`test/support/scenarios/channels_scenarios.ex`). Define at minimum:
-   `ChannelsScenarios.Empty`, `ChannelsScenarios.TwoChannels`. Implement the full `ChannelsPort`
+   `ChannelsScenarios.Empty`, `ChannelsScenarios.TwoChannels`. Implement the full `Channels.Behavior`
    behaviour in each.
 
 9. **Update `PeopleLive`** (`lib/foyer_web/live/people_live.ex`):
@@ -700,7 +700,7 @@ Profile context remains focused on recognition/points. This is covered by new sp
 ### Channels → Accounts: `list_people/1` channel filter
 
 `PeopleLive`'s channel filter calls `FoyerWeb.LiveDeps.accounts().list_people(channel_id: channel_id)`.
-This requires `Accounts.list_people/1` (and `AccountsPort`) to accept a `channel_id:` keyword
+This requires `Accounts.list_people/1` (and `Accounts.Behavior`) to accept a `channel_id:` keyword
 option and join `channel_memberships` when it is present. **The Accounts group must add this filter
 semantics before or alongside this plan's execution.** If blocked, the filter can temporarily
 fall back to an in-memory `Enum.filter/2` on a plain-list assign (explicitly justified as a

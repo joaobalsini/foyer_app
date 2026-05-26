@@ -5,7 +5,7 @@ defmodule Foyer.Today do
   Today is strictly read-only; all writes flow directly from LiveView to the
   owning context.
   """
-  @behaviour Foyer.TodayPort
+  @behaviour Foyer.Today.Behavior
 
   alias Foyer.Accounts.User
   alias Foyer.Chat

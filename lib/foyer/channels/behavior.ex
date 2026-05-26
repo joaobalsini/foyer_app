@@ -1,4 +1,4 @@
-defmodule Foyer.ChannelsPort do
+defmodule Foyer.Channels.Behavior do
   @moduledoc """
   Behaviour for `Foyer.Channels`.
   """

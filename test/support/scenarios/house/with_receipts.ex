@@ -13,7 +13,7 @@ defmodule Foyer.HouseScenarios.WithReceipts do
   `:acknowledged`, `:read_without_acknowledgement`, `:unread`, `:off_shift`,
   each holding a list of `%User{}` structs.
   """
-  @behaviour Foyer.HousePort
+  @behaviour Foyer.House.Behavior
 
   alias Foyer.House.Announcement
   alias Foyer.HouseScenarios.Fixtures

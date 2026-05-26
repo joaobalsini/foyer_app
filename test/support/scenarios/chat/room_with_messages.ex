@@ -4,7 +4,7 @@ defmodule Foyer.ChatScenarios.RoomWithMessages do
   count. Used for room-panel tests where the focus is event handling
   (compose submit, mark_read trigger), not inbox enrichment.
   """
-  @behaviour Foyer.ChatPort
+  @behaviour Foyer.Chat.Behavior
 
   alias Foyer.ChatScenarios.Fixtures
 

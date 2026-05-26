@@ -4,7 +4,7 @@ defmodule Today.Scenarios.AfterClockOut do
   The just_clocked_out assign is set by the LiveView from query params, not
   from brief_for — this scenario returns the off-shift briefing shape.
   """
-  @behaviour Foyer.TodayPort
+  @behaviour Foyer.Today.Behavior
 
   alias Foyer.Accounts.User
   alias Foyer.Today.Briefing

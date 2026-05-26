@@ -4,7 +4,7 @@ defmodule Foyer.ChatScenarios.WithUnread do
   message. Pins F.Chat.8 (unread count rendering) and F.Chat.9 (inbox
   enrichment: latest message + unread state).
   """
-  @behaviour Foyer.ChatPort
+  @behaviour Foyer.Chat.Behavior
 
   alias Foyer.ChatScenarios.Fixtures
 

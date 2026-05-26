@@ -6,7 +6,7 @@ defmodule FoyerWeb.ProfileLive do
 
   Data is loaded in `handle_params/3` (not `mount/3`) per ARCHITECTURE.md:
   expensive work belongs in handle_params so the first HTTP render stays cheap.
-  The rewards catalog is fetched via `ProfilePort.rewards_catalog/0` so isolated
+  The rewards catalog is fetched via `Profile.Behavior.rewards_catalog/0` so isolated
   tests can inject a controlled list via Mox.
   """
   use FoyerWeb, :live_view

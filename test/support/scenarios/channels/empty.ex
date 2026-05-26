@@ -5,7 +5,7 @@ defmodule Foyer.ChannelsScenarios.Empty do
   Every read returns an empty result. Use when the test does not depend on
   any channel data.
   """
-  @behaviour Foyer.ChannelsPort
+  @behaviour Foyer.Channels.Behavior
 
   alias Foyer.Channels.Channel
 

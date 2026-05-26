@@ -6,7 +6,7 @@ defmodule Foyer.ChannelsScenarios.SingleChannel do
   Used by isolated announcement tests so `list_for_user/1` returns a
   predictable list (the compose form's `channel_id` select reads from this).
   """
-  @behaviour Foyer.ChannelsPort
+  @behaviour Foyer.Channels.Behavior
 
   alias Foyer.HouseScenarios.Fixtures
 

@@ -34,7 +34,7 @@ defmodule Foyer.MixProject do
           FoyerWeb.CoreComponents,
           FoyerWeb.LiveDeps,
           # Behaviour-only modules (just @callback definitions)
-          ~r/^Foyer\.\w+Port$/,
+          ~r/^Foyer\.\w+\.Behavior$/,
           # Test support / fixtures / harnesses (under test/support)
           Foyer.DataCase,
           FoyerWeb.ConnCase,

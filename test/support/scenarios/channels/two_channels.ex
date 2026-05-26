@@ -5,7 +5,7 @@ defmodule Foyer.ChannelsScenarios.TwoChannels do
   Provides "Housekeeping · Floor 4" (id: 101) and "All Housekeeping" (id: 102),
   with stable IDs so tests can assert on them.
   """
-  @behaviour Foyer.ChannelsPort
+  @behaviour Foyer.Channels.Behavior
 
   alias Foyer.Channels.Channel
 

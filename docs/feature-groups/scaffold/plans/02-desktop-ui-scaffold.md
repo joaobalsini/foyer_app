@@ -591,7 +591,7 @@ Concrete changes to `AnnouncementLive.render/1` (`:show` clause):
 
 `/announcements/digest` (weekly digest) and `/announcements/mine` (my
 announcements) are **not in scope for this plan**. They require new routes,
-new `AnnouncementLive` actions, new `HousePort` callbacks, new context
+new `AnnouncementLive` actions, new `House.Behavior` callbacks, new context
 functions, and dedicated tests — genuine new House feature work, not desktop
 layout work. The desktop mocks for these surfaces (`desktop-weekly-digest.html`,
 `desktop-my-announcements.html`) are also not present in
@@ -835,7 +835,7 @@ desktop views is already loaded by existing context functions.
 
 ### 7.2 New context functions
 
-None. The §5.5/§5.6 surfaces are deferred; no new port callbacks or context
+None. The §5.5/§5.6 surfaces are deferred; no new behavior callbacks or context
 functions are added by this plan.
 
 ### 7.3 N+1 avoidance
@@ -851,7 +851,7 @@ functions are added by this plan.
 
 ### 7.4 Mock additions to `Foyer.HouseMock`
 
-No new callbacks are added to `Foyer.HousePort` in this plan (§5.5/§5.6 are
+No new callbacks are added to `Foyer.House.Behavior` in this plan (§5.5/§5.6 are
 deferred). The existing `stub_with(Foyer.HouseMock, Foyer.House)` in the
 desktop smoke test setup covers all current port functions without change.
 

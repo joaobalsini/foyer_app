@@ -130,7 +130,7 @@ Define small behaviours around the read-side functions a LiveView needs. Keep th
 LiveViews actually make, not the whole context API.
 
 ```elixir
-defmodule Foyer.HousePort do
+defmodule Foyer.House.Behavior do
   @callback some_query(user :: term()) :: list()
   # …one @callback per function the LiveView calls on this context.
 end
@@ -140,14 +140,14 @@ The real context implements the behaviour:
 
 ```elixir
 defmodule Foyer.House do
-  @behaviour Foyer.HousePort
+  @behaviour Foyer.House.Behavior
 end
 ```
 
 Mocks are defined once in `test/test_helper.exs`, one per port:
 
 ```elixir
-Mox.defmock(Foyer.HouseMock, for: Foyer.HousePort)
+Mox.defmock(Foyer.HouseMock, for: Foyer.House.Behavior)
 # …one defmock per context.
 ```
 
@@ -160,18 +160,18 @@ setup :verify_on_exit!
 ### Scenario Modules
 
 Prefer named scenario modules over inline `expect/3` calls when a test wants a particular "shape of the world."
-Scenario modules are plain modules that implement a port behaviour and describe one variation of the world the
+Scenario modules are plain modules that implement a context behavior and describe one variation of the world the
 LiveView is rendered against. `Mox.stub_with/2` swaps the scenario in per test.
 
 ```elixir
 defmodule Foyer.HouseScenarios.Empty do
-  @behaviour Foyer.HousePort
+  @behaviour Foyer.House.Behavior
 
   def some_query(_user), do: []
 end
 
 defmodule Foyer.HouseScenarios.Busy do
-  @behaviour Foyer.HousePort
+  @behaviour Foyer.House.Behavior
 
   def some_query(_user), do: [build_item(), build_item()]
 end

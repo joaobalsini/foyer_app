@@ -17,10 +17,10 @@ defmodule FoyerWeb.LiveDeps do
 
   ## Adding a new context
 
-  1. Define a port behaviour (`Foyer.SomePort`) with one `@callback` per function
+  1. Define a context behavior (`Foyer.Some.Behavior`) with one `@callback` per function
      the LiveViews call.
   2. Implement the behaviour in the real context (`Foyer.Some`).
-  3. Add a `Mox.defmock(Foyer.SomeMock, for: Foyer.SomePort)` call in
+  3. Add a `Mox.defmock(Foyer.SomeMock, for: Foyer.Some.Behavior)` call in
      `test/test_helper.exs`.
   4. Add an accessor here: `def some, do: Application.fetch_env!(:foyer, :some_context)`.
   5. Configure `:foyer, :some_context` in `config/dev.exs` and
