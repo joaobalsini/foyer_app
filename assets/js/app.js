@@ -47,6 +47,10 @@ window.addEventListener("phx:clear-chat-compose", ({detail}) => {
   if (input) input.value = ""
 })
 
+window.addEventListener("foyer:history-back", () => {
+  window.history.back()
+})
+
 // connect if there are any LiveViews on the page
 liveSocket.connect()
 

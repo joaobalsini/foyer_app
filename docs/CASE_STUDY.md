@@ -1,10 +1,48 @@
+# Case study
 
+Foyer started as a product exploration: could a luxury hotel replace fragmented WhatsApp groups
+with a calmer internal tool that still felt personal, respectful, and operationally useful?
 
-I started with claude design, started discussing the initial idea of having a system that would help luxury hotels to replace whatsapp and engage people at the same time.
+The first pass was a design conversation in Claude. Over roughly an hour, I explored the core
+problem, the target users, and the product tone. The idea settled into a small but opinionated
+application for hotel staff: a daily briefing, announcements with acknowledgements, peer
+recognition, chat, people profiles, channels, and explicit shift state.
 
-This session lasted about 1h, we had lot of back of forth until my claude design credits ended. 
+From that discussion, I wrote [FOYER.md](FOYER.md), the product brief for the project. I also
+organized the development rules, test conventions, and workflow documentation around it. That
+up-front product and process work mattered: it gave the later agents a shared source of truth
+instead of relying on ad hoc prompts.
 
-From that, I wrote the FOYER.md file, in which I describe the product features. That also took around 1h, if combined with repurposing some of the claude.md files that I had, and organizing it together with test conventions and workflow. 
+The implementation began with a Phoenix LiveView bootstrap: Nix setup, project README, database
+helpers, environment files, and a working app with tests. After that, I used separate sessions to
+build the first mobile and desktop UI with mocked data. This forced the application shape early:
+routes, LiveViews, contexts, schemas, and the main user journeys became visible before the feature
+logic was complete.
+
+Once the scaffold was usable, I moved into a spec-first workflow. Feature groups were split across
+announcements, recognitions, chat, channels, today, profile, people, and shifts. Multiple agents
+worked in parallel on separate worktrees and branches. Each feature group followed the same cycle:
+write or refine the spec, plan the implementation, build it, then verify it against the documented
+requirements.
+
+The parallel work made progress fast, but it also made review discipline important. I merged the
+feature branches one by one, asking agents to rebase on `main` and run the full verification step
+described in [WORKFLOW.md](WORKFLOW.md). The verification pass checked not only whether tests
+passed, but whether the tests matched the specs, whether database-backed tests were isolated, and
+whether the implementation still followed the architecture rules.
+
+The UI needed the same level of review. After the main feature groups landed, I ran another pass
+focused on design consistency. Some of the original mocked designs had drifted during feature
+implementation, so I used additional review sessions to bring the surfaces back into alignment:
+consistent widths, back actions, form layouts, empty states, mobile and desktop navigation, and
+detail-page behavior.
+
+The final result is not just a prototype screen. It is a tested Phoenix application with real
+feature boundaries, documented specs, scenario-based tests, smoke coverage for the routed app, and
+a workflow that made parallel AI-assisted development manageable. The most useful pattern was not
+asking one agent to "build the app"; it was keeping the product brief, specs, plans, branches,
+reviews, and verification steps explicit enough that many agents could contribute without losing
+the product's shape.
 
 # Appendix A — Session transcripts
 
@@ -34,7 +72,7 @@ application.
 also make sure you link the newly created AGENTS.MD to our claude.md (agents.md came with phoenix and liveview, so are development guidelines)
 
 
-## Session 2 - mobile Ui mocks
+## Session 2 - mobile UI mocks
 
 ### Prompt
 Read the designs and the project files and let's scaffold the Mobile UI. Have a basic version of the UI working, define the contexts, the routes, the models, the DB tables, etc., and continue from there. The data should be mocked at this point, but it will force us to define liveviews, contexts and the data model.
@@ -62,13 +100,13 @@ This don't need specs, we should have a single plan created by a opus agent and 
 
 ## Session 3
 
-### Terminal 1 - Desktop Ui mocks
+### Terminal 1 - Desktop UI mocks
 
 ####  Prompt 
 
 Ask sonnet to write a plan for writing a desktop version of the UI based on our designs. We already have a mobile version of it, later ask codex for review, and another sonnet agent to implement.
 
-### Terminal 2 - Annoucements, Recognitions and Chats (codex)
+### Terminal 2 - Announcements, Recognitions and Chats (Codex)
 
 ####  Prompt 
 
@@ -96,7 +134,7 @@ trigger a sonnet agent to implement each feature group (on their worktrees). We 
 
 --- continued after session 7 finished
 
-before running the verify pass, pull latest main and rebase. just to recap: we might not have anything else to do right now, besides verifying the sepcs by writing tests.
+	before running the verify pass, pull latest main and rebase. just to recap: we might not have anything else to do right now, besides verifying the specs by writing tests.
   Probably most of the features are already done, so, in case of conflict, consider main correct.
 
 ### Session 4
@@ -111,13 +149,13 @@ Go to feature/announcements, rebase main, check if the verification (verify.md f
 
 ####  Prompt 
 
-feature/announcements was just merged to main. rebase feature/recognitions with main, check if docs/feature-groups/ recognitions/plans/01-recognitions-verify.md was implemented, do a second verification pass, remove ocs/feature-groups/recognitions/plans/01-recognitions-verify.md, commit and push
+feature/announcements was just merged to main. rebase feature/recognitions with main, check if docs/feature-groups/recognitions/plans/01-recognitions-verify.md was implemented, do a second verification pass, remove docs/feature-groups/recognitions/plans/01-recognitions-verify.md, commit and push
 
 ### Session 6
 
 ####  Prompt 
 
-feature/recognitions was just merged to main. rebase feature/chat with main, check if docs/feature-groups/chat/plans/01-chat-verify.mdd was implemented, do a second verification pass, remove docs/feature-groups/chat/plans/01-chat-verify.md, commit and push
+feature/recognitions was just merged to main. rebase feature/chat with main, check if docs/feature-groups/chat/plans/01-chat-verify.md was implemented, do a second verification pass, remove docs/feature-groups/chat/plans/01-chat-verify.md, commit and push
 
 ### Session 7  (codex)
 
@@ -149,4 +187,3 @@ we still have plenty of tests that touch the DB on the test/foyer folder. Can't 
 moving some of the tests that are actual unit tests to not use DB, while the ones that
 need to use the db should rely on ecto sandbox, since no other tests shall depend on
 its DB state.
-

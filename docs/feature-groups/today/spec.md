@@ -35,10 +35,9 @@ follows the action; there is no live push in v1.
 
 - PubSub / real-time push in v1. Today refreshes on page load, shift start, shift end, and surface
   re-entry only.
-- Composing announcements or recognitions from Today. Write paths for those live in their own
-  feature groups.
 - Notification delivery rules, push notifications, or queued-delivery audit.
-- Multiple simultaneous open shifts per user (the DB enforces one open shift per user).
+- Showing more than the most recent eligible handoff. v1 intentionally shows a single handoff; a
+  multi-handoff briefing with grouping and review state is a v2 concern.
 - Shift scheduling or rostering; Foyer treats shift state as something the worker explicitly controls.
 
 ---

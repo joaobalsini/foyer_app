@@ -62,6 +62,8 @@ defmodule FoyerWeb.ChatLiveTest do
       {:ok, view, _html} = mount_isolated_chat(conn, Fixtures.maya(), live_action: :inbox)
       Mox.allow(Foyer.ChatMock, self(), view.pid)
 
+      assert has_element?(view, "#chat.chat-surface")
+      assert has_element?(view, "#chat-panel-inbox.chat-inbox")
       # No conversation row should render. The stream container is present but
       # holds no items.
       refute has_element?(view, "#conversation-row-50")

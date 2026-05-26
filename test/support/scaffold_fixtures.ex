@@ -167,8 +167,9 @@ defmodule FoyerWeb.ScaffoldFixtures do
       })
       |> Repo.insert()
 
-    # Pre-existing acks/reads.
-    for user <- [aisha, hugo] do
+    # Pre-existing acks/reads. Keep these within the announcement audience:
+    # `suite_412` targets All Housekeeping, where Hugo/Rafael are not members.
+    for user <- [aisha] do
       {:ok, _} =
         %AnnouncementAck{}
         |> AnnouncementAck.changeset(%{
@@ -179,7 +180,7 @@ defmodule FoyerWeb.ScaffoldFixtures do
         |> Repo.insert()
     end
 
-    for user <- [aisha, hugo, rafael] do
+    for user <- [aisha] do
       {:ok, _} =
         %AnnouncementRead{}
         |> AnnouncementRead.changeset(%{

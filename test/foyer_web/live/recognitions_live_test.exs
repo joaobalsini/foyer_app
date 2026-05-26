@@ -76,8 +76,11 @@ defmodule FoyerWeb.RecognitionsLiveTest do
 
       {:ok, view, _html} = mount_isolated_recognitions(conn, action: :new, scope: scope)
 
+      assert has_element?(view, "#back-to-house[href='/house']", "Back to The House")
+      assert has_element?(view, "#recognition-form-root.foyer-content-cols")
       assert has_element?(view, "form#recognize-form")
-      assert has_element?(view, "button#recognize-submit", "Send recognition")
+      assert has_element?(view, "button#recognize-submit.foyer-btn.forest.w-full", "Publish")
+      refute has_element?(view, "a", "Cancel")
     end
 
     # Off-shift visibility is enforced by the router's `:ensure_on_shift`
@@ -306,7 +309,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
       assert has_element?(view, "button#recognition-remove-btn", "Remove")
       assert has_element?(view, ".announcement-detail #recognition-detail")
       assert has_element?(view, "#recognition-detail .foyer-tag", "Recognition")
-      assert has_element?(view, "#back-to-recognitions[href='/house']", "Back to The House")
+      assert has_element?(view, "#back-to-house[href='/house']", "Back to The House")
     end
 
     test "author outside grace sees disabled Edit and Remove buttons with tooltip copy",

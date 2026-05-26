@@ -225,16 +225,17 @@ defmodule FoyerWeb.RecognitionsLive do
         <div class="foyer-content">
           <FoyerComponents.desktop_topbar current_scope={@current_scope} page_title={@page_title} />
           <div class="foyer-scroll" id="recognitions">
+            <.link
+              :if={@live_action in [:new, :show]}
+              navigate={~p"/house"}
+              class="foyer-btn ghost sm self-start"
+              id="back-to-house"
+            >
+              <.icon name="hero-arrow-left" class="size-4" /> Back to The House
+            </.link>
+
             <%= cond do %>
               <% @live_action == :show and @recognition -> %>
-                <.link
-                  navigate={~p"/house"}
-                  class="foyer-btn ghost sm self-start"
-                  id="back-to-recognitions"
-                >
-                  <.icon name="hero-arrow-left" class="size-4" /> Back to The House
-                </.link>
-
                 <div class="announcement-detail">
                   <article id="recognition-detail" class="announcement-detail__article">
                     <div class="flex items-center gap-2">
@@ -394,19 +395,10 @@ defmodule FoyerWeb.RecognitionsLive do
                   </button>
                 </.form>
               <% @live_action == :new -> %>
-                <div class="space-y-4">
-                  <div>
-                    <FoyerComponents.editorial_heading>
-                      Give recognition
-                    </FoyerComponents.editorial_heading>
-                    <p class="text-sm text-stone-500 mt-2">
-                      Shout-out a colleague. Write it like you'd tell it at staff dinner. Specific moments land.
-                    </p>
-                  </div>
-                </div>
+                <h1 class="foyer-serif text-3xl">Give recognition</h1>
 
-                <div class="grid lg:grid-cols-[1fr_360px] gap-8 mt-6" id="recognition-form-root">
-                  <div class="space-y-6">
+                <div class="foyer-content-cols" id="recognition-form-root">
+                  <div>
                     <form
                       id="recognize-form"
                       phx-submit="give_submit"
@@ -550,18 +542,15 @@ defmodule FoyerWeb.RecognitionsLive do
                         Recognition with bonus points is given by department heads. Your shout-out still lands on their phone and shows in The House.
                       </p>
 
-                      <div class="flex gap-2 pt-4 border-t border-stone-200/70">
-                        <button type="submit" class="foyer-btn forest" id="recognize-submit">
-                          Send recognition
+                      <div class="pt-4 border-t border-stone-200/70">
+                        <button type="submit" class="foyer-btn forest w-full" id="recognize-submit">
+                          Publish
                         </button>
-                        <.link navigate={~p"/house"} class="foyer-btn ghost sm">
-                          Cancel
-                        </.link>
                       </div>
                     </form>
                   </div>
 
-                  <aside id="recognition-preview" class="lg:sticky lg:top-6 self-start space-y-3">
+                  <aside id="recognition-preview" class="hidden lg:block">
                     <FoyerComponents.section_label label="Preview · The House feed" />
                     <div class="max-w-[360px]">
                       <FoyerComponents.recognition_card

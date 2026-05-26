@@ -312,6 +312,17 @@ defmodule FoyerWeb.SmokeTest do
       assert has_element?(view, "#ack-badge-#{ctx.maya.id}")
       refute render(view) =~ ">?? ✓"
     end
+
+    test "seeded announcement confirmation badges match acknowledged receipt members", ctx do
+      {:ok, view, _html} =
+        ctx.conn
+        |> sign_in(ctx.charlotte)
+        |> live(~p"/announcements/#{ctx.suite_412.id}")
+
+      assert has_element?(view, "#ack-badge-#{ctx.aisha.id}", "AB")
+      refute has_element?(view, "#ack-badge-#{ctx.hugo.id}")
+      assert has_element?(view, "#receipts-acknowledged", "Acknowledged · 1")
+    end
   end
 
   describe "chat routes" do
@@ -392,6 +403,9 @@ defmodule FoyerWeb.SmokeTest do
       assert render(view) =~ "Maya Okafor"
       assert render(view) =~ "Foyer points"
       assert render(view) =~ "LDN·MAY"
+
+      assert render(view) =~
+               ~r/<a[^>]*data-method="delete"[^>]*data-csrf="[^"]+"[^>]*data-to="\/session"[^>]*id="profile-sign-out"/
     end
 
     test "F.Channels.15 — people index renders a row for every seeded user", ctx do

@@ -317,6 +317,8 @@ Planned v2 areas include:
 - Rich receipt analytics: acknowledgement timeline, declined/exception states, and manager nudges.
 - Real notification delivery rules: queued delivery on clock-in, critical overrides, notification preferences, and
   delivery audit.
+- Today handoff depth: show all eligible handoffs instead of only the most recent one, with clear grouping and
+  de-emphasis after review.
 - Chat depth: typing indicators, delivery receipts separate from reads, reactions, attachments, muting, pinned
   conversations, and inline translation.
 - Translation for announcements and chat across multilingual teams.

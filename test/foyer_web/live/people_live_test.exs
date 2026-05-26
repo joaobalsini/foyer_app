@@ -44,6 +44,7 @@ defmodule FoyerWeb.PeopleLiveTest do
 
       {:ok, view, _html} = mount_isolated_people_index(conn, viewer)
 
+      assert has_element?(view, ".people-directory.foyer-page-wide")
       assert has_element?(view, "#people-count", "3 colleagues · The Linden")
       assert has_element?(view, "#people-filters")
       assert has_element?(view, "#filter-department-menu")
@@ -198,6 +199,8 @@ defmodule FoyerWeb.PeopleLiveTest do
 
       html = render(view)
       assert html =~ "Maya Okafor"
+      assert has_element?(view, "#back-to-people[href='/people']", "Back to People")
+      assert has_element?(view, "#people-profile-view.foyer-page-wide")
       assert has_element?(view, "#recognitions-received")
       assert has_element?(view, "#recognitions-given")
       refute has_element?(view, "#rewards")

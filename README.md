@@ -1,6 +1,6 @@
 # Foyer
 
-Foyer is a Phoenix LiveView application for staff communication in luxury hotel groups.
+Foyer is a Phoenix LiveView application for staff communication in luxury hotels.
 
 The product brings back-of-house coordination into one place:
 
@@ -11,15 +11,53 @@ The product brings back-of-house coordination into one place:
 
 The POC uses a simple user picker instead of production authentication, so the app can demonstrate manager/staff permissions, shift boundaries, channel membership, announcements, acknowledgements, chat, recognition, and profile flows without a full identity provider.
 
+## Quick Start
+
+Recommended local setup uses Nix plus direnv:
+
+```bash
+direnv allow
+bin/db start
+mix setup
+mix phx.server
+```
+
+Open <http://localhost:4000> and use the landing-page user picker to enter as a manager or staff member.
+
+When you are done:
+
+```bash
+bin/db stop
+```
+
+## Screenshots
+
+| Surface              | Mobile                                                                        | Desktop                                                                        |
+| -------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Today briefing       | [Mobile](docs/screenshots/mobile/today.png)                                   | [Desktop](docs/screenshots/desktop/today.png)                                  |
+| House feed           | [Mobile](docs/screenshots/mobile/house.png)                                   | [Desktop](docs/screenshots/desktop/house.png)                                  |
+| Announcement compose | [Mobile](docs/screenshots/mobile/announcement-compose.png)                    | [Desktop](docs/screenshots/desktop/announcement-compose.png)                   |
+| Announcement detail  | [Mobile](docs/screenshots/mobile/announcement-detail.png)                     | [Desktop](docs/screenshots/desktop/announcement-detail.png)                    |
+| Recognition compose  | [Mobile](docs/screenshots/mobile/recognition-compose.png)                     | [Desktop](docs/screenshots/desktop/recognition-compose.png)                    |
+| Recognition detail   | [Mobile](docs/screenshots/mobile/recognition-detail.png)                      | [Desktop](docs/screenshots/desktop/recognition-detail.png)                     |
+| Chat index           | [Mobile](docs/screenshots/mobile/chat-index.png)                              | [Desktop](docs/screenshots/desktop/chat-index.png)                             |
+| Chat                 | [Mobile](docs/screenshots/mobile/chat.png)                                    | [Desktop](docs/screenshots/desktop/chat.png)                                   |
+| Profile              | [Mobile](docs/screenshots/mobile/profile.png)                                 | [Desktop](docs/screenshots/desktop/profile.png)                                |
+| Shift handoff        | [Mobile](docs/screenshots/mobile/shift-handoff.png)                           | [Desktop](docs/screenshots/desktop/shift-handoff.png)                          |
+| Off shift            | [Mobile](docs/screenshots/mobile/off-shift.png)                               | [Desktop](docs/screenshots/desktop/off-shift.png)                              |
+
 ## Documentation
 
-Start here:
+Product and process:
 
 - [docs/FOYER.md](docs/FOYER.md) - product north star, surfaces, v1 boundary, and operating model.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - Phoenix/LiveView architecture, context boundaries, runtime config, and typing rules.
 - [docs/WORKFLOW.md](docs/WORKFLOW.md) - spec -> plan -> execute -> verify workflow and feature-group documentation model.
 - [docs/TESTING_GUIDE.md](docs/TESTING_GUIDE.md) - ExUnit, LiveView, Mox, scenario-module, and spec-clause testing conventions.
-- [docs/CASE_STUDY.md](docs/CASE_STUDY.md) - case study narrative and delivery context.
+- [docs/CASE_STUDY.md](docs/CASE_STUDY.md) - case study narrative and how I worked with AI.
+
+Contributor and agent rules:
+
 - [CLAUDE.md](CLAUDE.md) - short project brief for AI agents and contributors.
 - [AGENTS.md](AGENTS.md) - Phoenix, LiveView, Elixir, Ecto, Tailwind, and repository rules used by coding agents.
 
@@ -35,28 +73,9 @@ Feature specs live under [docs/feature-groups](docs/feature-groups):
 
 Static visual references live in [designs](designs).
 
-## Stack
-
-| Tool | Version |
-| --- | --- |
-| Elixir | 1.19.0, OTP 28 |
-| Erlang/OTP | 28.0 |
-| Phoenix | 1.8.x |
-| Phoenix LiveView | 1.1.x |
-| PostgreSQL | 17.0 |
-| Node.js | 22.11.0 |
-
-The Nix toolchain is pinned in [flake.nix](flake.nix). The non-Nix toolchain is listed in [.tool-versions](.tool-versions) for `asdf`, `mise`, or equivalent version managers.
-
 ## Setup With Nix
 
-Recommended local setup uses Nix plus direnv:
-
-```bash
-direnv allow
-```
-
-Or enter the shell manually:
+Use the quick-start commands above for the happy path. To enter the Nix shell manually:
 
 ```bash
 nix develop
@@ -78,7 +97,7 @@ mix setup
 mix phx.server
 ```
 
-Open <http://localhost:4000>.
+Open <http://localhost:4000> and pick a demo user.
 
 Stop the local database when you are done:
 
@@ -122,7 +141,7 @@ mix setup
 mix phx.server
 ```
 
-Open <http://localhost:4000>.
+Open <http://localhost:4000> and pick a demo user.
 
 ## Environment
 
@@ -149,6 +168,19 @@ mix precommit                   # compile, unused deps check, format, test
 ```
 
 Use `mix precommit` before considering a change complete.
+
+## Stack
+
+| Tool             | Version        |
+| ---------------- | -------------- |
+| Elixir           | 1.19.0, OTP 28 |
+| Erlang/OTP       | 28.0           |
+| Phoenix          | 1.8.x          |
+| Phoenix LiveView | 1.1.x          |
+| PostgreSQL       | 17.0           |
+| Node.js          | 22.11.0        |
+
+The Nix toolchain is pinned in [flake.nix](flake.nix). The non-Nix toolchain is listed in [.tool-versions](.tool-versions) for `asdf`, `mise`, or equivalent version managers.
 
 ## Project Layout
 

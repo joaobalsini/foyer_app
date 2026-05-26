@@ -151,22 +151,35 @@ defmodule FoyerWeb.TodayLiveTest do
       {:ok, view, _html} = mount_today(conn, Today.Scenarios.OnShiftNoHandoff)
 
       refute has_element?(view, "#handoff-card")
+      assert has_element?(view, "#today-empty-state", "Nothing needs your attention.")
     end
   end
 
   describe "F.Today.10 / F.Today.11 — end-shift form" do
-    test "end-shift form has textarea, channel picker, and skip link", %{conn: conn} do
+    test "end-shift screen has form controls and hides Today announcements and recognitions", %{
+      conn: conn
+    } do
       {:ok, view, html} =
         mount_today(conn, Today.Scenarios.OnShiftStaff,
           action: :end_shift,
           path: "/today/end-shift"
         )
 
+      assert has_element?(view, "#end-shift-screen")
+      assert has_element?(view, "#end-shift-layout.foyer-page-wide")
+      assert has_element?(view, "#back-to-today-link")
+      assert has_element?(view, "#back-to-today-link[href='/today']")
       assert has_element?(view, "#end-shift-form")
       assert has_element?(view, "#handoff-channel-select")
       assert has_element?(view, "#handoff-channel-select option[value='1'][selected]")
       refute html =~ "— no channel —"
       assert has_element?(view, "#skip-clock-out")
+      refute has_element?(view, "#on-shift-staff")
+      refute has_element?(view, "#handoff-card")
+      refute has_element?(view, "#needs-ack")
+      refute has_element?(view, "#needs-ack-10")
+      refute has_element?(view, "#recent-recognition")
+      refute has_element?(view, "#recognition-1")
     end
 
     test "F.Today.12 — skip clock out ends shift and redirects", %{conn: conn} do
@@ -253,6 +266,7 @@ defmodule FoyerWeb.TodayLiveTest do
       {:ok, view, _html} = mount_today(conn, Today.Scenarios.OnShiftAllAcked)
 
       refute has_element?(view, "#recent-recognition")
+      assert has_element?(view, "#today-empty-state")
     end
   end
 

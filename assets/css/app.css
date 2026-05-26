@@ -808,6 +808,21 @@ html, body {
   text-underline-offset: 0.15em;
 }
 
+.today-empty {
+  min-height: 6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 0.4rem;
+  border: 1px solid var(--foyer-rule);
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.32);
+  color: var(--foyer-ink-soft);
+  text-align: center;
+  padding: 1.5rem;
+}
+
 .chat-back-link,
 .chat-icon-link {
   display: inline-flex;
@@ -984,7 +999,7 @@ html, body {
    Announcement detail.
    --------------------------------------------------------------------------- */
 .announcement-detail {
-  width: min(100%, 58rem);
+  width: min(100%, 48rem);
   margin-inline: auto;
   display: flex;
   flex-direction: column;
@@ -1081,12 +1096,7 @@ html, body {
   }
 
   .chat-room {
-    width: min(100%, 60rem);
     min-height: calc(100vh - 9.9rem);
-  }
-
-  .chat-picker {
-    width: min(100%, 42rem);
   }
 }
 

@@ -184,30 +184,32 @@ defmodule FoyerWeb.PeopleLive do
                   class="foyer-btn ghost sm self-start"
                   id="back-to-people"
                 >
-                  <.icon name="hero-arrow-left" class="size-4" /> Back
+                  <.icon name="hero-arrow-left" class="size-4" /> Back to People
                 </.link>
-                <FoyerComponents.profile_card
-                  card={@card}
-                  viewer={:self}
-                  rewards={@profile_rewards}
-                  self_service={own_profile?(@current_scope, @card.user)}
-                />
-                <%= if @target_channels != [] do %>
-                  <div class="mt-4">
-                    <div class="foyer-mono mb-2">Channels</div>
-                    <div class="flex flex-wrap gap-2" id="target-channels">
-                      <span
-                        :for={ch <- @target_channels}
-                        class="foyer-tag outline"
-                        id={"target-channel-#{ch.id}"}
-                      >
-                        {ch.name}
-                      </span>
+                <div class="foyer-page-wide" id="people-profile-view">
+                  <FoyerComponents.profile_card
+                    card={@card}
+                    viewer={:self}
+                    rewards={@profile_rewards}
+                    self_service={own_profile?(@current_scope, @card.user)}
+                  />
+                  <%= if @target_channels != [] do %>
+                    <div class="mt-4">
+                      <div class="foyer-mono mb-2">Channels</div>
+                      <div class="flex flex-wrap gap-2" id="target-channels">
+                        <span
+                          :for={ch <- @target_channels}
+                          class="foyer-tag outline"
+                          id={"target-channel-#{ch.id}"}
+                        >
+                          {ch.name}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                <% end %>
+                  <% end %>
+                </div>
               <% true -> %>
-                <div class="people-directory foyer-page-people md:pt-8">
+                <div class="people-directory foyer-page-wide md:pt-8">
                   <header class="people-directory__header">
                     <div>
                       <h1 class="foyer-serif text-4xl leading-tight">People</h1>

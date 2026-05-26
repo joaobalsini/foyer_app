@@ -538,11 +538,11 @@ defmodule FoyerWeb.AnnouncementLive do
                     <div class="foyer-mono">Read receipts</div>
                     <div class="flex flex-wrap gap-2">
                       <span
-                        :for={ack <- @announcement.acks}
+                        :for={user <- @receipts.acknowledged}
                         class="foyer-tag moss"
-                        id={"ack-badge-#{ack.user_id}"}
+                        id={"ack-badge-#{user.id}"}
                       >
-                        {ack_initials(ack)} ✓
+                        {user.initials} ✓
                       </span>
                     </div>
                     <section id="announcement-receipts" class="flex flex-col gap-3">
@@ -624,9 +624,6 @@ defmodule FoyerWeb.AnnouncementLive do
   end
 
   defp truthy?(value), do: value in [true, "true", "on", "1"]
-
-  defp ack_initials(%{user: %{initials: initials}}), do: initials
-  defp ack_initials(_), do: "??"
 
   attr :id, :string, required: true
   attr :label, :string, required: true

@@ -317,6 +317,14 @@ defmodule FoyerWeb.ProfileLiveTest do
       assert has_element?(view, "#recognitions-received")
       assert has_element?(view, "#points")
       assert has_element?(view, "#profile-card")
+      assert has_element?(view, "#back-from-profile", "Back")
+      assert has_element?(view, "#profile-view.foyer-page-wide")
+
+      assert has_element?(
+               view,
+               "#profile-sign-out[href='/session'].foyer-btn.forest.w-full",
+               "Sign out"
+             )
     end
   end
 

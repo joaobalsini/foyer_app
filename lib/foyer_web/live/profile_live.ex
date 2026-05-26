@@ -46,13 +46,31 @@ defmodule FoyerWeb.ProfileLive do
           chat_unread_count={@chat_unread_count}
         />
         <div class="foyer-content">
-          <div class="foyer-scroll foyer-page-wide" id="profile">
-            <FoyerComponents.profile_card
-              :if={@card}
-              card={@card}
-              rewards={@rewards}
-              viewer={:self}
-            />
+          <div class="foyer-scroll" id="profile">
+            <button
+              type="button"
+              phx-click={JS.dispatch("foyer:history-back")}
+              class="foyer-btn ghost sm self-start"
+              id="back-from-profile"
+            >
+              <.icon name="hero-arrow-left" class="size-4" /> Back
+            </button>
+            <div class="foyer-page-wide" id="profile-view">
+              <FoyerComponents.profile_card
+                :if={@card}
+                card={@card}
+                rewards={@rewards}
+                viewer={:self}
+              />
+              <.link
+                href={~p"/session"}
+                method="delete"
+                id="profile-sign-out"
+                class="foyer-btn forest w-full justify-center"
+              >
+                <.icon name="hero-arrow-left-on-rectangle" class="size-4" /> Sign out
+              </.link>
+            </div>
             <FoyerComponents.bottom_nav active={:me} current_scope={@current_scope} />
           </div>
         </div>
