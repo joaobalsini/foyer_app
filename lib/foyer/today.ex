@@ -35,12 +35,7 @@ defmodule Foyer.Today do
     needs_ack = if on_shift?, do: deps.house.needs_ack_from(user), else: []
     handoff = if on_shift?, do: deps.shifts.last_handoff_for(user), else: nil
 
-    recent_recognitions =
-      if on_shift? do
-        deps.recognitions.received_by(user, user) |> Enum.take(3)
-      else
-        []
-      end
+    recent_recognitions = if on_shift?, do: recent_recognitions(user, deps), else: []
 
     own_announcements =
       if on_shift? and manager?(user),
@@ -81,6 +76,22 @@ defmodule Foyer.Today do
     rec = deps.recognitions.private_received_since(user, since)
     {ann, msg, rec}
   end
+
+  defp recent_recognitions(user, deps) do
+    received = deps.recognitions.received_by(user, user)
+
+    own_private =
+      deps.recognitions.given_by(user, user)
+      |> Enum.reject(& &1.public)
+
+    (received ++ own_private)
+    |> Enum.uniq_by(& &1.id)
+    |> Enum.sort_by(&recognition_inserted_at/1, {:desc, DateTime})
+    |> Enum.take(3)
+  end
+
+  defp recognition_inserted_at(%{inserted_at: %DateTime{} = inserted_at}), do: inserted_at
+  defp recognition_inserted_at(_recognition), do: ~U[1970-01-01 00:00:00Z]
 
   @spec default_deps() :: deps()
   defp default_deps do

@@ -32,6 +32,9 @@ defmodule FoyerWeb.AnnouncementLive do
      |> assign(:receipts, nil)
      |> assign(:preview_title, "")
      |> assign(:preview_body, "")
+     |> assign(:preview_channel_id, nil)
+     |> assign(:preview_requires_ack, false)
+     |> assign(:preview_pinned, false)
      |> assign(:page_title, "Announcement")}
   end
 
@@ -104,6 +107,9 @@ defmodule FoyerWeb.AnnouncementLive do
          |> assign(:channel_options, Enum.map(channels, &{&1.name, &1.id}))
          |> assign(:preview_title, a.title || "")
          |> assign(:preview_body, a.body || "")
+         |> assign(:preview_channel_id, a.channel_id)
+         |> assign(:preview_requires_ack, a.requires_ack)
+         |> assign(:preview_pinned, not is_nil(a.pinned_at))
          |> assign(:page_title, "Edit · " <> a.title)}
       else
         {:noreply,
@@ -225,7 +231,10 @@ defmodule FoyerWeb.AnnouncementLive do
     {:noreply,
      socket
      |> assign(:preview_title, Map.get(attrs, "title", ""))
-     |> assign(:preview_body, Map.get(attrs, "body", ""))}
+     |> assign(:preview_body, Map.get(attrs, "body", ""))
+     |> assign(:preview_channel_id, Map.get(attrs, "channel_id"))
+     |> assign(:preview_requires_ack, truthy?(Map.get(attrs, "requires_ack")))
+     |> assign(:preview_pinned, truthy?(Map.get(attrs, "pinned")))}
   end
 
   defp update_pin_state(socket, fun, message) do
@@ -326,6 +335,13 @@ defmodule FoyerWeb.AnnouncementLive do
                           label="Requires acknowledgement"
                         />
                         <.input
+                          name="announcement[pinned]"
+                          id="announcement-pinned"
+                          type="checkbox"
+                          label="Pin this announcement"
+                          value={@preview_pinned}
+                        />
+                        <.input
                           field={@form[:channel_id]}
                           type="select"
                           label="To · audience"
@@ -336,17 +352,11 @@ defmodule FoyerWeb.AnnouncementLive do
                     </div>
                     <div class="hidden lg:block" id="announcement-preview-col">
                       <div class="foyer-mono mb-2">Preview</div>
-                      <article
-                        class="rounded-lg border p-3 flex flex-col gap-2"
-                        style="border-color: var(--foyer-rule);"
-                      >
-                        <h3 class="foyer-serif text-xl">
-                          {if @preview_title != "", do: @preview_title, else: "Untitled"}
-                        </h3>
-                        <p class="text-sm">
-                          {if @preview_body != "", do: @preview_body, else: "Body will appear here…"}
-                        </p>
-                      </article>
+                      <FoyerComponents.announcement_card
+                        announcement={preview_announcement(assigns)}
+                        current_user_id={@current_scope.user.id}
+                        show_view_action={false}
+                      />
                     </div>
                   </div>
                 <% end %>
@@ -576,6 +586,43 @@ defmodule FoyerWeb.AnnouncementLive do
     do: author_id == id
 
   defp managed_by?(_, _), do: false
+
+  defp preview_announcement(assigns) do
+    channel = preview_channel(assigns)
+
+    %Announcement{
+      id: 0,
+      author_id: assigns.current_scope.user.id,
+      author: assigns.current_scope.user,
+      channel_id: channel && channel.id,
+      channel: channel,
+      title: if(assigns.preview_title == "", do: "Untitled", else: assigns.preview_title),
+      body:
+        if(assigns.preview_body == "", do: "Body will appear here...", else: assigns.preview_body),
+      requires_ack: assigns.preview_requires_ack,
+      pinned_at: if(assigns.preview_pinned, do: DateTime.utc_now(:second)),
+      published_at: DateTime.utc_now(:second),
+      reads: [],
+      acks: []
+    }
+  end
+
+  defp preview_channel(assigns) do
+    case Integer.parse(to_string(assigns.preview_channel_id || "")) do
+      {id, ""} ->
+        assigns.channel_options
+        |> Enum.find(fn {_name, channel_id} -> channel_id == id end)
+        |> case do
+          {name, ^id} -> %Foyer.Channels.Channel{id: id, name: name}
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp truthy?(value), do: value in [true, "true", "on", "1"]
 
   defp ack_initials(%{user: %{initials: initials}}), do: initials
   defp ack_initials(_), do: "??"

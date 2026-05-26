@@ -323,13 +323,19 @@ defmodule FoyerWeb.AnnouncementLiveTest do
           "title" => "Roof access",
           "body" => "Roof closed for inspection until 14:00.",
           "channel_id" => to_string(Fixtures.channel().id),
-          "requires_ack" => "true"
+          "requires_ack" => "true",
+          "pinned" => "true"
         }
       )
       |> render_change()
 
-      assert render(view) =~ "Roof access"
-      assert render(view) =~ "Roof closed for inspection until 14:00."
+      preview_html = render(view)
+      assert has_element?(view, "#announcement-pinned")
+      assert preview_html =~ "Roof access"
+      assert preview_html =~ "Roof closed for inspection until 14:00."
+      assert preview_html =~ "Pinned"
+      assert preview_html =~ "Ack required"
+      refute has_element?(view, "#announcement-preview-col #announcement-card-link-0")
 
       assert {:error, {:live_redirect, %{to: "/announcements/100", flash: flash}}} =
                view
@@ -338,7 +344,8 @@ defmodule FoyerWeb.AnnouncementLiveTest do
                    "title" => "Roof access",
                    "body" => "Roof closed for inspection until 14:00.",
                    "channel_id" => to_string(Fixtures.channel().id),
-                   "requires_ack" => "true"
+                   "requires_ack" => "true",
+                   "pinned" => "true"
                  }
                )
                |> render_submit()

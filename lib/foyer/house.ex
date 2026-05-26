@@ -121,6 +121,7 @@ defmodule Foyer.House do
       |> announcement_attrs()
       |> Map.put("author_id", author.id)
       |> Map.put("published_at", DateTime.utc_now() |> DateTime.truncate(:second))
+      |> maybe_pin_on_create()
 
     changeset = Announcement.changeset(%Announcement{}, attrs)
 
@@ -304,13 +305,22 @@ defmodule Foyer.House do
 
   defp announcement_attrs(attrs) do
     attrs
-    |> Map.take(["title", "body", "channel_id", "requires_ack"])
+    |> Map.take(["title", "body", "channel_id", "requires_ack", "pinned"])
     |> Map.merge(
       attrs
-      |> Map.take([:title, :body, :channel_id, :requires_ack])
+      |> Map.take([:title, :body, :channel_id, :requires_ack, :pinned])
       |> Map.new(fn {key, value} -> {Atom.to_string(key), value} end)
     )
   end
+
+  defp maybe_pin_on_create(%{"pinned" => pinned} = attrs)
+       when pinned in [true, "true", "on", "1"] do
+    attrs
+    |> Map.put("pinned_at", DateTime.utc_now() |> DateTime.truncate(:second))
+    |> Map.delete("pinned")
+  end
+
+  defp maybe_pin_on_create(attrs), do: Map.delete(attrs, "pinned")
 
   defp preload_announcement({:ok, %Announcement{} = announcement}) do
     {:ok, Repo.preload(announcement, [:author, :channel, :reads, :acks])}

@@ -96,6 +96,12 @@ defmodule Foyer.TodayTest do
       assert briefing.waiting_recognitions == 0
     end
 
+    test "on_shift? true: recent recognitions include authored private recognitions" do
+      briefing = Today.brief_for(user(), on_shift_deps())
+
+      assert Enum.any?(briefing.recent_recognitions, &(&1.id == 42))
+    end
+
     test "F.Today.20 — unread_since anchors waiting counts on last_shift_ended_at" do
       briefing = Today.brief_for(user(), off_shift_deps())
 

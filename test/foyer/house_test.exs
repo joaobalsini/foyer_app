@@ -33,12 +33,14 @@ defmodule Foyer.HouseTest do
         "title" => "Lift inspection",
         "body" => "Service lift will pause at noon.",
         "channel_id" => ctx.suite_412.channel_id,
-        "requires_ack" => "true"
+        "requires_ack" => "true",
+        "pinned" => "true"
       }
 
       assert {:ok, announcement} = House.create_announcement(ctx.charlotte, attrs)
       assert announcement.author_id == ctx.charlotte.id
       assert announcement.requires_ack
+      assert announcement.pinned_at
       assert announcement.channel_id == ctx.suite_412.channel_id
       assert Repo.get!(Announcement, announcement.id).id == announcement.id
     end

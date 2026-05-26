@@ -458,6 +458,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
       assert html =~ "Aisha Bello"
       assert html =~ "Caught the leak before it spread."
       assert html =~ "+50 pts"
+      refute has_element?(view, "#recognition-preview #recognition-view-0")
 
       # set_bonus "clear" branch (line 220) wipes the ribbon back to nothing.
       render_hook(view, "set_bonus", %{"bonus" => "clear"})

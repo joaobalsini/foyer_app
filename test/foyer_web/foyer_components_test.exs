@@ -285,6 +285,14 @@ defmodule FoyerWeb.FoyerComponentsTest do
 
       assert sender_html =~ ~s(id="recognition-view-201")
       assert sender_html =~ ~s(href="/recognitions/201")
+
+      recipient_html =
+        render_component(&FoyerComponents.recognition_card/1,
+          recognition: recognition,
+          current_user_id: 2
+        )
+
+      refute recipient_html =~ ~s(id="recognition-view-201")
       refute third_party_html =~ ~s(id="recognition-view-201")
     end
   end

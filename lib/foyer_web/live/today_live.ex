@@ -266,6 +266,7 @@ defmodule FoyerWeb.TodayLive do
                           <span :for={v <- r.values} class="foyer-tag outline">{v}</span>
                         </div>
                         <.link
+                          :if={r.sender_id == @current_scope.user.id}
                           navigate={~p"/recognitions/#{r.id}"}
                           class="foyer-btn sm shrink-0"
                           id={"today-recognition-view-#{r.id}"}
@@ -339,6 +340,7 @@ defmodule FoyerWeb.TodayLive do
                           <span :for={v <- r.values} class="foyer-tag outline">{v}</span>
                         </div>
                         <.link
+                          :if={r.sender_id == @current_scope.user.id}
                           navigate={~p"/recognitions/#{r.id}"}
                           class="foyer-btn sm shrink-0"
                           id={"today-recognition-view-#{r.id}"}

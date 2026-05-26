@@ -564,7 +564,10 @@ defmodule FoyerWeb.RecognitionsLive do
                   <aside id="recognition-preview" class="lg:sticky lg:top-6 self-start space-y-3">
                     <FoyerComponents.section_label label="Preview · The House feed" />
                     <div class="max-w-[360px]">
-                      <FoyerComponents.recognition_card recognition={preview_recognition(assigns)} />
+                      <FoyerComponents.recognition_card
+                        recognition={preview_recognition(assigns)}
+                        show_view_action={false}
+                      />
                     </div>
                   </aside>
                 </div>

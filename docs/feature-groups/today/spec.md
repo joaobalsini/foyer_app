@@ -187,9 +187,10 @@ bottom navigation is sticky at the bottom; tap targets meet minimum 44 px height
 
 **Given** an on-shift user has received one or more recognitions  
 **When** the user views `/today`  
-**Then** up to three most recent recognitions are shown, each displaying the sender's name and
-initials, the recognition body text, any house values tagged on the recognition, and a `View`
-action that navigates to `/recognitions/:id`.
+**Then** up to three most recent recognitions are shown, including received recognitions and the
+current user's authored private recognitions, each displaying the sender's name and initials, the
+recognition body text, and any house values tagged on the recognition. `View` appears only for
+recognitions authored by the current user and navigates to `/recognitions/:id`.
 
 ### F.Today.19 — No recognition section when none received
 

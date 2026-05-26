@@ -473,6 +473,7 @@ defmodule FoyerWeb.FoyerComponents do
 
   attr :announcement, Foyer.House.Announcement, required: true
   attr :current_user_id, :integer, default: nil
+  attr :show_view_action, :boolean, default: true
 
   def announcement_card(assigns) do
     assigns =
@@ -528,6 +529,7 @@ defmodule FoyerWeb.FoyerComponents do
           {@ack_count}/{@ack_denominator} acknowledged
         </span>
         <.link
+          :if={@show_view_action}
           navigate={~p"/announcements/#{@announcement.id}"}
           class="foyer-btn sm shrink-0 ml-auto"
           id={"announcement-card-link-#{@announcement.id}"}
@@ -566,6 +568,7 @@ defmodule FoyerWeb.FoyerComponents do
 
   attr :recognition, Foyer.Recognitions.Recognition, required: true
   attr :current_user_id, :integer, default: nil
+  attr :show_view_action, :boolean, default: true
 
   def recognition_card(assigns) do
     ~H"""
@@ -605,7 +608,7 @@ defmodule FoyerWeb.FoyerComponents do
         </div>
         <div class="flex items-center justify-end gap-2">
           <.link
-            :if={own_recognition?(@recognition, @current_user_id)}
+            :if={@show_view_action and own_recognition?(@recognition, @current_user_id)}
             navigate={~p"/recognitions/#{@recognition.id}"}
             class="foyer-btn sm"
             id={"recognition-view-#{@recognition.id}"}
@@ -620,7 +623,6 @@ defmodule FoyerWeb.FoyerComponents do
 
   defp own_recognition?(_recognition, nil), do: false
   defp own_recognition?(%{sender_id: user_id}, user_id), do: true
-  defp own_recognition?(%{recipient_id: user_id}, user_id), do: true
   defp own_recognition?(_recognition, _user_id), do: false
 
   defp recipient_name(%{recipient: %{name: name}}) when is_binary(name), do: String.upcase(name)

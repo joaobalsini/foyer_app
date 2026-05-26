@@ -143,10 +143,11 @@ defmodule FoyerWeb.HouseLiveTest do
   end
 
   describe "recognition feed actions" do
-    test "own recognitions link to their detail page from The House", %{conn: conn} do
+    test "authored recognitions link to their detail page from The House", %{conn: conn} do
       recognition = %{
         RecognitionsScenarios.WithReceived.sample()
-        | recipient_id: Fixtures.staff().id
+        | sender_id: Fixtures.staff().id,
+          sender: Fixtures.staff()
       }
 
       stub(Foyer.RecognitionsMock, :feed_public, fn _opts -> [recognition] end)
@@ -155,6 +156,40 @@ defmodule FoyerWeb.HouseLiveTest do
 
       assert has_element?(view, "#recognition-view-#{recognition.id}", "View")
       assert html =~ ~s(href="/recognitions/#{recognition.id}")
+    end
+
+    test "recipient does not get a View action for a received recognition", %{conn: conn} do
+      recognition = %{
+        RecognitionsScenarios.WithReceived.sample()
+        | recipient_id: Fixtures.staff().id,
+          recipient: Fixtures.staff()
+      }
+
+      stub(Foyer.RecognitionsMock, :feed_public, fn _opts -> [recognition] end)
+
+      {:ok, view, _html} = mount_house(conn, role: :staff)
+
+      refute has_element?(view, "#recognition-view-#{recognition.id}")
+    end
+
+    test "authored private recognitions appear in The House with a View action", %{conn: conn} do
+      recognition = %{
+        RecognitionsScenarios.WithReceived.sample()
+        | id: 9100,
+          sender_id: Fixtures.staff().id,
+          sender: Fixtures.staff(),
+          recipient_id: Fixtures.other_staff().id,
+          recipient: Fixtures.other_staff(),
+          public: false
+      }
+
+      stub(Foyer.RecognitionsMock, :feed_public, fn _opts -> [] end)
+      stub(Foyer.RecognitionsMock, :given_by, fn _target, _viewer -> [recognition] end)
+
+      {:ok, view, html} = mount_house(conn, role: :staff)
+
+      assert html =~ "Held the floor together."
+      assert has_element?(view, "#recognition-view-#{recognition.id}", "View")
     end
   end
 

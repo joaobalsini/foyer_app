@@ -51,8 +51,10 @@ all backed by `FoyerWeb.AnnouncementLive` and the `Foyer.House` context.
 **Given** a manager who is a member of channel X  \
 **When** they publish an announcement to channel X  \
 **Then** the announcement is created with the manager as author, scoped to channel X, and
-persists with the requested `requires_ack` setting. The user is redirected to the new announcement's
-show page with an info toast confirming the announcement was published.
+persists with the requested `requires_ack` and initial pinned settings. The compose form includes
+a "Pin this announcement" checkbox, and its preview uses the same announcement card treatment as
+The House feed. The user is redirected to the new announcement's show page with an info toast
+confirming the announcement was published.
 
 ### F.Announcements.2 — Staff cannot compose announcements
 
