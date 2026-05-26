@@ -255,7 +255,7 @@ defmodule FoyerWeb.FoyerComponentsTest do
       assert html =~ "Private"
       assert html =~ "+25 pts"
       assert html =~ "Maya Okafor"
-      assert html =~ "Aisha Bello"
+      assert html =~ "For AISHA BELLO"
     end
 
     test "F.Recognitions.10 — renders View only for sender or recipient" do

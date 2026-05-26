@@ -570,26 +570,40 @@ defmodule FoyerWeb.FoyerComponents do
   def recognition_card(assigns) do
     ~H"""
     <article
-      class="rounded-lg border p-5 flex flex-col gap-3 bg-[color-mix(in_srgb,var(--foyer-cream)_90%,white)]"
-      style="border-color: var(--foyer-rule);"
+      class="rounded-lg border p-5 md:p-6 min-h-52 flex flex-col justify-between gap-8"
+      style="background: color-mix(in srgb, var(--foyer-brass-soft) 42%, var(--foyer-cream) 58%); border-color: color-mix(in srgb, var(--foyer-rule) 72%, var(--foyer-brass) 28%);"
       id={"rec-card-#{@recognition.id}"}
       data-rec-id={@recognition.id}
     >
-      <div class="flex items-center gap-2 flex-wrap" data-values>
-        <.house_value_chip :for={v <- @recognition.values || []} value={v} selected />
-        <span :if={@recognition.public == false} class="foyer-mono">Private</span>
+      <div class="flex flex-col gap-5">
+        <div class="flex items-center justify-between gap-3">
+          <div class="foyer-mono flex items-center gap-2">
+            <.icon name="hero-sparkles" class="size-4 text-[var(--foyer-brass)]" />
+            <span>For {recipient_name(@recognition)}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <%= if @recognition.bonus_points && @recognition.bonus_points > 0 do %>
+              <span class="foyer-tag claret" data-bonus>+{@recognition.bonus_points} pts</span>
+            <% end %>
+            <span :if={@recognition.public == false} class="foyer-tag outline">Private</span>
+          </div>
+        </div>
+
+        <p class="foyer-serif text-2xl md:text-3xl leading-tight italic">
+          "{@recognition.body}"
+        </p>
       </div>
 
-      <p class="foyer-serif text-lg leading-snug italic">"{@recognition.body}"</p>
-
-      <div class="flex items-center justify-between text-sm gap-2">
+      <div class="flex items-end justify-between gap-4">
         <div class="flex items-center gap-2">
-          <.avatar :if={@recognition.sender} initials={@recognition.sender.initials} size={:sm} />
-          <span>{@recognition.sender && @recognition.sender.name}</span>
-          <span aria-hidden="true">→</span>
-          <span class="foyer-serif">{@recognition.recipient && @recognition.recipient.name}</span>
+          <.avatar :if={@recognition.sender} initials={@recognition.sender.initials} />
+          <div>
+            <div class="font-semibold">{@recognition.sender && @recognition.sender.name}</div>
+            <div class="text-sm text-stone-600">{relative_day(@recognition.inserted_at)}</div>
+          </div>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center justify-end gap-2 flex-wrap" data-values>
+          <.house_value_chip :for={v <- @recognition.values || []} value={v} selected />
           <.link
             :if={own_recognition?(@recognition, @current_user_id)}
             navigate={~p"/recognitions/#{@recognition.id}"}
@@ -598,10 +612,6 @@ defmodule FoyerWeb.FoyerComponents do
           >
             View
           </.link>
-          <%= if @recognition.bonus_points && @recognition.bonus_points > 0 do %>
-            <span class="foyer-tag claret" data-bonus>+{@recognition.bonus_points} pts</span>
-          <% end %>
-          <span class="text-xs text-stone-500">{relative_day(@recognition.inserted_at)}</span>
         </div>
       </div>
     </article>
@@ -612,6 +622,9 @@ defmodule FoyerWeb.FoyerComponents do
   defp own_recognition?(%{sender_id: user_id}, user_id), do: true
   defp own_recognition?(%{recipient_id: user_id}, user_id), do: true
   defp own_recognition?(_recognition, _user_id), do: false
+
+  defp recipient_name(%{recipient: %{name: name}}) when is_binary(name), do: String.upcase(name)
+  defp recipient_name(_recognition), do: "COLLEAGUE"
 
   attr :conversation, Foyer.Chat.Conversation, required: true
   attr :current_user_id, :integer, required: true
