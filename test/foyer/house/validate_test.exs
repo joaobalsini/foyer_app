@@ -17,8 +17,8 @@ defmodule Foyer.House.ValidateTest do
   alias Foyer.House.Validate
 
   describe "grace_window_seconds/0 and receipt_buckets/0" do
-    test "exposes the 15-minute grace window in seconds" do
-      assert Validate.grace_window_seconds() == 15 * 60
+    test "exposes the 5-minute grace window in seconds" do
+      assert Validate.grace_window_seconds() == 5 * 60
     end
 
     test "exposes the four receipt buckets in render order" do

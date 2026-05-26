@@ -16,7 +16,7 @@ defmodule FoyerWeb.AnnouncementLiveTest do
   Covers:
     F.Announcements.1 — managers publish to their own channels (compose submit)
     F.Announcements.2 — staff cannot compose announcements
-    F.Announcements.3 — author may edit within the 15-minute grace window
+    F.Announcements.3 — author may edit within the 5-minute grace window
     F.Announcements.4 — edit/remove rejected after grace or by non-authors
     F.Announcements.5 — managers pin/unpin announcements in their channel
     F.Announcements.7 — authors are excluded from the required-ack set
@@ -83,7 +83,7 @@ defmodule FoyerWeb.AnnouncementLiveTest do
   end
 
   describe "F.Announcements.3 — edit affordance within grace window" do
-    test "author within grace sees the Edit link on the detail page", %{conn: conn} do
+    test "author within grace sees Edit and Remove buttons on the detail page", %{conn: conn} do
       stub_with(Foyer.HouseMock, Foyer.HouseScenarios.WithReceipts)
 
       scope = IsolatedHelpers.scope_for(Fixtures.manager(), true)
@@ -98,13 +98,20 @@ defmodule FoyerWeb.AnnouncementLiveTest do
       Mox.allow(Foyer.HouseMock, self(), view.pid)
       Mox.allow(Foyer.ChannelsMock, self(), view.pid)
 
-      # The author (the manager from Fixtures) is within grace
-      # (`within_grace_window?/1` returns true on this scenario), so the
-      # Edit link is rendered.
       assert has_element?(view, "#announcement-edit-link.foyer-btn:not(.ghost)", "Edit")
+      assert has_element?(view, "#announcement-remove-btn:not([disabled])", "Remove")
+
+      html = render(view)
+      unpin_pos = html |> :binary.match("announcement-unpin-btn") |> elem(0)
+      edit_pos = html |> :binary.match("announcement-edit-link") |> elem(0)
+      remove_pos = html |> :binary.match("announcement-remove-btn") |> elem(0)
+
+      assert unpin_pos < edit_pos
+      assert edit_pos < remove_pos
     end
 
-    test "author outside grace does not see the Remove button", %{conn: conn} do
+    test "author outside grace sees disabled Edit and Remove buttons with tooltip copy",
+         %{conn: conn} do
       # Bind to Empty for the baseline, then override the four callbacks the
       # show path actually hits with one-off `expect/3`s — this asserts the
       # specific UI change for the outside-grace branch (per
@@ -137,11 +144,15 @@ defmodule FoyerWeb.AnnouncementLiveTest do
       Mox.allow(Foyer.HouseMock, self(), view.pid)
       Mox.allow(Foyer.ChannelsMock, self(), view.pid)
 
-      # Edit link is rendered for the author at any time (it's gated only by
-      # author identity, not grace), but the Remove button — which IS
-      # grace-gated by `within_grace_window?/1` returning false — is absent.
-      assert has_element?(view, "#announcement-edit-link")
-      refute has_element?(view, "#announcement-remove-btn")
+      tooltip = "Editing and removal are only available for 5 minutes after publishing."
+
+      assert has_element?(view, "[title='#{tooltip}'] #announcement-edit-link[disabled]", "Edit")
+
+      assert has_element?(
+               view,
+               "[title='#{tooltip}'] #announcement-remove-btn[disabled]",
+               "Remove"
+             )
     end
   end
 

@@ -20,7 +20,7 @@ all backed by `FoyerWeb.AnnouncementLive` and the `Foyer.House` context.
   acknowledgement requirement.
 - Detail page at `/announcements/:id`: renders the announcement, the read-and-acknowledge CTA
   for non-author members, and (for managers in the channel) the four-bucket receipts panel.
-- Edit flow at `/announcements/:id/edit`: author-only, gated by a 15-minute grace window after
+- Edit flow at `/announcements/:id/edit`: author-only, gated by a 5-minute grace window after
   `published_at`.
 - Pin / unpin from the detail page, by managers in the channel.
 - Soft removal via `removed_at`, gated by the same grace window; removed posts leave user feeds
@@ -62,19 +62,21 @@ submitting a forged compose payload  \
 **Then** the compose route redirects them away with a flash, and the context-level write rejects
 the attempt with `{:error, :unauthorized}` so no announcement is persisted.
 
-### F.Announcements.3 — Author may edit within the 15-minute grace window
+### F.Announcements.3 — Author may edit within the 5-minute grace window
 
-**Given** the author of an announcement published less than 15 minutes ago  \
+**Given** the author of an announcement published less than 5 minutes ago  \
 **When** they edit the title, body, audience, or `requires_ack` setting  \
 **Then** the update succeeds and the new values are persisted.
 
 ### F.Announcements.4 — Edit and remove are rejected after grace or by non-authors
 
-**Given** an announcement whose 15-minute grace window has expired (or a non-author attempting
+**Given** an announcement whose 5-minute grace window has expired (or a non-author attempting
 the action)  \
 **When** the author attempts to edit the announcement  \
 **Then** the update is rejected with `{:error, :outside_grace_window}` (or `{:error, :unauthorized}`
-for non-authors) and the announcement is unchanged.
+for non-authors) and the announcement is unchanged. On the detail page, the author still sees the
+Edit and Remove actions, but they are disabled with a tooltip explaining that editing and removal
+are only available for 5 minutes after publishing.
 
 **When** the author attempts to remove the announcement  \
 **Then** the removal is rejected with the same error and the announcement is unchanged.

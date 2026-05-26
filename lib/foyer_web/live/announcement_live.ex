@@ -77,6 +77,7 @@ defmodule FoyerWeb.AnnouncementLive do
        |> assign(:acked?, acked_by?(a, scope.user.id))
        |> assign(:can_ack?, can_ack?(a, scope.user))
        |> assign(:can_pin?, can_pin?(a, scope.user))
+       |> assign(:within_grace?, FoyerWeb.LiveDeps.house().within_grace_window?(a))
        |> assign(:receipts, load_receipts(a, scope))
        |> assign(:page_title, a.title)}
     rescue
@@ -418,15 +419,6 @@ defmodule FoyerWeb.AnnouncementLive do
                           Audience · {@announcement.channel && @announcement.channel.name}
                         </div>
                       </div>
-                      <%= if managed_by?(@announcement, @current_scope) do %>
-                        <.link
-                          navigate={~p"/announcements/#{@announcement.id}/edit"}
-                          class="foyer-btn sm ml-auto"
-                          id="announcement-edit-link"
-                        >
-                          <.icon name="hero-pencil-square" class="size-4" /> Edit
-                        </.link>
-                      <% end %>
                     </div>
 
                     <div class="flex flex-wrap gap-2">
@@ -450,15 +442,55 @@ defmodule FoyerWeb.AnnouncementLive do
                           <.icon name="hero-bookmark-slash" class="size-4" /> Unpin
                         </button>
                       <% end %>
-                      <%= if managed_by?(@announcement, @current_scope) and FoyerWeb.LiveDeps.house().within_grace_window?(@announcement) do %>
-                        <button
+                      <%= if managed_by?(@announcement, @current_scope) and @within_grace? do %>
+                        <.link
+                          navigate={~p"/announcements/#{@announcement.id}/edit"}
                           class="foyer-btn sm"
-                          phx-click="remove"
-                          id="announcement-remove-btn"
-                          type="button"
+                          id="announcement-edit-link"
                         >
-                          <.icon name="hero-trash" class="size-4" /> Remove
-                        </button>
+                          <.icon name="hero-pencil-square" class="size-4" /> Edit
+                        </.link>
+                      <% end %>
+                      <%= if managed_by?(@announcement, @current_scope) and not @within_grace? do %>
+                        <span
+                          class="inline-flex"
+                          title="Editing and removal are only available for 5 minutes after publishing."
+                        >
+                          <button
+                            class="foyer-btn sm"
+                            id="announcement-edit-link"
+                            type="button"
+                            disabled
+                          >
+                            <.icon name="hero-pencil-square" class="size-4" /> Edit
+                          </button>
+                        </span>
+                      <% end %>
+                      <%= if managed_by?(@announcement, @current_scope) do %>
+                        <%= if @within_grace? do %>
+                          <button
+                            class="foyer-btn sm"
+                            phx-click="remove"
+                            id="announcement-remove-btn"
+                            type="button"
+                          >
+                            <.icon name="hero-trash" class="size-4" /> Remove
+                          </button>
+                        <% else %>
+                          <span
+                            class="inline-flex"
+                            title="Editing and removal are only available for 5 minutes after publishing."
+                          >
+                            <button
+                              class="foyer-btn sm"
+                              id="announcement-remove-btn"
+                              type="button"
+                              disabled
+                            >
+                              <.icon name="hero-trash" class="size-4" /> Remove
+                            </button>
+                          </span>
+                        <% end %>
                       <% end %>
                     </div>
 

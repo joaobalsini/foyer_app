@@ -744,7 +744,7 @@ html, body {
   }
 
   .people-directory__row {
-    grid-template-columns: minmax(18rem, 1fr) 8rem auto;
+    grid-template-columns: minmax(18rem, 1fr) 10rem 17rem;
     padding: 0.85rem 1rem;
   }
 

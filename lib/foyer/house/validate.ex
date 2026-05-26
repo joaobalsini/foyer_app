@@ -17,7 +17,7 @@ defmodule Foyer.House.Validate do
   alias Foyer.Accounts.User
   alias Foyer.House.Announcement
 
-  @grace_window_seconds 15 * 60
+  @grace_window_seconds 5 * 60
 
   @receipt_buckets [:acknowledged, :read_without_acknowledgement, :unread, :off_shift]
 
@@ -89,7 +89,7 @@ defmodule Foyer.House.Validate do
   def ensure_ack_required_from(%Announcement{}, %User{}), do: {:error, :not_required}
 
   @doc """
-  Returns `true` while the announcement is inside its 15-minute grace window
+  Returns `true` while the announcement is inside its 5-minute grace window
   measured from `published_at`. Announcements without a `published_at` value
   are treated as outside the window.
   """

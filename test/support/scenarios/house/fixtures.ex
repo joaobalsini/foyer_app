@@ -82,13 +82,13 @@ defmodule Foyer.HouseScenarios.Fixtures do
 
   @doc """
   Returns the canonical announcement used across scenarios. Authored by the
-  manager (`manager/0`), in `channel/0`, published 5 minutes ago, requires
+  manager (`manager/0`), in `channel/0`, published 2 minutes ago, requires
   acknowledgement, pinned.
   """
   @spec announcement(keyword()) :: Announcement.t()
   def announcement(overrides \\ []) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
-    five_min_ago = DateTime.add(now, -5 * 60, :second)
+    two_min_ago = DateTime.add(now, -2 * 60, :second)
 
     base = %Announcement{
       id: 100,
@@ -98,9 +98,9 @@ defmodule Foyer.HouseScenarios.Fixtures do
       channel: channel(),
       title: "Suite 412 - Allergy protocol in effect",
       body: "Guest in 412 has severe tree-nut allergy.",
-      pinned_at: five_min_ago,
+      pinned_at: two_min_ago,
       requires_ack: true,
-      published_at: five_min_ago,
+      published_at: two_min_ago,
       removed_at: nil,
       removed_by_id: nil,
       reads: [],
