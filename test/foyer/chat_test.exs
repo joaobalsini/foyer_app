@@ -1,4 +1,28 @@
 defmodule Foyer.ChatTest do
+  @moduledoc """
+  DB-backed context tests for `Foyer.Chat`. These exercise canonical
+  conversation uniqueness (direct + channel) via the database unique
+  indexes, membership-gated reads and writes via joins, broadcast emission,
+  and multi-step persistence — all of which are fundamental to the chat
+  invariants and need a real Repo to verify. Pure validation/visibility
+  helpers are unit-tested in `test/foyer/chat/validate_test.exs` and
+  schema-level changeset rules in `test/foyer/chat/conversation_test.exs`.
+  The LiveView surface is covered by isolated tests in
+  `test/foyer_web/chat_live_test.exs`.
+
+  Covers:
+    F.Chat.1 — direct conversation is canonical per pair (DB unique index)
+    F.Chat.3 — channel conversation is unique per channel (DB unique index)
+    F.Chat.4 — channel membership gates open/get (DB join)
+    F.Chat.5 — empty conversations excluded from inbox (DB query)
+    F.Chat.6 — send_message persists, broadcasts, and gates on membership
+               (DB + PubSub)
+    F.Chat.7 — mark_read is idempotent and membership-gated (DB unique
+               index)
+    F.Chat.8 — unread count excludes own messages and respects visibility
+               (DB query)
+    F.Chat.9 — inbox enrichment shape (DB query)
+  """
   use Foyer.DataCase, async: true
 
   import FoyerWeb.ScaffoldFixtures
@@ -15,7 +39,7 @@ defmodule Foyer.ChatTest do
     {:ok, seed_scaffold!()}
   end
 
-  test "F.Chat.1/F.Chat.2 opens one canonical two-person direct conversation", ctx do
+  test "F.Chat.1 opens one canonical two-person direct conversation", ctx do
     assert {:ok, conversation} = Chat.open_direct(ctx.maya, ctx.hugo)
     assert conversation.kind == :direct
     assert conversation.direct_key == Conversation.direct_key([ctx.maya.id, ctx.hugo.id])
@@ -27,7 +51,6 @@ defmodule Foyer.ChatTest do
 
     assert {:ok, same_conversation} = Chat.open_direct(ctx.hugo, ctx.maya)
     assert same_conversation.id == conversation.id
-    assert {:error, :invalid_direct} = Chat.open_direct(ctx.maya, ctx.maya)
   end
 
   test "F.Chat.3/F.Chat.4 opens one channel conversation only for channel members", ctx do

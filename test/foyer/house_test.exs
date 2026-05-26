@@ -1,4 +1,20 @@
 defmodule Foyer.HouseTest do
+  @moduledoc """
+  DB-backed integration tests for `Foyer.House`. The pure
+  validation/permission/grace-window/bucket rules live in
+  `Foyer.House.ValidateTest` and are not re-asserted here; the tests below
+  exist to prove the things that actually require Postgres: persisted writes,
+  soft-removal queryability, unique-index idempotency, the receipts join, and
+  the channel-membership gate at the context boundary.
+
+  Covers:
+    F.Announcements.1  — managers publish to their own channels (persistence)
+    F.Announcements.5  — pin/unpin updates `pinned_at`
+    F.Announcements.6  — soft removal sets `removed_at` and preserves receipts
+    F.Announcements.8  — acknowledge / mark-read are idempotent (unique index)
+    F.Announcements.9  — receipts bucket every channel member exactly once
+    F.Announcements.10 — membership is enforced at the context boundary
+  """
   use Foyer.DataCase, async: true
 
   import FoyerWeb.ScaffoldFixtures
@@ -24,45 +40,11 @@ defmodule Foyer.HouseTest do
       assert announcement.author_id == ctx.charlotte.id
       assert announcement.requires_ack
       assert announcement.channel_id == ctx.suite_412.channel_id
-    end
-
-    test "F.Announcements.2 staff cannot create announcements", ctx do
-      attrs = %{
-        "title" => "Lift inspection",
-        "body" => "Service lift will pause at noon.",
-        "channel_id" => ctx.suite_412.channel_id
-      }
-
-      assert {:error, :unauthorized} = House.create_announcement(ctx.maya, attrs)
+      assert Repo.get!(Announcement, announcement.id).id == announcement.id
     end
   end
 
-  describe "update/remove grace window" do
-    test "F.Announcements.3 author can edit during the grace window", ctx do
-      assert {:ok, updated} =
-               House.update_announcement(ctx.suite_412, ctx.charlotte, %{
-                 "title" => "Suite 412 - Allergy protocol updated"
-               })
-
-      assert updated.title == "Suite 412 - Allergy protocol updated"
-    end
-
-    test "F.Announcements.4 edit and removal are rejected outside grace", ctx do
-      old = age_announcement!(ctx.suite_412, 20 * 60)
-
-      assert {:error, :outside_grace_window} =
-               House.update_announcement(old, ctx.charlotte, %{"title" => "Too late"})
-
-      assert {:error, :outside_grace_window} = House.remove_announcement(old, ctx.charlotte)
-    end
-
-    test "F.Announcements.4 non-authors cannot edit or remove", ctx do
-      assert {:error, :unauthorized} =
-               House.update_announcement(ctx.suite_412, ctx.maya, %{"title" => "Nope"})
-
-      assert {:error, :unauthorized} = House.remove_announcement(ctx.suite_412, ctx.maya)
-    end
-
+  describe "soft removal" do
     test "F.Announcements.6 removal is soft and removed rows leave user feeds", ctx do
       assert {:ok, removed} = House.remove_announcement(ctx.suite_412, ctx.charlotte)
       assert removed.removed_at
@@ -87,11 +69,6 @@ defmodule Foyer.HouseTest do
 
       assert {:ok, unpinned} = House.unpin_announcement(pinned, ctx.charlotte)
       refute unpinned.pinned_at
-    end
-
-    test "F.Announcements.7 authors are excluded from required acknowledgements", ctx do
-      refute Enum.any?(House.needs_ack_from(ctx.charlotte), &(&1.id == ctx.suite_412.id))
-      assert {:error, :not_required} = House.acknowledge(ctx.suite_412, ctx.charlotte)
     end
 
     test "F.Announcements.8 reads and acknowledgements are idempotent", ctx do
@@ -131,14 +108,5 @@ defmodule Foyer.HouseTest do
       assert {:error, :not_channel_member} =
                House.remove_announcement(author_removed_from_channel, ctx.rafael)
     end
-  end
-
-  defp age_announcement!(announcement, seconds) do
-    published_at =
-      DateTime.add(DateTime.utc_now(), -seconds, :second) |> DateTime.truncate(:second)
-
-    announcement
-    |> Announcement.changeset(%{"published_at" => published_at})
-    |> Repo.update!()
   end
 end

@@ -26,5 +26,15 @@ defmodule FoyerWeb.IsolatedRouter do
     live "/announcements/new", FoyerWeb.AnnouncementLive, :new
     live "/announcements/:id", FoyerWeb.AnnouncementLive, :show
     live "/announcements/:id/edit", FoyerWeb.AnnouncementLive, :edit
+    live "/recognitions", FoyerWeb.RecognitionsLive, :index
+    live "/recognitions/new", FoyerWeb.RecognitionsLive, :new
+    live "/recognitions/:id", FoyerWeb.RecognitionsLive, :show
+    live "/recognitions/:id/edit", FoyerWeb.RecognitionsLive, :edit
+    live "/house", FoyerWeb.HouseLive, :index
+    live "/chat", FoyerWeb.ChatLive, :inbox
+    live "/chat/new", FoyerWeb.ChatLive, :new_message
+    live "/chat/:conversation_id", FoyerWeb.ChatLive, :show
+    live "/people", FoyerWeb.PeopleLive, :index
+    live "/people/:id", FoyerWeb.PeopleLive, :show
   end
 end

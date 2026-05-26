@@ -62,10 +62,6 @@ defmodule Foyer.Profile do
     }
   ]
 
-  # ---------------------------------------------------------------------------
-  # Public API
-  # ---------------------------------------------------------------------------
-
   @doc """
   Viewer-aware profile builder. Enforces F.Profile.6 at the context boundary.
 
@@ -113,10 +109,6 @@ defmodule Foyer.Profile do
   @impl true
   @spec rewards_catalog() :: [RewardItem.t()]
   def rewards_catalog, do: @rewards_catalog
-
-  # ---------------------------------------------------------------------------
-  # Private helpers
-  # ---------------------------------------------------------------------------
 
   @spec build_card(User.t(), User.t(), keyword()) :: Card.t()
   defp build_card(%User{} = subject, %User{} = viewer, opts) do

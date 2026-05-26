@@ -1,4 +1,12 @@
 defmodule Foyer.Channels.ChannelTest do
+  @moduledoc """
+  Unit tests for `Foyer.Channels.Channel` changeset validation. Pure changeset
+  logic, no DB.
+
+  Covers:
+    F.Channels.2 — required fields on Channel
+    F.Channels.3 — kind enum constraint
+  """
   use ExUnit.Case, async: true
 
   alias Foyer.Channels.Channel

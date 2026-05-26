@@ -20,9 +20,11 @@ defmodule FoyerWeb.ProfileLiveTest do
     F.Profile.13 — rewards catalog items
     F.Profile.14 — no redeem button, "Coming soon" label
     F.Profile.15 — dimmed styling for unaffordable items
+    F.Profile.16 — mobile layout structure (stats row, sections, profile card)
     F.Profile.20 — empty received state
     F.Profile.21 — house value tags on recognition cards
     F.Profile.22 — bonus points badge
+    F.Profile.24 — points breakdown labelled as bonus-point earnings only
   """
   use ExUnit.Case, async: true
 
@@ -41,10 +43,6 @@ defmodule FoyerWeb.ProfileLiveTest do
   setup do
     {:ok, conn: build_conn()}
   end
-
-  # ---------------------------------------------------------------------------
-  # F.Profile.1 — Identity header renders user attributes
-  # ---------------------------------------------------------------------------
 
   describe "F.Profile.1 — identity header" do
     setup do
@@ -81,10 +79,6 @@ defmodule FoyerWeb.ProfileLiveTest do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # F.Profile.2 — On-shift indicator
-  # ---------------------------------------------------------------------------
-
   describe "F.Profile.2 — on-shift tag shown" do
     test "shows 'On shift' tag when on_shift? is true", %{conn: conn} do
       stub_with(Foyer.ProfileMock, ProfileScenarios.LineStaff)
@@ -95,10 +89,6 @@ defmodule FoyerWeb.ProfileLiveTest do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # F.Profile.3 — Off-shift state renders without pulse
-  # ---------------------------------------------------------------------------
-
   describe "F.Profile.3 — off-shift state" do
     test "does not show 'On shift' tag when on_shift? is false", %{conn: conn} do
       stub_with(Foyer.ProfileMock, ProfileScenarios.OffShift)
@@ -108,11 +98,6 @@ defmodule FoyerWeb.ProfileLiveTest do
       refute render(view) =~ "On shift"
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # F.Profile.4 — Recognitions received section on own profile
-  # F.Profile.5 — Private recognition visible to recipient
-  # ---------------------------------------------------------------------------
 
   describe "F.Profile.4, F.Profile.5 — received recognitions on own profile" do
     setup do
@@ -138,10 +123,6 @@ defmodule FoyerWeb.ProfileLiveTest do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # F.Profile.7 — Given section on own profile
-  # ---------------------------------------------------------------------------
-
   describe "F.Profile.7 — given section on own profile" do
     setup do
       stub_with(Foyer.ProfileMock, ProfileScenarios.LineStaff)
@@ -163,10 +144,6 @@ defmodule FoyerWeb.ProfileLiveTest do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # F.Profile.9 — Stats row: recognitions this month
-  # ---------------------------------------------------------------------------
-
   describe "F.Profile.9 — stats row: recognitions this month" do
     setup do
       stub_with(Foyer.ProfileMock, ProfileScenarios.LineStaff)
@@ -183,10 +160,6 @@ defmodule FoyerWeb.ProfileLiveTest do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # F.Profile.10 — Stats row: ack on time placeholder
-  # ---------------------------------------------------------------------------
-
   describe "F.Profile.10 — ack on time placeholder" do
     setup do
       stub_with(Foyer.ProfileMock, ProfileScenarios.LineStaff)
@@ -201,10 +174,6 @@ defmodule FoyerWeb.ProfileLiveTest do
       assert render(view) =~ "—"
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # F.Profile.11 — Foyer points balance
-  # ---------------------------------------------------------------------------
 
   describe "F.Profile.11 — points balance" do
     setup do
@@ -224,18 +193,15 @@ defmodule FoyerWeb.ProfileLiveTest do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # F.Profile.12 — Points earnings breakdown
-  # ---------------------------------------------------------------------------
-
-  describe "F.Profile.12 — points breakdown" do
+  describe "F.Profile.12 / F.Profile.24 — points breakdown" do
     setup do
       stub_with(Foyer.ProfileMock, ProfileScenarios.LineStaff)
       :ok
     end
 
     # F.Profile.24 — label says "bonus points" not "full balance explanation"
-    test "renders 'How you earned bonus points' when points_earned non-empty", %{conn: conn} do
+    test "F.Profile.24 — renders 'How you earned bonus points' when points_earned non-empty",
+         %{conn: conn} do
       user = ProfileScenarios.user_maya()
       {:ok, view, _html} = mount_isolated_profile(conn, user)
 
@@ -253,10 +219,6 @@ defmodule FoyerWeb.ProfileLiveTest do
       assert render(view) =~ "+25 pts"
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # F.Profile.13 — Rewards catalog renders all items
-  # ---------------------------------------------------------------------------
 
   describe "F.Profile.13 — rewards catalog" do
     setup do
@@ -283,10 +245,6 @@ defmodule FoyerWeb.ProfileLiveTest do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # F.Profile.14 — Rewards catalog items are non-redeemable
-  # ---------------------------------------------------------------------------
-
   describe "F.Profile.14 — no redeem button" do
     setup do
       stub_with(Foyer.ProfileMock, ProfileScenarios.LineStaff)
@@ -303,10 +261,6 @@ defmodule FoyerWeb.ProfileLiveTest do
       refute html =~ "Redeem"
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # F.Profile.15 — Rewards catalog: insufficient-points affordance
-  # ---------------------------------------------------------------------------
 
   describe "F.Profile.15 — insufficient-points styling" do
     setup do
@@ -325,10 +279,6 @@ defmodule FoyerWeb.ProfileLiveTest do
       assert has_element?(view, "#rewards")
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # F.Profile.20 — Empty recognitions state
-  # ---------------------------------------------------------------------------
 
   # F.Profile.16 — mobile layout: stats row, sections, bottom nav present
   # Layout structure is tested via element presence; CSS responsive behavior
@@ -372,10 +322,6 @@ defmodule FoyerWeb.ProfileLiveTest do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # F.Profile.21 — House value tags on recognition cards
-  # ---------------------------------------------------------------------------
-
   describe "F.Profile.21 — house value tags" do
     setup do
       stub_with(Foyer.ProfileMock, ProfileScenarios.LineStaff)
@@ -392,10 +338,6 @@ defmodule FoyerWeb.ProfileLiveTest do
       assert html =~ "DISCRETION"
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # F.Profile.22 — Bonus points badge
-  # ---------------------------------------------------------------------------
 
   describe "F.Profile.22 — bonus points badge" do
     setup do

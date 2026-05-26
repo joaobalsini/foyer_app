@@ -6,6 +6,37 @@ defmodule FoyerWeb.SmokeTest do
   router, session plugs, on-mount hooks, and Repo-backed ports. The Mox ports are
   stubbed to the real contexts so this is an end-to-end DB-backed wiring suite;
   feature behavior belongs in focused LiveView or context tests.
+
+  Covers (route-wiring layer for clauses that also have focused unit tests
+  elsewhere):
+    F.Announcements.2 — manager compose mounts / staff redirected
+    F.Announcements.3 — author edit mounts
+    F.Announcements.7 — ack flow and inaccessible-announcement redirect
+    F.Announcements.9 — announcement detail mounts with ack control
+    F.Channels.15     — people index renders all seeded users
+    F.Channels.16     — on-shift pulse for on-shift users
+    F.Channels.17     — channel pills come from real membership rows
+    F.Channels.18     — off-shift gate redirects /people to /today
+    F.Channels.21     — channel filter narrows and clears
+    F.Channels.22     — :show renders #target-channels from Channels API
+    F.Chat.5          — inbox mounts
+    F.Chat.6          — room mounts with messages
+    F.Chat.7          — room renders read state
+    F.Chat.8          — menu unread dots reflect PubSub updates
+    F.Chat.9          — inbox preview renders latest message
+    F.Chat.10         — room mount / channel deep link / picker mount
+    F.Chat.11         — picker tabs
+    F.Profile.1       — /me renders profile content
+    F.Profile.6       — colleague profile hides private recognitions
+    F.Profile.8       — colleague profile hides given list
+    F.Profile.11      — /me renders Foyer points section
+    F.Profile.17      — desktop rail rendered on primary surfaces
+    F.Profile.18      — /me gated for off-shift users
+    F.Profile.25      — property code rendered from config
+    F.Recognitions.1  — recognition new mounts
+    F.Recognitions.9  — recognition edit mounts for author
+    F.Recognitions.10 — recognition index and detail mount
+    F.Today.2         — off-shift route gate redirects to /today
   """
   use FoyerWeb.ConnCase, async: true
 
@@ -40,10 +71,28 @@ defmodule FoyerWeb.SmokeTest do
       assert has_element?(view, "#user-picker")
       assert has_element?(view, "#pick-btn-#{maya.id}")
     end
+
+    test "session pick puts the user on the session and redirects to /today",
+         %{conn: conn, maya: maya} do
+      conn =
+        conn
+        |> Phoenix.ConnTest.init_test_session(%{})
+        |> post(~p"/session/pick/#{maya.id}")
+
+      assert redirected_to(conn) == ~p"/today"
+      assert get_session(conn, :current_user_id) == maya.id
+    end
+
+    test "session delete clears the user and redirects to /", ctx do
+      conn = ctx.conn |> sign_in(ctx.maya) |> delete(~p"/session")
+
+      assert redirected_to(conn) == ~p"/"
+      refute get_session(conn, :current_user_id)
+    end
   end
 
   describe "route gates" do
-    test "F.Today.2 / F.Recognitions.1 / F.Chat.10 — off-shift users are redirected away from on-shift surfaces",
+    test "F.Today.2 / F.Recognitions.1 / F.Chat.10 / F.Profile.18 / F.Channels.18 — off-shift users are redirected away from on-shift surfaces",
          ctx do
       assert {:error, {:redirect, %{to: "/today"}}} =
                ctx.conn
@@ -64,11 +113,17 @@ defmodule FoyerWeb.SmokeTest do
                build_conn()
                |> sign_in(ctx.jamal)
                |> live(~p"/me")
+
+      assert {:error, {:redirect, %{to: "/today"}}} =
+               build_conn()
+               |> sign_in(ctx.jamal)
+               |> live(~p"/people")
     end
   end
 
   describe "desktop rail" do
-    test "primary authenticated surfaces render the desktop rail with active state", ctx do
+    test "F.Profile.17 — primary authenticated surfaces render the desktop rail with active state",
+         ctx do
       {:ok, today, _html} = ctx.conn |> sign_in(ctx.maya) |> live(~p"/today")
       assert has_element?(today, "#desktop-rail")
       assert has_element?(today, "#rail-nav-today[aria-current='page']")
@@ -332,15 +387,64 @@ defmodule FoyerWeb.SmokeTest do
       assert render(view) =~ "LDN·MAY"
     end
 
-    test "people index mounts", ctx do
+    test "F.Channels.15 — people index renders a row for every seeded user", ctx do
       {:ok, view, _html} = ctx.conn |> sign_in(ctx.charlotte) |> live(~p"/people")
 
       assert has_element?(view, "#people")
-      assert render(view) =~ "Maya Okafor"
+      assert has_element?(view, "#people-row-#{ctx.maya.id}")
+      assert has_element?(view, "#people-row-#{ctx.charlotte.id}")
+      assert has_element?(view, "#people-row-#{ctx.hugo.id}")
+      assert has_element?(view, "#people-row-#{ctx.rafael.id}")
+      assert has_element?(view, "#people-row-#{ctx.aisha.id}")
+      assert has_element?(view, "#people-row-#{ctx.jamal.id}")
       assert render(view) =~ "Sebastien Roy"
     end
 
-    test "people profile mounts", ctx do
+    test "F.Channels.16 — on-shift Maya has the pulse, off-shift Jamal does not", ctx do
+      {:ok, view, _html} = ctx.conn |> sign_in(ctx.charlotte) |> live(~p"/people")
+
+      assert has_element?(view, "#people-row-#{ctx.maya.id} .foyer-tag.moss")
+      refute has_element?(view, "#people-row-#{ctx.jamal.id} .foyer-tag.moss")
+    end
+
+    test "F.Channels.17 — channel membership pills come from real membership rows", ctx do
+      {:ok, view, _html} = ctx.conn |> sign_in(ctx.charlotte) |> live(~p"/people")
+
+      assert has_element?(
+               view,
+               "#people-row-#{ctx.maya.id} [id^='person-#{ctx.maya.id}-channel-']"
+             )
+    end
+
+    test "F.Channels.21 — channel filter shows only members, clearing restores all", ctx do
+      {:ok, view, _html} = ctx.conn |> sign_in(ctx.charlotte) |> live(~p"/people")
+
+      assert has_element?(view, "#people-row-#{ctx.maya.id}")
+      assert has_element?(view, "#people-row-#{ctx.hugo.id}")
+
+      leadership =
+        ctx.charlotte
+        |> Foyer.Channels.list_for_user()
+        |> Enum.find(fn c -> c.slug == "leadership" end)
+
+      view |> element("#filter-channel-#{leadership.id}") |> render_click()
+
+      assert has_element?(view, "#people-row-#{ctx.charlotte.id}")
+      assert has_element?(view, "#people-row-#{ctx.rafael.id}")
+      refute has_element?(view, "#people-row-#{ctx.maya.id}")
+
+      view |> element("#filter-all") |> render_click()
+      assert has_element?(view, "#people-row-#{ctx.maya.id}")
+    end
+
+    test "F.Channels.22 — :show renders #target-channels (channel pills from Channels API)",
+         ctx do
+      {:ok, view, _html} = ctx.conn |> sign_in(ctx.maya) |> live(~p"/people/#{ctx.maya.id}")
+
+      assert has_element?(view, "#target-channels")
+    end
+
+    test "people :show renders the colleague name and back button", ctx do
       {:ok, view, _html} = ctx.conn |> sign_in(ctx.maya) |> live(~p"/people/#{ctx.hugo.id}")
 
       assert has_element?(view, "#back-to-people")

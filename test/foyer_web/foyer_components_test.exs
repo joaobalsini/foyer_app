@@ -1,5 +1,17 @@
 defmodule FoyerWeb.FoyerComponentsTest do
-  use FoyerWeb.ConnCase, async: true
+  @moduledoc """
+  Unit tests for `FoyerWeb.FoyerComponents`. Pure component rendering with
+  hand-built structs — no router, no on_mount, no DB.
+
+  Covers:
+    F.Announcements.7  — author hidden from required-ack badges
+    F.Chat.8           — unread dot driven by chat_unread_count
+    F.Chat.9           — inbox preview renders latest message and unread state
+    F.Chat.10          — bottom nav unread indicator
+    F.Recognitions.5   — bonus points badge only when present
+    F.Recognitions.10  — private recognition body hidden for third parties
+  """
+  use ExUnit.Case, async: true
 
   import Phoenix.Component
   import Phoenix.LiveViewTest
@@ -148,6 +160,23 @@ defmodule FoyerWeb.FoyerComponentsTest do
       assert html =~ "Messages"
       assert html =~ ~s(data-new-action="chat")
       assert html =~ ~s(data-new-action="recognition")
+      refute html =~ ~s(data-new-action="announcement")
+    end
+
+    test "F.Today.22 — hides the entire +New menu when the user is off shift" do
+      html =
+        render_component(&FoyerComponents.desktop_topbar/1,
+          current_scope: scope(user(1, role: :staff), false),
+          page_title: "Today"
+        )
+
+      # The page title still renders, but the +New menu and all its items are
+      # gone — off-shift users have nothing they can compose, so the affordance
+      # would only lead to ensure_on_shift route gates.
+      assert html =~ "Today"
+      refute html =~ ~s(id="new-menu")
+      refute html =~ ~s(data-new-action="chat")
+      refute html =~ ~s(data-new-action="recognition")
       refute html =~ ~s(data-new-action="announcement")
     end
   end

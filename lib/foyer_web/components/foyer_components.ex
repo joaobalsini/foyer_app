@@ -15,10 +15,6 @@ defmodule FoyerWeb.FoyerComponents do
     router: FoyerWeb.Router,
     statics: FoyerWeb.static_paths()
 
-  # ---------------------------------------------------------------------------
-  # Bottom navigation
-  # ---------------------------------------------------------------------------
-
   attr :active, :atom, required: true, values: [:today, :house, :chat, :me, :people, :profile]
   attr :current_scope, FoyerWeb.Scope, required: true
   attr :chat_unread_count, :integer, default: 0
@@ -124,10 +120,6 @@ defmodule FoyerWeb.FoyerComponents do
     </nav>
     """
   end
-
-  # ---------------------------------------------------------------------------
-  # Desktop side-rail
-  # ---------------------------------------------------------------------------
 
   attr :active, :atom, required: true, values: [:today, :house, :chat, :me, :people, :profile]
   attr :current_scope, FoyerWeb.Scope, required: true
@@ -277,10 +269,6 @@ defmodule FoyerWeb.FoyerComponents do
     """
   end
 
-  # ---------------------------------------------------------------------------
-  # Avatar
-  # ---------------------------------------------------------------------------
-
   attr :initials, :string, required: true
   attr :size, :atom, default: :md, values: [:sm, :md, :lg]
   attr :class, :string, default: nil
@@ -298,10 +286,6 @@ defmodule FoyerWeb.FoyerComponents do
     """
   end
 
-  # ---------------------------------------------------------------------------
-  # Tag
-  # ---------------------------------------------------------------------------
-
   attr :variant, :atom, required: true, values: [:claret, :moss, :forest, :outline]
   attr :class, :string, default: nil
   slot :inner_block, required: true
@@ -314,10 +298,6 @@ defmodule FoyerWeb.FoyerComponents do
     """
   end
 
-  # ---------------------------------------------------------------------------
-  # Section label (mono eyebrow)
-  # ---------------------------------------------------------------------------
-
   attr :label, :string, default: nil
   attr :class, :string, default: nil
   slot :inner_block
@@ -328,19 +308,11 @@ defmodule FoyerWeb.FoyerComponents do
     """
   end
 
-  # ---------------------------------------------------------------------------
-  # Pulse
-  # ---------------------------------------------------------------------------
-
   def pulse(assigns) do
     ~H"""
     <span class="foyer-pulse" aria-hidden="true"></span>
     """
   end
-
-  # ---------------------------------------------------------------------------
-  # Status pill
-  # ---------------------------------------------------------------------------
 
   attr :kind, :atom,
     required: true,
@@ -372,10 +344,6 @@ defmodule FoyerWeb.FoyerComponents do
   defp status_pill_for(:ack_required), do: {"outline", "Ack required"}
   defp status_pill_for(:manager_only), do: {"forest", "Manager view only"}
 
-  # ---------------------------------------------------------------------------
-  # Editorial heading
-  # ---------------------------------------------------------------------------
-
   attr :class, :string, default: ""
   slot :inner_block, required: true
 
@@ -386,10 +354,6 @@ defmodule FoyerWeb.FoyerComponents do
     </h1>
     """
   end
-
-  # ---------------------------------------------------------------------------
-  # House value chip
-  # ---------------------------------------------------------------------------
 
   @value_labels %{
     "care" => "Care",
@@ -421,10 +385,6 @@ defmodule FoyerWeb.FoyerComponents do
     """
   end
 
-  # ---------------------------------------------------------------------------
-  # Desktop topbar
-  # ---------------------------------------------------------------------------
-
   attr :current_scope, FoyerWeb.Scope, required: true
   attr :page_title, :string, default: nil
 
@@ -446,6 +406,7 @@ defmodule FoyerWeb.FoyerComponents do
       </div>
 
       <details
+        :if={@current_scope.on_shift?}
         id="new-menu"
         class="relative [&_summary::-webkit-details-marker]:hidden marker:hidden group"
       >
@@ -509,10 +470,6 @@ defmodule FoyerWeb.FoyerComponents do
     </.link>
     """
   end
-
-  # ---------------------------------------------------------------------------
-  # Announcement card
-  # ---------------------------------------------------------------------------
 
   attr :announcement, Foyer.House.Announcement, required: true
   attr :current_user_id, :integer, default: nil
@@ -607,10 +564,6 @@ defmodule FoyerWeb.FoyerComponents do
     if String.length(text) > 200, do: String.slice(text, 0, 200) <> "...", else: text
   end
 
-  # ---------------------------------------------------------------------------
-  # Recognition card
-  # ---------------------------------------------------------------------------
-
   attr :recognition, Foyer.Recognitions.Recognition, required: true
 
   def recognition_card(assigns) do
@@ -645,10 +598,6 @@ defmodule FoyerWeb.FoyerComponents do
     </article>
     """
   end
-
-  # ---------------------------------------------------------------------------
-  # Conversation row
-  # ---------------------------------------------------------------------------
 
   attr :conversation, Foyer.Chat.Conversation, required: true
   attr :current_user_id, :integer, required: true
@@ -714,10 +663,6 @@ defmodule FoyerWeb.FoyerComponents do
   defp conversation_preview(%{messages: [%{body: body} | _]}), do: truncate(body)
   defp conversation_preview(_), do: ""
 
-  # ---------------------------------------------------------------------------
-  # Message bubble
-  # ---------------------------------------------------------------------------
-
   attr :message, Foyer.Chat.Message, required: true
   attr :current_user_id, :integer, required: true
 
@@ -745,18 +690,6 @@ defmodule FoyerWeb.FoyerComponents do
     </div>
     """
   end
-
-  # ---------------------------------------------------------------------------
-  # Profile card — shared between `ProfileLive :me` and `PeopleLive :show`.
-  #
-  # `viewer` controls what sections render:
-  #   :self  — own profile (/me): shows Given section, points breakdown, rewards
-  #            catalog, and settings links.
-  #   :other — colleague profile (/people/:id): shows only Received (public) and
-  #            points balance. Given section, breakdown, rewards, and settings
-  #            are suppressed. Data filtering is already enforced by
-  #            `Foyer.Profile.profile_for/2` at the context boundary.
-  # ---------------------------------------------------------------------------
 
   attr :card, Foyer.Profile.Card, required: true
   attr :viewer, :atom, default: :other, values: [:self, :other]
@@ -938,12 +871,6 @@ defmodule FoyerWeb.FoyerComponents do
     """
   end
 
-  # ---------------------------------------------------------------------------
-  # Profile recognition card — used inside profile_card only. Renders a single
-  # recognition with house value tags, bonus points badge, and relative timestamp.
-  # (F.Profile.21, F.Profile.22)
-  # ---------------------------------------------------------------------------
-
   attr :recognition, Foyer.Recognitions.Recognition, required: true
   attr :show_recipient, :boolean, default: false
 
@@ -986,10 +913,6 @@ defmodule FoyerWeb.FoyerComponents do
     </article>
     """
   end
-
-  # ---------------------------------------------------------------------------
-  # Colleague row
-  # ---------------------------------------------------------------------------
 
   attr :user, Foyer.Accounts.User, required: true
   attr :subtitle, :string, default: nil
@@ -1042,10 +965,6 @@ defmodule FoyerWeb.FoyerComponents do
     """
   end
 
-  # ---------------------------------------------------------------------------
-  # Format helpers
-  # ---------------------------------------------------------------------------
-
   @spec member_since(Foyer.Accounts.User.t()) :: integer() | String.t()
   defp member_since(%{inserted_at: %DateTime{year: year}}), do: year
   defp member_since(_), do: "—"
@@ -1088,11 +1007,6 @@ defmodule FoyerWeb.FoyerComponents do
       true -> Calendar.strftime(date, "%-d %b %Y")
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # Manager guard helper — re-exported here so LiveView templates can use
-  # `manager?/1` without aliasing Scope. (Convenience only.)
-  # ---------------------------------------------------------------------------
 
   @spec manager?(Scope.t()) :: boolean()
   defdelegate manager?(scope), to: Scope

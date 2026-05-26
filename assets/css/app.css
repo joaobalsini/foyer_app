@@ -305,16 +305,29 @@ html, body {
     flex-shrink: 0;
     background: var(--foyer-cream);
     border-right: 1px solid var(--foyer-rule);
-    padding: 1.25rem 0;
+    padding-top: 0;
+    padding-bottom: 0;
     gap: 0;
     overflow-y: auto;
   }
 }
 
-/* Rail wordmark / header block */
+/* Rail wordmark / header block (also used on the desktop topbar for the
+   shared border colour). */
 .foyer-rail__header {
-  padding: 0 1rem 1rem;
   border-bottom: 1px solid var(--foyer-rule);
+}
+
+/* Wordmark inside the side rail: forced to 5rem so its bottom border
+   aligns with the desktop topbar (`min-h-20` on `#desktop-topbar`).
+   The topbar is NOT a child of `.foyer-rail`, so it keeps its own
+   Tailwind row layout. */
+.foyer-rail > .foyer-rail__header {
+  min-height: 5rem;
+  padding: 0 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   margin-bottom: 0.75rem;
 }
 

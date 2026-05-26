@@ -359,19 +359,9 @@ defmodule FoyerWeb.ChatLive do
                       <div class="foyer-mono">The Linden · Mayfair, London</div>
                       <h1 class="foyer-serif text-4xl leading-tight">Messages</h1>
                     </div>
-                    <.link navigate={~p"/chat/new"} class="foyer-btn forest" id="new-message-cta">
+                    <.link navigate={~p"/chat/new"} class="foyer-btn forest sm" id="new-message-cta">
                       <.icon name="hero-plus" class="size-4" /> New
                     </.link>
-                  </div>
-
-                  <div class="foyer-fieldset">
-                    <input
-                      type="search"
-                      class="foyer-input chat-search"
-                      placeholder="Search messages"
-                      id="chat-search"
-                      name="search"
-                    />
                   </div>
 
                   <div id="inbox" phx-update="stream" class="chat-inbox-list">

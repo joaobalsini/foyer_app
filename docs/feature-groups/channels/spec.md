@@ -32,6 +32,8 @@ lets on-shift staff see who is in each channel.
 - Handoff channel visibility in Today — Today feature group.
 - Any PubSub broadcast triggered by membership changes (no membership writes in v1).
 
+---
+
 ## Clauses
 
 ### F.Channels.1 — Slug uniqueness
@@ -41,23 +43,17 @@ lets on-shift staff see who is in each channel.
 **Then** the operation fails with a changeset error on `:slug` (the unique index
 `:channels_slug_index` is violated), and no second row is created.
 
----
-
 ### F.Channels.2 — Required fields on Channel
 
 **Given** an empty `Channel` changeset.
 **When** `Channel.changeset/2` is called with any combination of missing `:name`, `:slug`, or `:kind`.
 **Then** the changeset is invalid and carries a `"can't be blank"` error for each missing required field.
 
----
-
 ### F.Channels.3 — Kind enum constraint
 
 **Given** a `Channel` changeset.
 **When** `kind` is set to any value other than `:department` or `:general`.
 **Then** the changeset is invalid and carries an error on `:kind`.
-
----
 
 ### F.Channels.4 — Membership uniqueness
 
@@ -66,15 +62,11 @@ lets on-shift staff see who is in each channel.
 **Then** the operation fails with a changeset error on `[:user_id, :channel_id]`
 (the unique index `:channel_memberships_user_id_channel_id_index` is violated).
 
----
-
 ### F.Channels.5 — Membership required fields
 
 **Given** an empty `Membership` changeset.
 **When** `Membership.changeset/2` is called without `:user_id` or `:channel_id`.
 **Then** the changeset is invalid with a `"can't be blank"` error for each missing field.
-
----
 
 ### F.Channels.6 — `list_for_user/1` returns only the caller's channels
 
@@ -84,23 +76,17 @@ and NOT a member of "Leadership".
 **Then** the result contains "Housekeeping · Floor 4" and "All Housekeeping", does NOT contain
 "Leadership", and the channels are ordered alphabetically by name.
 
----
-
 ### F.Channels.7 — `list_for_user/1` returns empty list for a user with no memberships
 
 **Given** a user who has no `Membership` rows.
 **When** `Foyer.Channels.list_for_user/1` is called with that user.
 **Then** the result is an empty list.
 
----
-
 ### F.Channels.8 — `get!/1` raises for unknown id
 
 **Given** no channel with id 99999 exists.
 **When** `Foyer.Channels.get!/1` is called with 99999.
 **Then** an `Ecto.NoResultsError` is raised.
-
----
 
 ### F.Channels.9 — `list_all_with_member_counts/0` returns all channels with accurate counts
 
@@ -110,52 +96,17 @@ and NOT a member of "Leadership".
 ordered alphabetically by channel name, with each count matching the actual number of
 `Membership` rows for that channel. Channels with no members have a count of `0`.
 
----
-
 ### F.Channels.10 — `member?/2` accurately reflects membership
 
 **Given** a user who is a member of "All Housekeeping" and NOT a member of "Leadership".
 **When** `Foyer.Channels.member?/2` is called with that user and each channel.
 **Then** it returns `true` for "All Housekeeping" and `false` for "Leadership".
 
----
-
 ### F.Channels.11 — `member_count/1` returns the count for a single channel
 
 **Given** "F&B" channel has exactly 2 members.
 **When** `Foyer.Channels.member_count/1` is called with the "F&B" channel.
 **Then** the result is `2`.
-
----
-
-### F.Channels.12 — Managers are seeded into their operational channels
-
-**Given** the seed script has run.
-**When** `Foyer.Channels.list_for_user/1` is called for any user with `role: :manager`.
-**Then** the result contains at least "Leadership" and "Linden · All staff", plus the
-department channel(s) the manager is responsible for. Manager role alone does NOT guarantee
-membership in every seeded channel; a manager can be absent from channels outside their
-remit (e.g. Engineering if they do not manage that department).
-
----
-
-### F.Channels.13 — Staff are seeded into their department channel(s)
-
-**Given** the seed script has run.
-**When** `Foyer.Channels.list_for_user/1` is called for a staff user whose department is
-"Housekeeping".
-**Then** the result contains at least one channel whose name or slug corresponds to
-"Housekeeping" (e.g. "All Housekeeping"). It does NOT contain "Leadership".
-
----
-
-### F.Channels.14 — All staff are seeded into the general all-staff channel
-
-**Given** the seed script has run and a `Linden · All staff` general channel exists.
-**When** `Foyer.Channels.list_for_user/1` is called for ANY seeded user regardless of role.
-**Then** the result always includes the "Linden · All staff" channel.
-
----
 
 ### F.Channels.15 — People Directory renders all staff with channel pills
 
@@ -164,16 +115,12 @@ remit (e.g. Engineering if they do not manage that department).
 **Then** the page displays a list row for every seeded user, each row showing the user's name,
 title, and on-shift indicator when relevant, and no row is missing.
 
----
-
 ### F.Channels.16 — People Directory shows on-shift pulse for on-shift colleagues
 
 **Given** user A is on shift and user B is not on shift.
 **When** `PeopleLive` renders the `:index` action.
 **Then** user A's row shows the on-shift indicator (the `foyer-pulse` element with the "On shift"
 label) and user B's row does not show it.
-
----
 
 ### F.Channels.17 — People Directory membership pills come from real membership data
 
@@ -182,16 +129,12 @@ label) and user B's row does not show it.
 **Then** both channel names appear in the rendered HTML. A channel the user is NOT a member
 of does NOT appear.
 
----
-
 ### F.Channels.18 — People Directory is gated to on-shift users
 
 **Given** a user is authenticated but off shift.
 **When** the user navigates directly to `/people`.
 **Then** the user is redirected to `/today` with a flash message indicating they must start their
 shift, and the People Directory page is not rendered.
-
----
 
 ### F.Channels.19 — Channel membership is access-only, no manager override
 
@@ -200,8 +143,6 @@ shift, and the People Directory page is not rendered.
 **Then** "Engineering" does NOT appear in the result. Manager role alone does not grant
 membership in channels the manager was not explicitly added to.
 
----
-
 ### F.Channels.20 — `list_all_with_member_counts/0` is N+1-free
 
 **Given** any number of channels exist.
@@ -209,7 +150,13 @@ membership in channels the manager was not explicitly added to.
 **Then** it issues at most 2 database queries regardless of the number of channels (one for
 channels, one grouped count query over memberships — or a single join query).
 
----
+### F.Channels.21 — People Directory channel filter shows only members of the selected channel
+
+**Given** a user is authenticated and on shift and navigates to `/people`.
+**When** the user selects a channel from the filter sidebar.
+**Then** only rows for users who have a real `Membership` record in that channel are shown.
+All other users are removed from the list. Clearing the filter (or selecting "All") restores
+the full unfiltered people list.
 
 ### F.Channels.22 — Colleague detail view channel memberships come from a Channels-owned API
 
@@ -219,13 +166,3 @@ channels, one grouped count query over memberships — or a single join query).
 `Channels.list_for_user/1` (or `LiveDeps.channels().list_for_user/1`), assigned to a
 dedicated socket assign owned by the Channels surface. They are NOT sourced from accidental
 preloads on `Foyer.Profile.Card` or from `Profile.profile_for/1`.
-
----
-
-### F.Channels.21 — People Directory channel filter shows only members of the selected channel
-
-**Given** a user is authenticated and on shift and navigates to `/people`.
-**When** the user selects a channel from the filter sidebar.
-**Then** only rows for users who have a real `Membership` record in that channel are shown.
-All other users are removed from the list. Clearing the filter (or selecting "All") restores
-the full unfiltered people list.

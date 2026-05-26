@@ -1,7 +1,10 @@
 defmodule Foyer.Recognitions do
   @moduledoc """
-  Peer recognition context. Reads are real; `give/2` is stubbed until the
-  Recognitions feature group lands.
+  Peer recognition context. Composes pure validation from
+  `Foyer.Recognitions.Validate` with `Ecto.Multi` transactions and read
+  queries. See `Foyer.Recognitions.Validate` for the rule-by-rule
+  validation helpers (self-recognition guard, bonus-point tier, grace
+  window, …).
   """
   @behaviour Foyer.RecognitionsPort
 
@@ -10,10 +13,8 @@ defmodule Foyer.Recognitions do
   alias Foyer.Accounts.User
   alias Foyer.Recognitions.PointEntry
   alias Foyer.Recognitions.Recognition
+  alias Foyer.Recognitions.Validate
   alias Foyer.Repo
-
-  @grace_window_seconds 15 * 60
-  @point_tiers [0, 10, 25, 50, 100]
 
   @impl true
   @spec feed_public(keyword()) :: [Recognition.t()]
@@ -83,15 +84,15 @@ defmodule Foyer.Recognitions do
   def give(%User{} = sender, attrs) do
     attrs =
       attrs
-      |> recognition_attrs()
+      |> Validate.recognition_attrs()
       |> Map.put("sender_id", sender.id)
-      |> normalize_bonus_points(sender)
+      |> Validate.normalize_bonus_points(sender)
 
     changeset = Recognition.changeset(%Recognition{}, attrs)
 
-    with :ok <- ensure_not_self(sender, changeset),
-         :ok <- ensure_bonus_allowed(sender, changeset),
-         :ok <- ensure_bonus_tier(changeset) do
+    with :ok <- Validate.ensure_not_self(sender, changeset),
+         :ok <- Validate.ensure_bonus_allowed(sender, changeset),
+         :ok <- Validate.ensure_bonus_tier(changeset) do
       Ecto.Multi.new()
       |> Ecto.Multi.insert(:recognition, changeset)
       |> Ecto.Multi.run(:points, fn repo, %{recognition: recognition} ->
@@ -111,17 +112,17 @@ defmodule Foyer.Recognitions do
   def update_recognition(%Recognition{} = recognition, %User{} = editor, attrs) do
     attrs =
       attrs
-      |> recognition_attrs()
-      |> normalize_bonus_points(editor)
+      |> Validate.recognition_attrs()
+      |> Validate.normalize_bonus_points(editor)
 
     changeset = Recognition.changeset(recognition, attrs)
 
-    with :ok <- ensure_not_removed(recognition),
-         :ok <- ensure_sender(recognition, editor),
-         :ok <- ensure_within_grace(recognition),
-         :ok <- ensure_not_self(editor, changeset),
-         :ok <- ensure_bonus_allowed(editor, changeset),
-         :ok <- ensure_bonus_tier(changeset) do
+    with :ok <- Validate.ensure_not_removed(recognition),
+         :ok <- Validate.ensure_sender(recognition, editor),
+         :ok <- Validate.ensure_within_grace(recognition),
+         :ok <- Validate.ensure_not_self(editor, changeset),
+         :ok <- Validate.ensure_bonus_allowed(editor, changeset),
+         :ok <- Validate.ensure_bonus_tier(changeset) do
       changeset
       |> Repo.update()
       |> case do
@@ -135,9 +136,9 @@ defmodule Foyer.Recognitions do
   @spec remove_recognition(Recognition.t(), User.t()) ::
           {:ok, Recognition.t()} | {:error, Ecto.Changeset.t() | atom()}
   def remove_recognition(%Recognition{} = recognition, %User{} = remover) do
-    with :ok <- ensure_not_removed(recognition),
-         :ok <- ensure_sender(recognition, remover),
-         :ok <- ensure_within_grace(recognition) do
+    with :ok <- Validate.ensure_not_removed(recognition),
+         :ok <- Validate.ensure_sender(recognition, remover),
+         :ok <- Validate.ensure_within_grace(recognition) do
       Ecto.Multi.new()
       |> Ecto.Multi.update(
         :recognition,
@@ -159,64 +160,8 @@ defmodule Foyer.Recognitions do
 
   @impl true
   @spec within_grace_window?(Recognition.t()) :: boolean()
-  def within_grace_window?(%Recognition{inserted_at: %DateTime{} = inserted_at}) do
-    DateTime.diff(DateTime.utc_now(), inserted_at, :second) <= @grace_window_seconds
-  end
-
-  def within_grace_window?(%Recognition{}), do: false
-
-  defp recognition_attrs(attrs) do
-    attrs
-    |> Map.take(["recipient_id", "body", "values", "bonus_points", "public"])
-    |> Map.merge(
-      attrs
-      |> Map.take([:recipient_id, :body, :values, :bonus_points, :public])
-      |> Map.new(fn {key, value} -> {Atom.to_string(key), value} end)
-    )
-    |> normalize_values()
-  end
-
-  defp normalize_values(%{"values" => values} = attrs) when is_list(values) do
-    Map.put(attrs, "values", Enum.reject(values, &(&1 in ["", nil])))
-  end
-
-  defp normalize_values(attrs), do: attrs
-
-  defp normalize_bonus_points(attrs, %User{role: :manager}), do: attrs
-  defp normalize_bonus_points(attrs, %User{}), do: Map.put(attrs, "bonus_points", 0)
-
-  defp ensure_not_self(%User{id: sender_id}, %Ecto.Changeset{} = changeset) do
-    case Ecto.Changeset.get_field(changeset, :recipient_id) do
-      ^sender_id -> {:error, :self_recognition}
-      _ -> :ok
-    end
-  end
-
-  defp ensure_bonus_allowed(%User{role: :manager}, _changeset), do: :ok
-
-  defp ensure_bonus_allowed(%User{}, %Ecto.Changeset{} = changeset) do
-    case Ecto.Changeset.get_field(changeset, :bonus_points) do
-      points when points in [nil, 0] -> :ok
-      _ -> {:error, :unauthorized_points}
-    end
-  end
-
-  defp ensure_bonus_tier(%Ecto.Changeset{} = changeset) do
-    case Ecto.Changeset.get_field(changeset, :bonus_points) do
-      points when points in @point_tiers -> :ok
-      _ -> {:error, :invalid_point_tier}
-    end
-  end
-
-  defp ensure_sender(%Recognition{sender_id: user_id}, %User{id: user_id}), do: :ok
-  defp ensure_sender(%Recognition{}, %User{}), do: {:error, :unauthorized}
-
-  defp ensure_within_grace(%Recognition{} = recognition) do
-    if within_grace_window?(recognition), do: :ok, else: {:error, :outside_grace_window}
-  end
-
-  defp ensure_not_removed(%Recognition{removed_at: nil}), do: :ok
-  defp ensure_not_removed(%Recognition{}), do: {:error, :removed}
+  def within_grace_window?(%Recognition{} = recognition),
+    do: Validate.within_grace_window?(recognition)
 
   defp grant_points(_repo, %Recognition{bonus_points: points}) when points in [nil, 0],
     do: {:ok, nil}

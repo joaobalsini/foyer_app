@@ -72,15 +72,15 @@ defmodule FoyerWeb.IsolatedHelpers do
         |> Map.put(:params, params)
         |> FoyerWeb.IsolatedHelpers.prepare_conn(
           FoyerWeb.RecognitionsLive,
-          :authenticated_on_shift,
+          :isolated_test,
           path,
-          [{FoyerWeb.UserAuth, :ensure_on_shift}]
+          [{FoyerWeb.IsolatedHelpers.OnMount, :default}]
         )
 
       Phoenix.LiveViewTest.live_isolated(conn, FoyerWeb.RecognitionsLive,
         session: FoyerWeb.IsolatedHelpers.session_for(scope),
         action: action,
-        router: FoyerWeb.Router
+        router: FoyerWeb.IsolatedRouter
       )
     end
   end

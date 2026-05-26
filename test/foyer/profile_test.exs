@@ -1,4 +1,12 @@
 defmodule Foyer.ProfileTest do
+  @moduledoc """
+  Unit tests for `Foyer.Profile` — the read-only orchestration context that
+  assembles `Profile.Card` DTOs out of User, Recognition, and Shift data.
+  Pure-struct testing with injected callables; no DB.
+
+  Covers:
+    F.Profile.23 — private-recognition filtering enforced at the context boundary
+  """
   use ExUnit.Case, async: true
 
   alias Foyer.Accounts.User
@@ -47,7 +55,7 @@ defmodule Foyer.ProfileTest do
     ]
   end
 
-  describe "profile_for/2 privacy boundary" do
+  describe "F.Profile.23 — profile_for/2 privacy boundary" do
     test "viewer is subject: includes private recognitions and given list" do
       maya = user(%{id: 1})
       public = recognition(%{id: 1, public: true})

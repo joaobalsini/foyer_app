@@ -46,7 +46,7 @@ defmodule FoyerWeb.ProfileLive do
           chat_unread_count={@chat_unread_count}
         />
         <div class="foyer-content">
-          <div class="foyer-scroll md:max-w-xl md:mx-auto" id="profile">
+          <div class="foyer-scroll foyer-page-wide" id="profile">
             <FoyerComponents.profile_card
               :if={@card}
               card={@card}

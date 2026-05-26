@@ -17,6 +17,38 @@ defmodule Foyer.MixProject do
         plt_local_path: "priv/plts",
         plt_core_path: "priv/plts",
         ignore_warnings: ".dialyzer_ignore.exs"
+      ],
+      test_coverage: [
+        ignore_modules: [
+          # Framework-generated wrappers with no behavior to test
+          Foyer,
+          Foyer.Application,
+          Foyer.Repo,
+          FoyerWeb,
+          FoyerWeb.Endpoint,
+          FoyerWeb.Router,
+          FoyerWeb.Layouts,
+          FoyerWeb.Telemetry,
+          FoyerWeb.ErrorHTML,
+          FoyerWeb.ErrorJSON,
+          FoyerWeb.CoreComponents,
+          FoyerWeb.LiveDeps,
+          # Behaviour-only modules (just @callback definitions)
+          ~r/^Foyer\.\w+Port$/,
+          # Test support / fixtures / harnesses (under test/support)
+          Foyer.DataCase,
+          FoyerWeb.ConnCase,
+          FoyerWeb.ScaffoldFixtures,
+          FoyerWeb.IsolatedHelpers,
+          FoyerWeb.IsolatedHelpers.OnMount,
+          FoyerWeb.IsolatedRouter,
+          FoyerWeb.IsolatedRouter.Helpers,
+          FoyerWeb.IsolatedChatLive,
+          FoyerWeb.IsolatedPeopleLive,
+          FoyerWeb.IsolatedProfileLive,
+          # Test scenario modules (only exercised for the world-shape they describe)
+          ~r/Scenarios(\.|$)/
+        ]
       ]
     ]
   end

@@ -12,10 +12,6 @@ defmodule Foyer.ProfileScenarios do
   alias Foyer.Profile.RewardItem
   alias Foyer.Recognitions.Recognition
 
-  # ---------------------------------------------------------------------------
-  # Helpers — shared user and recognition builders
-  # ---------------------------------------------------------------------------
-
   @spec user_maya() :: User.t()
   def user_maya do
     %User{
@@ -131,10 +127,6 @@ defmodule Foyer.ProfileScenarios do
     ]
   end
 
-  # ---------------------------------------------------------------------------
-  # Scenario: Empty — user with no recognitions, 0 points
-  # ---------------------------------------------------------------------------
-
   defmodule Empty do
     @moduledoc "A profile with no recognitions and zero points balance."
     @behaviour Foyer.ProfilePort
@@ -168,11 +160,6 @@ defmodule Foyer.ProfileScenarios do
     @impl true
     def rewards_catalog, do: []
   end
-
-  # ---------------------------------------------------------------------------
-  # Scenario: LineStaff — Maya: on shift, 2 received (1 public, 1 private),
-  # 1 given, 245 pts. Matches F.Profile.1-7, F.Profile.9, F.Profile.11.
-  # ---------------------------------------------------------------------------
 
   defmodule LineStaff do
     @moduledoc "Maya Okafor — on shift, mix of public and private recognitions."
@@ -212,10 +199,6 @@ defmodule Foyer.ProfileScenarios do
     def rewards_catalog, do: ProfileScenarios.sample_rewards()
   end
 
-  # ---------------------------------------------------------------------------
-  # Scenario: Manager — Charlotte: on shift, 0 received, 2 given, 0 pts.
-  # ---------------------------------------------------------------------------
-
   defmodule Manager do
     @moduledoc "Charlotte Voss — manager, on shift, with given recognitions."
     @behaviour Foyer.ProfilePort
@@ -252,10 +235,6 @@ defmodule Foyer.ProfileScenarios do
     @impl true
     def rewards_catalog, do: ProfileScenarios.sample_rewards()
   end
-
-  # ---------------------------------------------------------------------------
-  # Scenario: OffShift — on_shift?: false (F.Profile.3, F.Profile.18)
-  # ---------------------------------------------------------------------------
 
   defmodule OffShift do
     @moduledoc "A staff member who is currently off shift."

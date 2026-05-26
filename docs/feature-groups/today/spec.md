@@ -213,3 +213,13 @@ initials, the recognition body text, and any house values tagged on the recognit
 full-attention card treatment); it does not disappear, but it no longer dominates the view. No
 persistent read-state record is stored for handoffs in v1; the visual de-emphasis is UI-only,
 driven by a flag the LiveView sets after the first render of the current session.
+
+### F.Today.22 — Desktop topbar hides the +New menu off-shift
+
+**Given** an authenticated user who is off shift, viewing any surface that renders the desktop
+topbar (`#desktop-topbar`)  
+**When** the topbar component is rendered  
+**Then** the `#new-menu` dropdown (including its `New chat`, `New announcement`, and
+`Give recognition` items) is absent from the DOM. The +New menu would only deep-link into
+on-shift-gated routes, so it is suppressed for off-shift users; the only call-to-action they see
+is `Start shift` in the Today off-shift card.

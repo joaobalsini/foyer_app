@@ -21,10 +21,9 @@ defmodule Foyer.House do
   alias Foyer.House.Announcement
   alias Foyer.House.AnnouncementAck
   alias Foyer.House.AnnouncementRead
+  alias Foyer.House.Validate
   alias Foyer.Repo
   alias Foyer.Shifts.Shift
-
-  @grace_window_seconds 15 * 60
 
   @impl true
   @spec feed_for(User.t(), keyword()) :: [Announcement.t()]
@@ -76,7 +75,7 @@ defmodule Foyer.House do
   @spec acknowledge(Announcement.t(), User.t()) :: {:ok, term()} | {:error, term()}
   def acknowledge(%Announcement{} = announcement, %User{id: user_id} = user) do
     with :ok <- ensure_available_member(announcement, user),
-         :ok <- ensure_ack_required_from(announcement, user) do
+         :ok <- Validate.ensure_ack_required_from(announcement, user) do
       %AnnouncementAck{}
       |> AnnouncementAck.changeset(%{
         announcement_id: announcement.id,
@@ -125,7 +124,7 @@ defmodule Foyer.House do
 
     changeset = Announcement.changeset(%Announcement{}, attrs)
 
-    with :ok <- ensure_manager(author),
+    with :ok <- Validate.ensure_manager(author),
          :ok <- ensure_changeset_channel_member(changeset, author) do
       changeset
       |> Repo.insert()
@@ -146,9 +145,9 @@ defmodule Foyer.House do
   def update_announcement(%Announcement{} = announcement, %User{} = editor, attrs) do
     changeset = Announcement.changeset(announcement, announcement_attrs(attrs))
 
-    with :ok <- ensure_not_removed(announcement),
-         :ok <- ensure_author(announcement, editor),
-         :ok <- ensure_within_grace(announcement),
+    with :ok <- Validate.ensure_not_removed(announcement),
+         :ok <- Validate.ensure_author(announcement, editor),
+         :ok <- Validate.ensure_within_grace(announcement),
          :ok <- ensure_changeset_channel_member(changeset, editor) do
       changeset
       |> Repo.update()
@@ -161,10 +160,10 @@ defmodule Foyer.House do
   @spec remove_announcement(Announcement.t(), User.t()) ::
           {:ok, Announcement.t()} | {:error, Ecto.Changeset.t() | atom()}
   def remove_announcement(%Announcement{} = announcement, %User{} = remover) do
-    with :ok <- ensure_not_removed(announcement),
-         :ok <- ensure_author(announcement, remover),
+    with :ok <- Validate.ensure_not_removed(announcement),
+         :ok <- Validate.ensure_author(announcement, remover),
          :ok <- ensure_member(announcement.channel_id, remover.id),
-         :ok <- ensure_within_grace(announcement) do
+         :ok <- Validate.ensure_within_grace(announcement) do
       announcement
       |> Announcement.changeset(%{
         "removed_at" => DateTime.utc_now() |> DateTime.truncate(:second),
@@ -193,7 +192,7 @@ defmodule Foyer.House do
   @impl true
   @spec receipts_for(Announcement.t(), User.t()) :: {:ok, map()} | {:error, atom()}
   def receipts_for(%Announcement{} = announcement, %User{} = manager) do
-    with :ok <- ensure_manager(manager),
+    with :ok <- Validate.ensure_manager(manager),
          :ok <- ensure_member(announcement.channel_id, manager.id) do
       recipients = receipt_recipients(announcement)
       recipient_ids = Enum.map(recipients, & &1.id)
@@ -203,8 +202,8 @@ defmodule Foyer.House do
 
       grouped =
         recipients
-        |> Enum.reduce(empty_receipt_groups(), fn user, acc ->
-          bucket = receipt_bucket_for(user.id, on_shift, acked, read)
+        |> Enum.reduce(Validate.empty_receipt_groups(), fn user, acc ->
+          bucket = Validate.receipt_bucket_for(user.id, on_shift, acked, read)
           Map.update!(acc, bucket, &[user | &1])
         end)
         |> Map.new(fn {key, users} -> {key, Enum.reverse(users)} end)
@@ -213,34 +212,10 @@ defmodule Foyer.House do
     end
   end
 
-  defp empty_receipt_groups do
-    %{acknowledged: [], read_without_acknowledgement: [], unread: [], off_shift: []}
-  end
-
-  # Uses bare maps (not MapSet) as O(1) lookup tables. MapSet has an opaque
-  # internal representation that trips Dialyzer on Erlang/OTP 27+ when its
-  # values flow across function boundaries; a plain map keeps the type
-  # transparent and the lookup the same complexity. The map value (`true`) is
-  # unused — only key membership matters.
-  @spec receipt_bucket_for(integer(), %{integer() => true}, %{integer() => true}, %{
-          integer() => true
-        }) :: :off_shift | :acknowledged | :read_without_acknowledgement | :unread
-  defp receipt_bucket_for(user_id, on_shift, acked, read) do
-    cond do
-      not Map.has_key?(on_shift, user_id) -> :off_shift
-      Map.has_key?(acked, user_id) -> :acknowledged
-      Map.has_key?(read, user_id) -> :read_without_acknowledgement
-      true -> :unread
-    end
-  end
-
   @impl true
   @spec within_grace_window?(Announcement.t()) :: boolean()
-  def within_grace_window?(%Announcement{published_at: %DateTime{} = published_at}) do
-    DateTime.diff(DateTime.utc_now(), published_at, :second) <= @grace_window_seconds
-  end
-
-  def within_grace_window?(%Announcement{}), do: false
+  def within_grace_window?(%Announcement{} = announcement),
+    do: Validate.within_grace_window?(announcement)
 
   @impl true
   @spec needs_ack_from(User.t()) :: [Announcement.t()]
@@ -254,7 +229,7 @@ defmodule Foyer.House do
       where: a.author_id != ^user_id,
       where: is_nil(a.removed_at),
       order_by: [desc_nulls_last: a.pinned_at, desc: a.published_at],
-      preload: [:author, :channel]
+      preload: [:author, :channel, :reads, :acks]
     )
     |> Repo.all()
   end
@@ -296,8 +271,8 @@ defmodule Foyer.House do
   end
 
   defp update_pin(%Announcement{} = announcement, %User{} = manager, pinned_at, event) do
-    with :ok <- ensure_not_removed(announcement),
-         :ok <- ensure_manager(manager),
+    with :ok <- Validate.ensure_not_removed(announcement),
+         :ok <- Validate.ensure_manager(manager),
          :ok <- ensure_member(announcement.channel_id, manager.id) do
       announcement
       |> Announcement.changeset(%{"pinned_at" => pinned_at})
@@ -342,32 +317,11 @@ defmodule Foyer.House do
 
   defp preload_announcement(other), do: other
 
-  defp ensure_manager(%User{role: :manager}), do: :ok
-  defp ensure_manager(%User{}), do: {:error, :unauthorized}
-
-  defp ensure_author(%Announcement{author_id: user_id}, %User{id: user_id}), do: :ok
-  defp ensure_author(%Announcement{}, %User{}), do: {:error, :unauthorized}
-
-  defp ensure_within_grace(%Announcement{} = announcement) do
-    if within_grace_window?(announcement), do: :ok, else: {:error, :outside_grace_window}
-  end
-
-  defp ensure_not_removed(%Announcement{removed_at: nil}), do: :ok
-  defp ensure_not_removed(%Announcement{}), do: {:error, :removed}
-
   defp ensure_available_member(%Announcement{} = announcement, %User{id: user_id}) do
-    with :ok <- ensure_not_removed(announcement) do
+    with :ok <- Validate.ensure_not_removed(announcement) do
       ensure_member(announcement.channel_id, user_id)
     end
   end
-
-  defp ensure_ack_required_from(%Announcement{requires_ack: true, author_id: author_id}, %User{
-         id: user_id
-       })
-       when author_id != user_id,
-       do: :ok
-
-  defp ensure_ack_required_from(%Announcement{}, %User{}), do: {:error, :not_required}
 
   defp ensure_changeset_channel_member(%Ecto.Changeset{} = changeset, %User{id: user_id}) do
     if changeset.valid? do

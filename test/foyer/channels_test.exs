@@ -1,17 +1,28 @@
 defmodule Foyer.ChannelsTest do
-  # async: false — Ecto sandbox, shared state. Required for integration tests.
-  use Foyer.DataCase, async: false
+  @moduledoc """
+  DB-backed context tests for `Foyer.Channels` (membership reads, channel
+  uniqueness, member counts, N+1 guards). Uses `Foyer.DataCase` because every
+  assertion runs against the real Repo. This is the primary coverage of the
+  Channels query API, not a cross-layer wiring check.
 
-  @moduletag :integration
+  Covers:
+    F.Channels.1  — slug uniqueness
+    F.Channels.4  — membership uniqueness
+    F.Channels.6  — list_for_user/1 returns only the caller's channels
+    F.Channels.7  — list_for_user/1 returns empty for users with no memberships
+    F.Channels.8  — get!/1 raises for unknown id
+    F.Channels.9  — list_all_with_member_counts/0 accuracy
+    F.Channels.10 — member?/2 accuracy
+    F.Channels.11 — member_count/1 returns count for a single channel
+    F.Channels.19 — channel membership is access-only, no manager override
+    F.Channels.20 — list_all_with_member_counts/0 is N+1-free
+  """
+  use Foyer.DataCase, async: true
 
   alias Foyer.Accounts.User
   alias Foyer.Channels
   alias Foyer.Channels.Channel
   alias Foyer.Channels.Membership
-
-  # ---------------------------------------------------------------------------
-  # Helpers
-  # ---------------------------------------------------------------------------
 
   defp insert_user!(name) do
     Repo.insert!(%User{
@@ -37,10 +48,6 @@ defmodule Foyer.ChannelsTest do
     Repo.insert!(%Membership{user_id: user.id, channel_id: channel.id})
   end
 
-  # ---------------------------------------------------------------------------
-  # F.Channels.1 — slug uniqueness (integration: DB unique index)
-  # ---------------------------------------------------------------------------
-
   describe "F.Channels.1 — slug uniqueness" do
     test "inserting a duplicate slug returns a changeset error on :slug" do
       _first = insert_channel!("housekeeping-floor-4", "Housekeeping · Floor 4")
@@ -59,10 +66,6 @@ defmodule Foyer.ChannelsTest do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # F.Channels.4 — membership uniqueness (integration: DB unique index)
-  # ---------------------------------------------------------------------------
-
   describe "F.Channels.4 — membership uniqueness" do
     test "inserting a duplicate (user_id, channel_id) pair returns a changeset error" do
       user = insert_user!("Member User")
@@ -78,10 +81,6 @@ defmodule Foyer.ChannelsTest do
       assert changeset.errors[:user_id] != nil or changeset.errors[:channel_id] != nil
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # F.Channels.6 — list_for_user/1 returns only caller's channels, ordered
-  # ---------------------------------------------------------------------------
 
   describe "F.Channels.6 — list_for_user/1 returns only caller's channels" do
     test "returns the user's channels alphabetically, excludes non-member channels" do
@@ -108,20 +107,12 @@ defmodule Foyer.ChannelsTest do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # F.Channels.7 — list_for_user/1 returns empty list for memberless user
-  # ---------------------------------------------------------------------------
-
   describe "F.Channels.7 — list_for_user/1 empty for user with no memberships" do
     test "returns empty list" do
       user = insert_user!("No Channels User")
       assert [] == Channels.list_for_user(user)
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # F.Channels.8 — get!/1 raises for unknown id
-  # ---------------------------------------------------------------------------
 
   describe "F.Channels.8 — get!/1 raises for unknown id" do
     test "raises Ecto.NoResultsError for id 99999" do
@@ -130,10 +121,6 @@ defmodule Foyer.ChannelsTest do
       end
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # F.Channels.9 — list_all_with_member_counts/0
-  # ---------------------------------------------------------------------------
 
   describe "F.Channels.9 — list_all_with_member_counts/0" do
     test "returns all channels with accurate counts in alphabetical order" do
@@ -169,10 +156,6 @@ defmodule Foyer.ChannelsTest do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # F.Channels.10 — member?/2
-  # ---------------------------------------------------------------------------
-
   describe "F.Channels.10 — member?/2" do
     test "returns true for a member and false for a non-member" do
       user = insert_user!("Member Check")
@@ -185,10 +168,6 @@ defmodule Foyer.ChannelsTest do
       assert Channels.member?(user, leadership) == false
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # F.Channels.11 — member_count/1
-  # ---------------------------------------------------------------------------
 
   describe "F.Channels.11 — member_count/1" do
     test "returns exact count for a channel" do
@@ -207,10 +186,6 @@ defmodule Foyer.ChannelsTest do
       assert Channels.member_count(channel) == 0
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # F.Channels.19 — manager role alone does not grant channel access
-  # ---------------------------------------------------------------------------
 
   describe "F.Channels.19 — manager role alone does not grant membership" do
     test "a manager not added to Engineering does not see it in list_for_user" do
@@ -246,10 +221,6 @@ defmodule Foyer.ChannelsTest do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # F.Channels.20 — list_all_with_member_counts/0 issues at most 2 queries
-  # ---------------------------------------------------------------------------
-
   describe "F.Channels.20 — list_all_with_member_counts/0 is N+1-free" do
     test "F.Channels.20 — list_all_with_member_counts/0 issues at most 2 queries" do
       # Create a few channels to make the assertion meaningful
@@ -258,13 +229,17 @@ defmodule Foyer.ChannelsTest do
       end
 
       ref = :counters.new(1, [])
+      test_pid = self()
 
       handler = fn _event, _measurements, _metadata, _config ->
-        :counters.add(ref, 1, 1)
+        # Filter to this test's queries only — async sandbox runs other tests
+        # in parallel and they emit Repo telemetry under their own PIDs.
+        if self() == test_pid, do: :counters.add(ref, 1, 1)
       end
 
-      :telemetry.attach("query-counter-channels", [:foyer, :repo, :query], handler, nil)
-      on_exit(fn -> :telemetry.detach("query-counter-channels") end)
+      handler_id = "query-counter-channels-#{System.unique_integer()}"
+      :telemetry.attach(handler_id, [:foyer, :repo, :query], handler, nil)
+      on_exit(fn -> :telemetry.detach(handler_id) end)
 
       _result = Channels.list_all_with_member_counts()
 

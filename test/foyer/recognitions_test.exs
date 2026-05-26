@@ -1,4 +1,21 @@
 defmodule Foyer.RecognitionsTest do
+  @moduledoc """
+  DB-backed tests for `Foyer.Recognitions`. Uses `Foyer.DataCase` because
+  every assertion here exercises a real `Ecto.Multi` transaction, the
+  point-ledger round-trip through the `users` row, the soft-delete
+  persistence, or the visibility queries on the recognitions table. Pure
+  validation rules (self-recognition, value vocabulary, bonus tier, grace
+  window) are covered as unit tests in
+  `Foyer.Recognitions.ValidateTest`. This is the primary integration
+  coverage of the Recognitions context, so it is NOT tagged `:integration`.
+
+  Covers:
+    F.Recognitions.1  — happy-path `give/2` commits to the DB
+    F.Recognitions.7  — recognition + ledger commit atomically
+    F.Recognitions.8  — removal soft-deletes and reverses points
+    F.Recognitions.9  — grace window gates edits and removals (persisted timestamp)
+    F.Recognitions.10 — public / private visibility at the boundary
+  """
   use Foyer.DataCase, async: true
 
   import FoyerWeb.ScaffoldFixtures
@@ -14,7 +31,7 @@ defmodule Foyer.RecognitionsTest do
   end
 
   describe "give/2" do
-    test "F.Recognitions.1 sends recognition to another user", ctx do
+    test "F.Recognitions.1 happy-path commits a recognition to the DB", ctx do
       assert {:ok, recognition} =
                Recognitions.give(ctx.maya, %{
                  "recipient_id" => ctx.hugo.id,
@@ -26,55 +43,7 @@ defmodule Foyer.RecognitionsTest do
       assert recognition.sender_id == ctx.maya.id
       assert recognition.recipient_id == ctx.hugo.id
       assert recognition.values == ["craft"]
-    end
-
-    test "F.Recognitions.2 rejects self-recognition", ctx do
-      assert {:error, :self_recognition} =
-               Recognitions.give(ctx.maya, %{
-                 "recipient_id" => ctx.maya.id,
-                 "body" => "I was great.",
-                 "values" => ["care"]
-               })
-    end
-
-    test "F.Recognitions.3 and F.Recognitions.4 enforce the six required values", ctx do
-      assert {:error, changeset} =
-               Recognitions.give(ctx.maya, %{
-                 "recipient_id" => ctx.hugo.id,
-                 "body" => "Thank you.",
-                 "values" => ["team"]
-               })
-
-      assert %{values: [_]} = errors_on(changeset)
-
-      assert {:error, changeset} =
-               Recognitions.give(ctx.maya, %{
-                 "recipient_id" => ctx.hugo.id,
-                 "body" => "Thank you.",
-                 "values" => []
-               })
-
-      assert %{values: [_]} = errors_on(changeset)
-    end
-
-    test "F.Recognitions.5 and F.Recognitions.6 restrict point tiers", ctx do
-      assert {:ok, no_points} =
-               Recognitions.give(ctx.maya, %{
-                 "recipient_id" => ctx.hugo.id,
-                 "body" => "Thanks.",
-                 "values" => ["care"],
-                 "bonus_points" => "100"
-               })
-
-      assert no_points.bonus_points == 0
-
-      assert {:error, :invalid_point_tier} =
-               Recognitions.give(ctx.charlotte, %{
-                 "recipient_id" => ctx.hugo.id,
-                 "body" => "Thanks.",
-                 "values" => ["care"],
-                 "bonus_points" => "15"
-               })
+      assert Repo.get!(Recognition, recognition.id).body =~ "effortless"
     end
 
     test "F.Recognitions.7 writes ledger and point balance in one transaction", ctx do
