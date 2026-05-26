@@ -563,45 +563,9 @@ defmodule FoyerWeb.RecognitionsLive do
 
                   <aside id="recognition-preview" class="lg:sticky lg:top-6 self-start space-y-3">
                     <FoyerComponents.section_label label="Preview · The House feed" />
-                    <article class="card-parchment p-5 space-y-3 max-w-[360px]">
-                      <div class="flex flex-wrap gap-1.5" data-preview-values>
-                        <FoyerComponents.house_value_chip
-                          :for={v <- @preview_values}
-                          value={v}
-                          selected
-                        />
-                        <span :if={@preview_values == []} class="text-xs text-stone-400 italic">
-                          Add values…
-                        </span>
-                      </div>
-                      <p class="foyer-serif text-base italic leading-snug">
-                        "{if @preview_body == "", do: "Tell the story…", else: @preview_body}"
-                      </p>
-                      <div class="flex items-center justify-between text-xs text-stone-500 pt-1">
-                        <div class="flex items-center gap-2">
-                          <FoyerComponents.avatar
-                            initials={@current_scope.user.initials}
-                            size={:sm}
-                          />
-                          <span>{@current_scope.user.name}</span>
-                          <span>→</span>
-                          <span class="font-medium text-stone-700">
-                            {if @preview_recipient_name == "",
-                              do: "…",
-                              else: @preview_recipient_name}
-                          </span>
-                        </div>
-                        <span
-                          :if={
-                            (Scope.manager?(@current_scope) and
-                               @preview_bonus_points) && @preview_bonus_points > 0
-                          }
-                          class="foyer-tag forest"
-                        >
-                          +{@preview_bonus_points} pts
-                        </span>
-                      </div>
-                    </article>
+                    <div class="max-w-[360px]">
+                      <FoyerComponents.recognition_card recognition={preview_recognition(assigns)} />
+                    </div>
                   </aside>
                 </div>
             <% end %>
@@ -622,6 +586,30 @@ defmodule FoyerWeb.RecognitionsLive do
     do: sender_id == id
 
   defp managed_by?(_, _), do: false
+
+  defp preview_recognition(assigns) do
+    recipient =
+      case Enum.find(assigns.people, &(to_string(&1.id) == assigns.preview_recipient_id)) do
+        nil ->
+          %Foyer.Accounts.User{name: "Add recipient...", initials: "AR"}
+
+        person ->
+          person
+      end
+
+    %Recognition{
+      id: 0,
+      sender_id: assigns.current_scope.user.id,
+      sender: assigns.current_scope.user,
+      recipient_id: recipient.id,
+      recipient: recipient,
+      body: if(assigns.preview_body == "", do: "Tell the story...", else: assigns.preview_body),
+      values: assigns.preview_values,
+      bonus_points: assigns.preview_bonus_points || 0,
+      public: assigns.preview_public,
+      inserted_at: DateTime.utc_now(:second)
+    }
+  end
 
   attr :form, Phoenix.HTML.Form, required: true
   attr :field, :atom, required: true
