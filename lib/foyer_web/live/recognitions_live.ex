@@ -218,8 +218,8 @@ defmodule FoyerWeb.RecognitionsLive do
           chat_unread_count={@chat_unread_count}
         />
         <div class="foyer-content">
+          <FoyerComponents.desktop_topbar current_scope={@current_scope} page_title={@page_title} />
           <div class="foyer-scroll" id="recognitions">
-            <FoyerComponents.desktop_topbar current_scope={@current_scope} page_title={@page_title} />
             <%= cond do %>
               <% @live_action == :index -> %>
                 <header class="flex items-start justify-between">
@@ -255,7 +255,7 @@ defmodule FoyerWeb.RecognitionsLive do
                 </div>
               <% @live_action == :show and @recognition -> %>
                 <.link
-                  navigate={~p"/recognitions"}
+                  navigate={~p"/house"}
                   class="foyer-btn ghost sm self-start"
                   id="back-to-recognitions"
                 >
@@ -286,6 +286,15 @@ defmodule FoyerWeb.RecognitionsLive do
                           Sent to {@recognition.recipient && @recognition.recipient.name}
                         </div>
                       </div>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2">
+                      <span :for={value <- @recognition.values} class="foyer-tag outline">
+                        {String.capitalize(value)}
+                      </span>
+                      <span :if={@recognition.bonus_points > 0} class="foyer-tag claret">
+                        +{@recognition.bonus_points} pts
+                      </span>
                     </div>
 
                     <div
@@ -340,15 +349,6 @@ defmodule FoyerWeb.RecognitionsLive do
                           </button>
                         </span>
                       <% end %>
-                    </div>
-
-                    <div class="flex flex-wrap gap-2">
-                      <span :for={value <- @recognition.values} class="foyer-tag outline">
-                        {String.capitalize(value)}
-                      </span>
-                      <span :if={@recognition.bonus_points > 0} class="foyer-tag claret">
-                        +{@recognition.bonus_points} pts
-                      </span>
                     </div>
                   </article>
                 </div>
@@ -576,7 +576,7 @@ defmodule FoyerWeb.RecognitionsLive do
                         <button type="submit" class="foyer-btn forest" id="recognize-submit">
                           Send recognition
                         </button>
-                        <.link navigate={~p"/recognitions"} class="foyer-btn ghost sm">
+                        <.link navigate={~p"/house"} class="foyer-btn ghost sm">
                           Cancel
                         </.link>
                       </div>

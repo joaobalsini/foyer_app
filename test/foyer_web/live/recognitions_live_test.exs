@@ -269,6 +269,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
       assert has_element?(view, "button#recognition-remove-btn", "Remove")
       assert has_element?(view, ".announcement-detail #recognition-detail")
       assert has_element?(view, "#recognition-detail .foyer-tag", "Recognition")
+      assert has_element?(view, "#back-to-recognitions[href='/house']", "Back")
     end
 
     test "author outside grace sees disabled Edit and Remove buttons with tooltip copy",
