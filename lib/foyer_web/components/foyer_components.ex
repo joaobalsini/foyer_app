@@ -399,7 +399,7 @@ defmodule FoyerWeb.FoyerComponents do
     ~H"""
     <header
       id="desktop-topbar"
-      class="hidden md:flex items-center justify-between gap-4 px-6 py-3 border-b foyer-rail__header sticky top-0 z-20"
+      class="hidden md:flex items-center justify-between gap-4 px-6 py-3 border-b foyer-rail__header sticky top-0 z-20 bg-[var(--foyer-cream)]"
     >
       <div class="foyer-serif text-lg truncate">
         {@page_title || ""}
