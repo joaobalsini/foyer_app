@@ -18,7 +18,8 @@ lets on-shift staff see who is in each channel.
   (Leadership, Linden · All staff, and their managed department), staff membership scoped to their
   department.
 - People Directory LiveView (`PeopleLive`) — the one user-facing surface this group owns. Renders
-  a filterable list of staff with their channel memberships and on-shift state.
+  a filterable list of staff, department filter options backed by channel membership counts,
+  on-shift state, and channel membership pills on the colleague detail view.
 - Slug uniqueness and `kind`-dependent structural constraints.
 - `ChannelsPort` behaviour and `ChannelsMock` Mox double wired through `FoyerWeb.LiveDeps`.
 - Isolated and route smoke tests for all clauses.

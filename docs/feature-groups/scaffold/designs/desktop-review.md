@@ -22,7 +22,7 @@ recognition (4).
    timeline sparkline, median-to-ack metric, declined/conflict state, monthly
    recognition quota, nudge/export actions, recipient typeahead picker, a
    "Team" house value (only six exist), point-emoji reactions on recognitions.
-4. **The mockups omit the F.F.4 grace-window UI entirely** from
+4. **The mockups omit the F.Recognitions.9 grace-window UI entirely** from
    `desktop-recognition-sent-undo.html` — there's no countdown, no Edit, no
    Remove. Filename promises "undo" but no undo affordance is shown.
 5. **Chat desktop assumes a three-pane (rail + inbox + thread) layout** while
@@ -127,28 +127,28 @@ wrong screen, the wrong control, or features the data model doesn't support.
 - **"Save draft" button is fabricated.**
 - **"—" (none) bonus tier is wrong.** Mockup renders `— / +25 / +50 / +100` as
   four equal toggles. Impl renders only the three tiers plus a separate text
-  `clear` link (`recognition_live.ex:474-498`).
+  `clear` link (`recognitions_live.ex`).
 - **Recipient picker is a `<select>`, not an avatar card with "Change…"
-  button.** `recognition_live.ex:378-392` is a plain dropdown — the mockup
+  button.** `recognitions_live.ex` uses a plain dropdown — the mockup
   implies a typeahead search picker that doesn't exist.
 - **"House values shown" label** mis-implies a passive readout. It's a
-  multi-select picker (`recognition_live.ex:395`, subtext "Pick one or more.").
+  multi-select picker (`recognitions_live.ex`, subtext "Pick one or more.").
 
 ### `recognition/desktop-staff-give-no-points.html`
 - Inherits all desktop-give criticals (Team chip, Save draft, recipient card,
   values picker).
 - **Preview avatar is wrong persona.** Mockup shows Charlotte (`CV`) in the
   preview author block while the left nav is Maya Okafor. Impl uses
-  `@current_user` for the preview avatar (`recognition_live.ex:531`), so the
+  `@current_user` for the preview avatar (`recognitions_live.ex`), so the
   staff user (Maya) should appear there.
 
 ### `recognition/desktop-recognition-sent-undo.html`
-- **The 60s grace UI is missing entirely.** Filename promises
+- **The recognition grace UI is missing entirely.** Filename promises
   "edit / remove / undo" but the mockup has no countdown, no Edit, no Remove —
   only a "See it in the feed" ghost button. Impl
-  (`recognition_live.ex:289-339`) is built around `60s to edit or remove.` +
+  (`recognitions_live.ex`) is built around the 15-minute edit/remove window,
   Edit link + Remove button + expired state. An implementer would drop the
-  core F.F.4 affordance.
+  core F.Recognitions.9 affordance.
 - **Receipt block is fabricated.** Mockup shows a labeled grid
   (Recipient / Values / Visibility / Bonus). Impl shows a single sentence:
   `Recognition for {recipient}{· N Foyer points} — delivered.`.
@@ -237,7 +237,7 @@ wrong screen, the wrong control, or features the data model doesn't support.
   Impl puts only Preview in the right aside; Visibility/Bonus/Send live inside
   the left form column.
 - Visibility radios are shown as button-style cards. Impl uses an
-  `<input type=radio>` fieldset (`recognition_live.ex:446,459`).
+  `<input type=radio>` fieldset (`recognitions_live.ex`).
 - Subhead copy: mockup splits the helper line; impl puts it in one block
   ("Shout-out a colleague. Write it like you'd tell it at staff dinner.
   Specific moments land.").
@@ -245,7 +245,7 @@ wrong screen, the wrong control, or features the data model doesn't support.
 ### `recognition/desktop-staff-give-no-points.html`
 - No-points note placement: impl renders it as a `card-parchment`
   (`id="staff-bonus-note"`) inside the main form column
-  (`recognition_live.ex:503-508`); mockup floats it in the right rail.
+  (`recognitions_live.ex`); mockup floats it in the right rail.
 
 ---
 
@@ -285,11 +285,11 @@ wrong screen, the wrong control, or features the data model doesn't support.
    scheduling, drafts, push notifications, multi-channel audience, monthly
    recognition quota, nudge/export, ack timeline / median-to-ack / declined,
    "Team" house value, point-emoji reactions on recognitions, recipient
-   typeahead, 60s-grace replacement for `sent-undo`.
+   typeahead, grace-window replacement for `sent-undo`.
 3. **Fix the data-model control mismatches** (single channel select, ack states
    set, three bonus tiers + clear link, six house values, on-shift checkbox,
    department `<select>`).
-4. **Restore the 60s grace UI** in `recognition/desktop-recognition-sent-undo`
-   — this is the core F.F.4 affordance and the file currently shows none of it.
+4. **Restore the recognition grace UI** in `recognition/desktop-recognition-sent-undo`
+   — this is the core F.Recognitions.9 affordance and the file currently shows none of it.
 5. **Add the off-shift visual** to `recognition/desktop-people-directory` (at
    least one card without the pulse pill).

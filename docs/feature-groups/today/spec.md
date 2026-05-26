@@ -2,8 +2,8 @@
 
 Today is the staff member's daily briefing surface. It is phone-first and gets quieter as the shift
 progresses. When on shift, it shows — in priority order — the most recent relevant handoff from the
-previous shift, announcements that still require the user's acknowledgement, and recent recognition
-received while the user was off shift. When off shift, Today becomes the user's entire allowed
+previous shift, announcements that still require the user's acknowledgement, and recent recognitions
+received by the user or authored privately by them. When off shift, Today becomes the user's entire allowed
 surface: a paused-state banner, a Start shift action, and a compact summary of work held quietly in
 waiting. Transitions between off-shift and on-shift states update the view on the same page load that
 follows the action; there is no live push in v1.

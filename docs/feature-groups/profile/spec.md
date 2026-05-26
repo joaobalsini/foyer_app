@@ -14,12 +14,12 @@ Profile is accessible at `/me` for the current user; `/people/:id` surfaces the 
 **In scope (v1)**
 - Identity header: avatar initials, name, title (job title), property code, on-shift
   indicator, languages.
-- Recognition received: all recognitions where the viewer is the recipient, ordered
-  newest-first. Private recognitions are visible to the recipient on their own profile
-  but never visible on a colleague's profile view.
-- Recognition given: all recognitions where the viewer is the sender, ordered
-  newest-first. On a colleague's profile (PeopleLive :show), given recognitions are
-  not shown (own-profile-only surface).
+- Recognition received: all recognitions where the profile subject is the recipient, ordered
+  newest-first. Private recognitions are visible on the recipient's own profile and on the
+  manager-only full colleague profile view; they are hidden from non-manager colleague reads.
+- Recognition given: all recognitions where the profile subject is the sender, ordered
+  newest-first. The Given section renders on `/me` and on the manager-only full colleague profile
+  view; non-manager colleague reads do not expose it.
 - Stats row: "Recognitions this month" count (received) and "Ack on time" placeholder
   (renders `—` until acknowledgement analytics land in a later group).
 - Foyer points balance with an "How you earned them" earnings breakdown list.
@@ -29,15 +29,15 @@ Profile is accessible at `/me` for the current user; `/people/:id` surfaces the 
   and `designs/profile/mobile-recognitions-received.html`.
 - Desktop layout matching the side-rail shell from `designs/profile/desktop-charlotte-voss.html`;
   the profile content column follows the same card/section structure as mobile.
-- Role-aware rendering: on a manager's own profile, the "Given" section shows
-  recognitions they sent; a manager viewing a colleague's profile does not see that
-  colleague's "Given" list.
+- Role-aware rendering: on a user's own profile, the "Given" section shows recognitions they sent;
+  on the manager-only colleague profile view, the same full profile treatment is rendered without
+  rewards or settings affordances.
 - The `profile_card` component is reused by `PeopleLive :show`.
 
 **Out of scope (v1)**
 - Rewards redemption — catalog is visible only; actions render "Coming soon".
 - Profile editing (name, languages, notification preferences, shift availability).
-- Viewing private recognitions on a colleague's profile (recipient only).
+- Viewing private recognitions on a colleague's profile as a non-manager.
 - Acknowledgement analytics (the "Ack on time" stat is a placeholder).
 - Points ledger write path (points accumulate only through Recognition events, handled
   by the Recognitions group).

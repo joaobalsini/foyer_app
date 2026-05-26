@@ -20,7 +20,9 @@ defmodule FoyerWeb.PeopleLiveTest do
   import Mox
   import FoyerWeb.IsolatedHelpers
 
+  alias Foyer.AccountsScenarios.WithPeople
   alias Foyer.ProfileScenarios
+  alias Foyer.ProfileScenarios.LineStaff
 
   setup :verify_on_exit!
   setup :set_mox_from_context
@@ -31,7 +33,7 @@ defmodule FoyerWeb.PeopleLiveTest do
 
   describe "F.Channels.15 / F.Channels.17 — desktop People directory design" do
     setup do
-      stub_with(Foyer.AccountsMock, Foyer.AccountsScenarios.WithPeople)
+      stub_with(Foyer.AccountsMock, WithPeople)
       stub_with(Foyer.ChannelsMock, Foyer.ChannelsScenarios.TwoChannels)
       stub_with(Foyer.ShiftsMock, Foyer.ShiftsScenarios.WithOnShift)
       :ok
@@ -69,7 +71,7 @@ defmodule FoyerWeb.PeopleLiveTest do
 
     test "F.Profile.8 / F.Profile.19 — staff see View profile only for themselves",
          %{conn: conn} do
-      viewer = Foyer.AccountsScenarios.WithPeople.people() |> Enum.find(&(&1.id == 2))
+      viewer = WithPeople.people() |> Enum.find(&(&1.id == 2))
 
       {:ok, view, _html} = mount_isolated_people_index(conn, viewer)
 
@@ -83,7 +85,7 @@ defmodule FoyerWeb.PeopleLiveTest do
 
   describe "F.Channels.16 / F.Channels.21 — People directory filters" do
     setup do
-      stub_with(Foyer.AccountsMock, Foyer.AccountsScenarios.WithPeople)
+      stub_with(Foyer.AccountsMock, WithPeople)
       stub_with(Foyer.ChannelsMock, Foyer.ChannelsScenarios.TwoChannels)
       stub_with(Foyer.ShiftsMock, Foyer.ShiftsScenarios.WithOnShift)
       :ok
@@ -165,7 +167,7 @@ defmodule FoyerWeb.PeopleLiveTest do
     end
 
     test "redirects staff away from a colleague profile", %{conn: conn} do
-      viewer = Foyer.AccountsScenarios.WithPeople.people() |> Enum.find(&(&1.id == 2))
+      viewer = WithPeople.people() |> Enum.find(&(&1.id == 2))
       subject_id = ProfileScenarios.user_maya().id
 
       assert {:error, {:live_redirect, %{to: "/people"}}} =
@@ -180,7 +182,7 @@ defmodule FoyerWeb.PeopleLiveTest do
       end)
 
       stub(Foyer.ProfileMock, :own_profile_for, fn _subject ->
-        Foyer.ProfileScenarios.LineStaff.own_profile_for(ProfileScenarios.user_maya())
+        LineStaff.own_profile_for(ProfileScenarios.user_maya())
       end)
 
       stub(Foyer.ChannelsMock, :list_for_user, fn _user -> [] end)

@@ -53,6 +53,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
   alias Foyer.RecognitionsScenarios
 
   alias FoyerWeb.IsolatedHelpers
+  alias Phoenix.LiveView.Utils
 
   setup :verify_on_exit!
   # The LiveView runs in its own pid; without `set_mox_from_context` Mox in
@@ -390,7 +391,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
                )
                |> render_submit()
 
-      assert Phoenix.LiveView.Utils.verify_flash(@endpoint, flash) == %{
+      assert Utils.verify_flash(@endpoint, flash) == %{
                "info" => "Recognition sent."
              }
     end

@@ -35,6 +35,7 @@ defmodule FoyerWeb.AnnouncementLiveTest do
   alias Foyer.House.AnnouncementAck
   alias Foyer.HouseScenarios.Fixtures
   alias FoyerWeb.IsolatedHelpers
+  alias Phoenix.LiveView.Utils
 
   setup :verify_on_exit!
   setup :set_mox_from_context
@@ -353,7 +354,7 @@ defmodule FoyerWeb.AnnouncementLiveTest do
 
       assert is_binary(flash)
 
-      assert Phoenix.LiveView.Utils.verify_flash(@endpoint, flash) == %{
+      assert Utils.verify_flash(@endpoint, flash) == %{
                "info" => "Announcement published."
              }
     end
