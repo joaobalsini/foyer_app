@@ -261,8 +261,17 @@ defmodule FoyerWeb.TodayLive do
                         <span class="foyer-mono">{r.sender.name}</span>
                       </div>
                       <p class="foyer-serif mt-2">{r.body}</p>
-                      <div class="flex gap-1 mt-2">
-                        <span :for={v <- r.values} class="foyer-tag outline">{v}</span>
+                      <div class="flex items-center justify-between gap-2 mt-2">
+                        <div class="flex gap-1 flex-wrap">
+                          <span :for={v <- r.values} class="foyer-tag outline">{v}</span>
+                        </div>
+                        <.link
+                          navigate={~p"/recognitions/#{r.id}"}
+                          class="foyer-btn sm shrink-0"
+                          id={"today-recognition-view-#{r.id}"}
+                        >
+                          View
+                        </.link>
                       </div>
                     </div>
                   </div>
@@ -325,8 +334,17 @@ defmodule FoyerWeb.TodayLive do
                         <span class="foyer-mono">{r.sender.name}</span>
                       </div>
                       <p class="foyer-serif mt-2">{r.body}</p>
-                      <div class="flex gap-1 mt-2">
-                        <span :for={v <- r.values} class="foyer-tag outline">{v}</span>
+                      <div class="flex items-center justify-between gap-2 mt-2">
+                        <div class="flex gap-1 flex-wrap">
+                          <span :for={v <- r.values} class="foyer-tag outline">{v}</span>
+                        </div>
+                        <.link
+                          navigate={~p"/recognitions/#{r.id}"}
+                          class="foyer-btn sm shrink-0"
+                          id={"today-recognition-view-#{r.id}"}
+                        >
+                          View
+                        </.link>
                       </div>
                     </div>
                   </div>

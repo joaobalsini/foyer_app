@@ -1,9 +1,8 @@
 defmodule FoyerWeb.RecognitionsLive do
   @moduledoc """
-  Recognitions surface — `/recognitions` (public feed), `/recognitions/new`
-  (give form), `/recognitions/:id` (show), `/recognitions/:id/edit` (author-only
-  edit, stubbed). Manager scope unlocks the bonus-points tier picker on the
-  give and edit forms.
+  Recognitions surface — `/recognitions/new` (give form), `/recognitions/:id`
+  (show), and `/recognitions/:id/edit` (author-only edit, stubbed). The House
+  and Today feeds are the entry points for recognition cards.
   """
   use FoyerWeb, :live_view
 
@@ -24,28 +23,16 @@ defmodule FoyerWeb.RecognitionsLive do
      |> assign(:preview_body, "")
      |> assign(:preview_values, [])
      |> assign(:preview_bonus_points, nil)
-     |> stream_configure(:recognitions, dom_id: &"recognition-#{&1.id}")
-     |> stream(:recognitions, [])
      |> assign(:page_title, "Recognitions")}
   end
 
   @impl true
   def handle_params(params, _uri, socket) do
     case socket.assigns.live_action do
-      :index -> apply_index(socket)
       :new -> apply_new(socket)
       :show -> apply_show(socket, params)
       :edit -> apply_edit(socket, params)
     end
-  end
-
-  defp apply_index(socket) do
-    feed = FoyerWeb.LiveDeps.recognitions().feed_public([])
-
-    {:noreply,
-     socket
-     |> stream(:recognitions, feed, reset: true)
-     |> assign(:page_title, "Recognitions")}
   end
 
   defp apply_new(socket) do
@@ -78,7 +65,7 @@ defmodule FoyerWeb.RecognitionsLive do
         {:noreply,
          socket
          |> put_flash(:error, "That recognition is not available to you.")
-         |> push_navigate(to: ~p"/recognitions")}
+         |> push_navigate(to: ~p"/house")}
     end
   end
 
@@ -99,7 +86,7 @@ defmodule FoyerWeb.RecognitionsLive do
         {:noreply,
          socket
          |> put_flash(:error, "That recognition is not available to you.")
-         |> push_navigate(to: ~p"/recognitions")}
+         |> push_navigate(to: ~p"/house")}
     end
   end
 
@@ -153,7 +140,7 @@ defmodule FoyerWeb.RecognitionsLive do
         {:noreply,
          socket
          |> put_flash(:info, "Recognition removed.")
-         |> push_navigate(to: ~p"/recognitions")}
+         |> push_navigate(to: ~p"/house")}
 
       {:error, :outside_grace_window} ->
         {:noreply, put_flash(socket, :error, "That recognition can no longer be removed.")}
@@ -221,38 +208,6 @@ defmodule FoyerWeb.RecognitionsLive do
           <FoyerComponents.desktop_topbar current_scope={@current_scope} page_title={@page_title} />
           <div class="foyer-scroll" id="recognitions">
             <%= cond do %>
-              <% @live_action == :index -> %>
-                <header class="flex items-start justify-between">
-                  <div>
-                    <div class="foyer-mono">Recognition</div>
-                    <FoyerComponents.editorial_heading>
-                      Recognitions
-                    </FoyerComponents.editorial_heading>
-                  </div>
-                  <.link
-                    navigate={~p"/recognitions/new"}
-                    id="recognitions-new-cta"
-                    class="foyer-btn forest sm"
-                  >
-                    <.icon name="hero-sparkles" class="size-4" /> Give recognition
-                  </.link>
-                </header>
-
-                <div
-                  id="recognitions-feed"
-                  phx-update="stream"
-                  class="flex flex-col gap-3 mt-3"
-                >
-                  <div :for={{dom_id, r} <- @streams.recognitions} id={dom_id}>
-                    <.link
-                      navigate={~p"/recognitions/#{r.id}"}
-                      id={"recognition-link-#{r.id}"}
-                      class="block"
-                    >
-                      <FoyerComponents.recognition_card recognition={r} />
-                    </.link>
-                  </div>
-                </div>
               <% @live_action == :show and @recognition -> %>
                 <.link
                   navigate={~p"/house"}

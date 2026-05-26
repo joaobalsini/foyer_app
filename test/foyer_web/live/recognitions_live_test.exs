@@ -312,9 +312,9 @@ defmodule FoyerWeb.RecognitionsLiveTest do
         raise Ecto.NoResultsError, queryable: Recognition
       end)
 
-      # apply_show/2 rescues the NoResultsError and push_navigates to
-      # /recognitions. live_isolated returns the redirect tuple at mount-time.
-      assert {:error, {:live_redirect, %{to: "/recognitions"}}} =
+      # apply_show/2 rescues the NoResultsError and push_navigates to /house.
+      # live_isolated returns the redirect tuple at mount-time.
+      assert {:error, {:live_redirect, %{to: "/house"}}} =
                mount_isolated_recognitions(conn,
                  action: :show,
                  scope: scope,
@@ -587,7 +587,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
           params: %{"id" => to_string(recognition.id)}
         )
 
-      assert {:error, {:live_redirect, %{to: "/recognitions"}}} =
+      assert {:error, {:live_redirect, %{to: "/house"}}} =
                view |> element("button#recognition-remove-btn") |> render_click()
     end
 
@@ -626,7 +626,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
   # F.Recognitions.10 — :edit raises NoResultsError → redirect
   # ---------------------------------------------------------------------------
   describe "F.Recognitions.10 — :edit NoResultsError rescue" do
-    test "edit redirects to /recognitions when get_recognition! raises NoResultsError",
+    test "edit redirects to /house when get_recognition! raises NoResultsError",
          %{conn: conn} do
       stub_with(Foyer.RecognitionsMock, RecognitionsScenarios.Empty)
       scope = IsolatedHelpers.build_scope(id: 999, role: :staff, on_shift?: true)
@@ -635,7 +635,7 @@ defmodule FoyerWeb.RecognitionsLiveTest do
         raise Ecto.NoResultsError, queryable: Recognition
       end)
 
-      assert {:error, {:live_redirect, %{to: "/recognitions"}}} =
+      assert {:error, {:live_redirect, %{to: "/house"}}} =
                mount_isolated_recognitions(conn,
                  action: :edit,
                  scope: scope,

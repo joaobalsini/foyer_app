@@ -142,6 +142,22 @@ defmodule FoyerWeb.HouseLiveTest do
     end
   end
 
+  describe "recognition feed actions" do
+    test "own recognitions link to their detail page from The House", %{conn: conn} do
+      recognition = %{
+        RecognitionsScenarios.WithReceived.sample()
+        | recipient_id: Fixtures.staff().id
+      }
+
+      stub(Foyer.RecognitionsMock, :feed_public, fn _opts -> [recognition] end)
+
+      {:ok, view, html} = mount_house(conn, role: :staff)
+
+      assert has_element?(view, "#recognition-view-#{recognition.id}", "View")
+      assert html =~ ~s(href="/recognitions/#{recognition.id}")
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Non-pinned announcement feed entry + day_group_label branches.
   # Covers line 51 (`feed_entry(:announcement, …)` for non-pinned items) and

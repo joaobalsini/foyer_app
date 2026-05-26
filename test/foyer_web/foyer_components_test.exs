@@ -238,7 +238,9 @@ defmodule FoyerWeb.FoyerComponentsTest do
         render_component(&FoyerComponents.recognition_card/1,
           recognition: %Recognition{
             id: 200,
+            sender_id: 1,
             sender: user(1, name: "Maya Okafor", initials: "MO"),
+            recipient_id: 2,
             recipient: user(2, name: "Aisha Bello", initials: "AB"),
             body: "Stayed late for 412.",
             values: ["care"],
@@ -254,6 +256,36 @@ defmodule FoyerWeb.FoyerComponentsTest do
       assert html =~ "+25 pts"
       assert html =~ "Maya Okafor"
       assert html =~ "Aisha Bello"
+    end
+
+    test "F.Recognitions.10 — renders View only for sender or recipient" do
+      recognition = %Recognition{
+        id: 201,
+        sender_id: 1,
+        sender: user(1, name: "Maya Okafor", initials: "MO"),
+        recipient_id: 2,
+        recipient: user(2, name: "Aisha Bello", initials: "AB"),
+        body: "Stayed late for 412.",
+        values: ["care"],
+        public: true,
+        inserted_at: DateTime.utc_now(:second)
+      }
+
+      sender_html =
+        render_component(&FoyerComponents.recognition_card/1,
+          recognition: recognition,
+          current_user_id: 1
+        )
+
+      third_party_html =
+        render_component(&FoyerComponents.recognition_card/1,
+          recognition: recognition,
+          current_user_id: 3
+        )
+
+      assert sender_html =~ ~s(id="recognition-view-201")
+      assert sender_html =~ ~s(href="/recognitions/201")
+      refute third_party_html =~ ~s(id="recognition-view-201")
     end
   end
 

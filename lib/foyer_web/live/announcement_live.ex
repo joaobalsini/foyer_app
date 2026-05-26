@@ -421,6 +421,8 @@ defmodule FoyerWeb.AnnouncementLive do
                       </div>
                     </div>
 
+                    <p class="foyer-serif">{@announcement.body}</p>
+
                     <div class="flex flex-wrap gap-2">
                       <%= if @can_pin? do %>
                         <button
@@ -493,8 +495,6 @@ defmodule FoyerWeb.AnnouncementLive do
                         <% end %>
                       <% end %>
                     </div>
-
-                    <p class="foyer-serif">{@announcement.body}</p>
 
                     <%= if @announcement.requires_ack do %>
                       <div class="foyer-mono">

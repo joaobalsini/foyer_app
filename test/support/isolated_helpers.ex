@@ -173,7 +173,6 @@ defmodule FoyerWeb.IsolatedHelpers do
 
   @doc false
   @spec recognitions_path_for(atom()) :: String.t()
-  def recognitions_path_for(:index), do: "/recognitions"
   def recognitions_path_for(:new), do: "/recognitions/new"
   def recognitions_path_for(:show), do: "/recognitions/1"
   def recognitions_path_for(:edit), do: "/recognitions/1/edit"

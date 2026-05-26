@@ -36,9 +36,11 @@ profile listings, single-recognition fetches — honours it consistently.
   late authors get `:outside_grace_window`.
 - Public / private visibility enforced at the context boundary across
   `feed_public/0`, `received_by/2`, `given_by/2`, and `get_recognition!/2`.
-- LiveView surfaces `/recognitions`, `/recognitions/new`, `/recognitions/:id`,
-  `/recognitions/:id/edit` rendering the public feed, compose form, detail
-  view, and edit form respectively.
+- LiveView surfaces `/recognitions/new`, `/recognitions/:id`, and
+  `/recognitions/:id/edit` rendering the compose form, detail view, and edit
+  form respectively. There is no standalone recognitions index route; public
+  recognition browsing happens through The House, and recent received
+  recognition entry points also appear on Today.
 
 **Out of scope**
 
@@ -164,6 +166,11 @@ the grace window, but they are disabled with a tooltip explaining the
 sender's profile, or `get_recognition!/2`
 
 **Then** the recognition is visible to every viewer.
+
+The House renders a `View` action only for recognitions where the current user
+is the sender or recipient; Today renders `View` actions for the current user's
+recent received recognitions. Both actions navigate directly to
+`/recognitions/:id`.
 
 **Given** a private recognition (`public = false`)
 

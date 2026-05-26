@@ -102,10 +102,12 @@ defmodule FoyerWeb.AnnouncementLiveTest do
       assert has_element?(view, "#announcement-remove-btn:not([disabled])", "Remove")
 
       html = render(view)
+      body_pos = html |> :binary.match("Guest in 412 has severe tree-nut allergy.") |> elem(0)
       unpin_pos = html |> :binary.match("announcement-unpin-btn") |> elem(0)
       edit_pos = html |> :binary.match("announcement-edit-link") |> elem(0)
       remove_pos = html |> :binary.match("announcement-remove-btn") |> elem(0)
 
+      assert body_pos < unpin_pos
       assert unpin_pos < edit_pos
       assert edit_pos < remove_pos
     end

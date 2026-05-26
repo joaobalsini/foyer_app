@@ -68,6 +68,8 @@ the attempt with `{:error, :unauthorized}` so no announcement is persisted.
 **When** they edit the title, body, audience, or `requires_ack` setting  \
 **Then** the update succeeds, the new values are persisted, and the user is redirected back to the
 announcement show page.
+On the detail page, author/manager actions render after the announcement body in this order:
+Pin/Unpin, Edit, then Remove.
 
 ### F.Announcements.4 — Edit and remove are rejected after grace or by non-authors
 

@@ -565,6 +565,7 @@ defmodule FoyerWeb.FoyerComponents do
   end
 
   attr :recognition, Foyer.Recognitions.Recognition, required: true
+  attr :current_user_id, :integer, default: nil
 
   def recognition_card(assigns) do
     ~H"""
@@ -589,6 +590,14 @@ defmodule FoyerWeb.FoyerComponents do
           <span class="foyer-serif">{@recognition.recipient && @recognition.recipient.name}</span>
         </div>
         <div class="flex items-center gap-2">
+          <.link
+            :if={own_recognition?(@recognition, @current_user_id)}
+            navigate={~p"/recognitions/#{@recognition.id}"}
+            class="foyer-btn sm"
+            id={"recognition-view-#{@recognition.id}"}
+          >
+            View
+          </.link>
           <%= if @recognition.bonus_points && @recognition.bonus_points > 0 do %>
             <span class="foyer-tag claret" data-bonus>+{@recognition.bonus_points} pts</span>
           <% end %>
@@ -598,6 +607,11 @@ defmodule FoyerWeb.FoyerComponents do
     </article>
     """
   end
+
+  defp own_recognition?(_recognition, nil), do: false
+  defp own_recognition?(%{sender_id: user_id}, user_id), do: true
+  defp own_recognition?(%{recipient_id: user_id}, user_id), do: true
+  defp own_recognition?(_recognition, _user_id), do: false
 
   attr :conversation, Foyer.Chat.Conversation, required: true
   attr :current_user_id, :integer, required: true

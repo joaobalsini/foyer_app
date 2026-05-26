@@ -217,11 +217,13 @@ defmodule FoyerWeb.TodayLiveTest do
   end
 
   describe "F.Today.18 — recent recognition cards" do
-    test "recognition section shows sender name, body, and values", %{conn: conn} do
+    test "recognition section shows sender name, body, values, and View links", %{conn: conn} do
       {:ok, view, html} = mount_today(conn, Today.Scenarios.OnShiftStaff)
 
       assert has_element?(view, "#recent-recognition")
       assert has_element?(view, "#recognition-1")
+      assert has_element?(view, "#today-recognition-view-1", "View")
+      assert html =~ ~p"/recognitions/1"
       assert html =~ "Rafael Mendes"
       assert html =~ "Quietly handled a 02:14 guest issue with grace."
       assert html =~ "care"

@@ -35,7 +35,7 @@ defmodule FoyerWeb.SmokeTest do
     F.Profile.25      — property code rendered from config
     F.Recognitions.1  — recognition new mounts
     F.Recognitions.9  — recognition edit mounts for author
-    F.Recognitions.10 — recognition index and detail mount
+    F.Recognitions.10 — recognition detail mounts
     F.Today.2         — off-shift route gate redirects to /today
   """
   use FoyerWeb.ConnCase, async: true
@@ -107,7 +107,7 @@ defmodule FoyerWeb.SmokeTest do
       assert {:error, {:redirect, %{to: "/today"}}} =
                build_conn()
                |> sign_in(ctx.jamal)
-               |> live(~p"/recognitions")
+               |> live(~p"/recognitions/new")
 
       assert {:error, {:redirect, %{to: "/today"}}} =
                build_conn()
@@ -349,13 +349,6 @@ defmodule FoyerWeb.SmokeTest do
   end
 
   describe "recognition routes" do
-    test "F.Recognitions.10 — recognitions index mounts", ctx do
-      {:ok, view, _html} = ctx.conn |> sign_in(ctx.maya) |> live(~p"/recognitions")
-
-      assert has_element?(view, "#recognitions")
-      assert has_element?(view, "#recognitions-new-cta")
-    end
-
     test "F.Recognitions.1 — new recognition mounts", ctx do
       {:ok, view, _html} = ctx.conn |> sign_in(ctx.maya) |> live(~p"/recognitions/new")
 

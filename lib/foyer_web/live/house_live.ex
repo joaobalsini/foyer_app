@@ -216,7 +216,10 @@ defmodule FoyerWeb.HouseLive do
 
   defp feed_card(%{entry: %{kind: :recognition}} = assigns) do
     ~H"""
-    <FoyerComponents.recognition_card recognition={@entry.item} />
+    <FoyerComponents.recognition_card
+      recognition={@entry.item}
+      current_user_id={@current_user_id}
+    />
     """
   end
 
