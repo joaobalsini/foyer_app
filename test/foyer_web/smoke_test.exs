@@ -230,7 +230,12 @@ defmodule FoyerWeb.SmokeTest do
       assert has_element?(view, "#end-shift-form")
 
       view
-      |> form("#end-shift-form", shift: %{handoff_note: "All clear in 412."})
+      |> form("#end-shift-form",
+        shift: %{
+          handoff_note: "All clear in 412.",
+          handoff_channel_id: ctx.suite_412.channel_id
+        }
+      )
       |> render_submit()
 
       assert {:error, {:redirect, %{to: "/today"}}} =

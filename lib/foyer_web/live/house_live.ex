@@ -206,11 +206,15 @@ defmodule FoyerWeb.HouseLive do
     recognitions = FoyerWeb.LiveDeps.recognitions()
     public = recognitions.feed_public([])
 
-    own_private =
+    authored_private =
       recognitions.given_by(user, user)
       |> Enum.reject(& &1.public)
 
-    (public ++ own_private)
+    received_private =
+      recognitions.received_by(user, user)
+      |> Enum.reject(& &1.public)
+
+    (public ++ authored_private ++ received_private)
     |> Enum.uniq_by(& &1.id)
   end
 

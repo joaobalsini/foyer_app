@@ -173,12 +173,12 @@ sender's profile, or `get_recognition!/2`
 
 **Then** the recognition is visible to every viewer.
 
-The House includes the author's own private recognitions alongside public
-recognitions. The `View` action renders only when the current user authored the
-recognition, so authors can reach the detail page to edit/remove within the
-grace window while recipients do not get that action. Today applies the same
-author-only `View` rule for recognition cards and also includes authored
-private recognitions in the recent recognition list.
+The House includes private recognitions where the current user is either the
+sender or recipient, alongside public recognitions. The `View` action renders
+only when the current user authored the recognition, so authors can reach the
+detail page to edit/remove within the grace window while recipients do not get
+that action. Today applies the same shared recognition card style and
+author-only `View` rule.
 
 **Given** a private recognition (`public = false`)
 

@@ -790,10 +790,10 @@ defmodule FoyerWeb.FoyerComponents do
           </p>
         <% else %>
           <div class="flex flex-col gap-2">
-            <.profile_recognition_card
+            <.recognition_card
               :for={r <- @card.received}
               recognition={r}
-              show_recipient={false}
+              current_user_id={profile_current_user_id(assigns)}
             />
           </div>
         <% end %>
@@ -814,10 +814,10 @@ defmodule FoyerWeb.FoyerComponents do
             </p>
           <% else %>
             <div class="flex flex-col gap-2">
-              <.profile_recognition_card
+              <.recognition_card
                 :for={r <- @card.given}
                 recognition={r}
-                show_recipient={true}
+                current_user_id={profile_current_user_id(assigns)}
               />
             </div>
           <% end %>
@@ -906,48 +906,8 @@ defmodule FoyerWeb.FoyerComponents do
   defp self_service?(%{self_service: nil, viewer: viewer}), do: viewer == :self
   defp self_service?(%{self_service: self_service}), do: self_service
 
-  attr :recognition, Foyer.Recognitions.Recognition, required: true
-  attr :show_recipient, :boolean, default: false
-
-  defp profile_recognition_card(assigns) do
-    ~H"""
-    <article
-      class="rounded-lg border p-3 flex flex-col gap-2"
-      style="border-color: var(--foyer-rule);"
-      id={"recognition-#{@recognition.id}"}
-    >
-      <%= if @show_recipient and @recognition.recipient do %>
-        <div class="foyer-mono">
-          For {@recognition.recipient.name}
-        </div>
-      <% end %>
-      <p class="foyer-serif text-lg">{@recognition.body}</p>
-      <%!-- House value tags (F.Profile.21) --%>
-      <%= if @recognition.values && @recognition.values != [] do %>
-        <div class="flex flex-wrap gap-1">
-          <span :for={v <- @recognition.values} class="foyer-tag outline">
-            {String.upcase(v)}
-          </span>
-        </div>
-      <% end %>
-      <div class="flex items-center gap-2">
-        <.avatar :if={@recognition.sender} initials={@recognition.sender.initials} size={:sm} />
-        <span class="text-sm">{@recognition.sender && @recognition.sender.name}</span>
-        <%!-- Bonus points badge (F.Profile.22) --%>
-        <%= if @recognition.bonus_points && @recognition.bonus_points > 0 do %>
-          <span class="foyer-tag forest ml-auto">+{@recognition.bonus_points} pts</span>
-        <% end %>
-        <span class={[
-          "foyer-mono",
-          @recognition.bonus_points && @recognition.bonus_points > 0 && "ml-0",
-          (@recognition.bonus_points == nil or @recognition.bonus_points == 0) && "ml-auto"
-        ]}>
-          {relative_date(@recognition.inserted_at)}
-        </span>
-      </div>
-    </article>
-    """
-  end
+  defp profile_current_user_id(%{viewer: :self, card: %{user: %{id: id}}}), do: id
+  defp profile_current_user_id(_assigns), do: nil
 
   attr :user, Foyer.Accounts.User, required: true
   attr :subtitle, :string, default: nil
@@ -1024,22 +984,6 @@ defmodule FoyerWeb.FoyerComponents do
       0 -> "Today"
       1 -> "Yesterday"
       _ -> Calendar.strftime(date, "%a %-d %b")
-    end
-  end
-
-  @spec relative_date(DateTime.t() | nil) :: String.t()
-  defp relative_date(nil), do: ""
-
-  defp relative_date(%DateTime{} = dt) do
-    today = Date.utc_today()
-    date = DateTime.to_date(dt)
-    diff = Date.diff(today, date)
-
-    cond do
-      diff == 0 -> "Today"
-      diff == 1 -> "Yesterday"
-      diff < 7 -> Calendar.strftime(date, "%a %-d %b")
-      true -> Calendar.strftime(date, "%-d %b %Y")
     end
   end
 

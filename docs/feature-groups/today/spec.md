@@ -21,7 +21,8 @@ follows the action; there is no live push in v1.
 - On-shift manager state: same structure as staff plus a New announcement CTA; manager's own live
   posts replace the needs-ack list when the manager has nothing pending.
 - Start shift action: transitions Today from off-shift to on-shift state.
-- End shift flow: optional handoff note (targeted at one of the user's channels), clock-out action.
+- End shift flow: required note and target channel when submitting a handoff, plus an explicit skip
+  clock-out action for ending without a handoff.
 - Inline acknowledgement: tapping a needs-ack item navigates to the announcement detail; once the
   user acknowledges there, the item disappears from Today on next surface load.
 - Off-shift route gate: every authenticated route other than `/today` redirects off-shift users back
@@ -127,18 +128,19 @@ channel membership, or too old)
 **Then** the page navigates to `/today/end-shift` and renders a handoff prompt with a textarea for a
 note and a "Clock out" submit button; a "Skip · clock out" option is also available.
 
-### F.Today.11 — End shift — optional handoff note
+### F.Today.11 — End shift — handoff note and channel are required
 
 **Given** the user is on the `/today/end-shift` view  
-**When** the user fills in a handoff note (and optionally selects a target channel from their own
-channel memberships) and submits  
+**When** the user fills in a handoff note, keeps one of their channels selected, and submits  
 **Then** the current shift row is updated with `ended_at = now`, `handoff_note`, and
 `handoff_channel_id`; the user's scope becomes off-shift; Today re-renders in the off-shift state.
+The form starts with the user's first channel selected, does not offer a blank channel option, and
+the backend rejects handoff-form submissions with either an empty note or missing channel.
 
 ### F.Today.12 — End shift — skip (no note)
 
 **Given** the user is on the `/today/end-shift` view  
-**When** the user submits without entering a handoff note (or taps "Skip · clock out")  
+**When** the user taps "Skip · clock out"  
 **Then** the current shift row is updated with `ended_at = now` and no handoff note; the user's
 scope becomes off-shift; Today re-renders in the off-shift state.
 
@@ -188,9 +190,9 @@ bottom navigation is sticky at the bottom; tap targets meet minimum 44 px height
 **Given** an on-shift user has received one or more recognitions  
 **When** the user views `/today`  
 **Then** up to three most recent recognitions are shown, including received recognitions and the
-current user's authored private recognitions, each displaying the sender's name and initials, the
-recognition body text, and any house values tagged on the recognition. `View` appears only for
-recognitions authored by the current user and navigates to `/recognitions/:id`.
+current user's authored private recognitions, each rendered with the shared House recognition card
+style. `View` appears only for recognitions authored by the current user and navigates to
+`/recognitions/:id`.
 
 ### F.Today.19 — No recognition section when none received
 

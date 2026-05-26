@@ -191,6 +191,26 @@ defmodule FoyerWeb.HouseLiveTest do
       assert html =~ "Held the floor together."
       assert has_element?(view, "#recognition-view-#{recognition.id}", "View")
     end
+
+    test "received private recognitions appear in The House without a View action", %{conn: conn} do
+      recognition = %{
+        RecognitionsScenarios.WithReceived.sample()
+        | id: 9101,
+          sender_id: Fixtures.other_staff().id,
+          sender: Fixtures.other_staff(),
+          recipient_id: Fixtures.staff().id,
+          recipient: Fixtures.staff(),
+          public: false
+      }
+
+      stub(Foyer.RecognitionsMock, :feed_public, fn _opts -> [] end)
+      stub(Foyer.RecognitionsMock, :received_by, fn _target, _viewer -> [recognition] end)
+
+      {:ok, view, html} = mount_house(conn, role: :staff)
+
+      assert html =~ "Held the floor together."
+      refute has_element?(view, "#recognition-view-#{recognition.id}")
+    end
   end
 
   # ---------------------------------------------------------------------------

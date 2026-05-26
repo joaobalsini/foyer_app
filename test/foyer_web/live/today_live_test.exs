@@ -39,7 +39,16 @@ defmodule FoyerWeb.TodayLiveTest do
       {:ok, %{shift | ended_at: ended_at}}
     end)
 
-    stub(Foyer.ChannelsMock, :list_for_user, fn _user -> [] end)
+    stub(Foyer.ChannelsMock, :list_for_user, fn _user ->
+      [
+        %Foyer.Channels.Channel{
+          id: 1,
+          name: "All Housekeeping",
+          slug: "all-housekeeping",
+          kind: :department
+        }
+      ]
+    end)
 
     {:ok, conn: build_conn()}
   end
@@ -147,7 +156,7 @@ defmodule FoyerWeb.TodayLiveTest do
 
   describe "F.Today.10 / F.Today.11 — end-shift form" do
     test "end-shift form has textarea, channel picker, and skip link", %{conn: conn} do
-      {:ok, view, _html} =
+      {:ok, view, html} =
         mount_today(conn, Today.Scenarios.OnShiftStaff,
           action: :end_shift,
           path: "/today/end-shift"
@@ -155,6 +164,8 @@ defmodule FoyerWeb.TodayLiveTest do
 
       assert has_element?(view, "#end-shift-form")
       assert has_element?(view, "#handoff-channel-select")
+      assert has_element?(view, "#handoff-channel-select option[value='1'][selected]")
+      refute html =~ "— no channel —"
       assert has_element?(view, "#skip-clock-out")
     end
 
@@ -224,9 +235,10 @@ defmodule FoyerWeb.TodayLiveTest do
 
       assert has_element?(view, "#recent-recognition")
       assert has_element?(view, "#recognition-1")
-      refute has_element?(view, "#today-recognition-view-1")
-      refute has_element?(view, "#today-recognition-view-2")
-      assert has_element?(view, "#today-recognition-view-3", "View")
+      assert has_element?(view, "#recognition-1 #rec-card-1")
+      refute has_element?(view, "#recognition-view-1")
+      refute has_element?(view, "#recognition-view-2")
+      assert has_element?(view, "#recognition-view-3", "View")
       assert html =~ ~p"/recognitions/3"
       assert html =~ "Rafael Mendes"
       assert html =~ "Quietly handled a 02:14 guest issue with grace."

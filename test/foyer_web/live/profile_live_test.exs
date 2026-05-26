@@ -129,6 +129,7 @@ defmodule FoyerWeb.ProfileLiveTest do
       html = render(view)
       # LineStaff scenario includes the public recognition body
       assert html =~ "Quietly handled a 02:14 guest issue"
+      assert has_element?(view, "#recognitions-received #rec-card-101")
     end
 
     test "F.Profile.5 — private recognition appears on own profile", %{conn: conn} do
@@ -158,6 +159,8 @@ defmodule FoyerWeb.ProfileLiveTest do
       {:ok, view, _html} = mount_isolated_profile(conn, user)
 
       assert render(view) =~ "Rafael stayed calm under pressure"
+      assert has_element?(view, "#recognitions-given #rec-card-103")
+      assert has_element?(view, "#recognitions-given #recognition-view-103", "View")
     end
   end
 
@@ -345,14 +348,14 @@ defmodule FoyerWeb.ProfileLiveTest do
       :ok
     end
 
-    test "renders house value tags (CARE, DISCRETION) on recognition cards", %{conn: conn} do
+    test "renders house value tags on recognition cards", %{conn: conn} do
       user = ProfileScenarios.user_maya()
       {:ok, view, _html} = mount_isolated_profile(conn, user)
 
       html = render(view)
       # The public recognition has values: ["care", "discretion"]
-      assert html =~ "CARE"
-      assert html =~ "DISCRETION"
+      assert html =~ "Care"
+      assert html =~ "Discretion"
     end
   end
 

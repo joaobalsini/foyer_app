@@ -64,12 +64,20 @@ defmodule Foyer.Shifts do
   @impl true
   @spec end_shift(Shift.t(), map()) :: {:ok, Shift.t()} | {:error, Ecto.Changeset.t()}
   def end_shift(%Shift{} = shift, attrs) do
+    handoff_submit? = Map.has_key?(attrs, "handoff_note") or Map.has_key?(attrs, :handoff_note)
+
     attrs = Map.put_new_lazy(attrs, "ended_at", fn -> DateTime.utc_now() end)
 
     shift
     |> Shift.changeset(attrs)
+    |> maybe_require_handoff_channel(handoff_submit?)
     |> Repo.update()
   end
+
+  defp maybe_require_handoff_channel(changeset, true),
+    do: Ecto.Changeset.validate_required(changeset, [:handoff_note, :handoff_channel_id])
+
+  defp maybe_require_handoff_channel(changeset, false), do: changeset
 
   # Owned by feature/shifts; this branch carries a local copy until that branch lands on main.
   @impl true

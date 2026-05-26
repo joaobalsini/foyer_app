@@ -52,16 +52,19 @@ defmodule FoyerWeb.TodayLive do
     channels = FoyerWeb.LiveDeps.channels().list_for_user(scope.user)
     channel_options = Enum.map(channels, &{&1.name, &1.id})
 
+    default_channel_id =
+      channel_options |> List.first() |> then(fn option -> option && elem(option, 1) end)
+
     socket
-    |> assign(:end_shift_form, build_end_shift_form())
+    |> assign(:end_shift_form, build_end_shift_form(default_channel_id))
     |> assign(:channel_options, channel_options)
   end
 
   defp maybe_assign_end_shift_form(socket, _scope), do: socket
 
-  defp build_end_shift_form do
+  defp build_end_shift_form(default_channel_id) do
     %Shift{}
-    |> Shift.changeset(%{handoff_note: ""})
+    |> Shift.changeset(%{handoff_note: "", handoff_channel_id: default_channel_id})
     |> to_form(as: :shift)
   end
 
@@ -253,27 +256,12 @@ defmodule FoyerWeb.TodayLive do
                     <div
                       :for={r <- @briefing.recent_recognitions}
                       id={"recognition-#{r.id}"}
-                      class="rounded-lg border p-3 mt-2"
-                      style="border-color: var(--foyer-rule);"
+                      class="mt-2"
                     >
-                      <div class="flex items-center gap-2">
-                        <FoyerComponents.avatar initials={r.sender.initials} size={:sm} />
-                        <span class="foyer-mono">{r.sender.name}</span>
-                      </div>
-                      <p class="foyer-serif mt-2">{r.body}</p>
-                      <div class="flex items-center justify-between gap-2 mt-2">
-                        <div class="flex gap-1 flex-wrap">
-                          <span :for={v <- r.values} class="foyer-tag outline">{v}</span>
-                        </div>
-                        <.link
-                          :if={r.sender_id == @current_scope.user.id}
-                          navigate={~p"/recognitions/#{r.id}"}
-                          class="foyer-btn sm shrink-0"
-                          id={"today-recognition-view-#{r.id}"}
-                        >
-                          View
-                        </.link>
-                      </div>
+                      <FoyerComponents.recognition_card
+                        recognition={r}
+                        current_user_id={@current_scope.user.id}
+                      />
                     </div>
                   </div>
                 </section>
@@ -327,27 +315,12 @@ defmodule FoyerWeb.TodayLive do
                     <div
                       :for={r <- @briefing.recent_recognitions}
                       id={"recognition-#{r.id}"}
-                      class="rounded-lg border p-3 mt-2"
-                      style="border-color: var(--foyer-rule);"
+                      class="mt-2"
                     >
-                      <div class="flex items-center gap-2">
-                        <FoyerComponents.avatar initials={r.sender.initials} size={:sm} />
-                        <span class="foyer-mono">{r.sender.name}</span>
-                      </div>
-                      <p class="foyer-serif mt-2">{r.body}</p>
-                      <div class="flex items-center justify-between gap-2 mt-2">
-                        <div class="flex gap-1 flex-wrap">
-                          <span :for={v <- r.values} class="foyer-tag outline">{v}</span>
-                        </div>
-                        <.link
-                          :if={r.sender_id == @current_scope.user.id}
-                          navigate={~p"/recognitions/#{r.id}"}
-                          class="foyer-btn sm shrink-0"
-                          id={"today-recognition-view-#{r.id}"}
-                        >
-                          View
-                        </.link>
-                      </div>
+                      <FoyerComponents.recognition_card
+                        recognition={r}
+                        current_user_id={@current_scope.user.id}
+                      />
                     </div>
                   </div>
                 </section>
@@ -375,7 +348,7 @@ defmodule FoyerWeb.TodayLive do
                     field={@end_shift_form[:handoff_channel_id]}
                     type="select"
                     label="Send to channel"
-                    options={[{"— no channel —", nil} | @channel_options]}
+                    options={@channel_options}
                     id="handoff-channel-select"
                   />
                   <button class="foyer-btn forest sm" type="submit">Clock out</button>
@@ -383,7 +356,7 @@ defmodule FoyerWeb.TodayLive do
                     type="button"
                     phx-click="skip_clock_out"
                     id="skip-clock-out"
-                    class="foyer-mono text-sm text-center"
+                    class="foyer-mono text-sm text-center cursor-pointer"
                   >
                     Skip · clock out
                   </button>
