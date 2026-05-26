@@ -88,9 +88,6 @@ defmodule FoyerWeb.RecognitionsLiveTest do
     test "submitting with recipient = sender surfaces the self-recognition flash", %{conn: conn} do
       stub_with(Foyer.RecognitionsMock, RecognitionsScenarios.Empty)
 
-      # `id: 2` is Hugo in `WithPeople` — so the select option for
-      # `recipient_id` includes "2" and form validation passes through to
-      # `give/2`, which is what we want to assert on.
       scope = IsolatedHelpers.build_scope(id: 2, role: :staff, on_shift?: true)
 
       expect(Foyer.RecognitionsMock, :give, fn _sender, attrs ->
@@ -100,16 +97,16 @@ defmodule FoyerWeb.RecognitionsLiveTest do
 
       {:ok, view, _html} = mount_isolated_recognitions(conn, action: :new, scope: scope)
 
-      view
-      |> form("#recognize-form",
-        recognition: %{
+      refute has_element?(view, "select#recognition-recipient option[value='2']", "Hugo Brandt")
+
+      render_hook(view, "give_submit", %{
+        "recognition" => %{
           "recipient_id" => to_string(scope.user.id),
           "body" => "Praise myself.",
           "values" => ["care"],
           "public" => "true"
         }
-      )
-      |> render_submit()
+      })
 
       assert render(view) =~ "Choose someone else to recognize."
     end
@@ -165,10 +162,49 @@ defmodule FoyerWeb.RecognitionsLiveTest do
       assert has_element?(view, "input#value-care[checked]")
       refute render(view) =~ ~s(data-value="")
     end
+
+    test "visibility and bonus selections remain selected while editing text", %{conn: conn} do
+      stub_with(Foyer.RecognitionsMock, RecognitionsScenarios.Empty)
+
+      scope = IsolatedHelpers.build_scope(id: 99, role: :manager, on_shift?: true)
+
+      {:ok, view, _html} = mount_isolated_recognitions(conn, action: :new, scope: scope)
+
+      view
+      |> form("#recognize-form",
+        recognition: %{
+          "recipient_id" => "3",
+          "values" => ["care"],
+          "body" => "First draft",
+          "public" => "false",
+          "bonus_points" => "25"
+        }
+      )
+      |> render_change()
+
+      assert has_element?(view, "input#visibility-private[checked]")
+      assert has_element?(view, "input#bonus-25[checked]")
+
+      view
+      |> form("#recognize-form",
+        recognition: %{
+          "recipient_id" => "3",
+          "values" => ["care"],
+          "body" => "Second draft",
+          "public" => "false",
+          "bonus_points" => "25"
+        }
+      )
+      |> render_change()
+
+      assert has_element?(view, "input#visibility-private[checked]")
+      assert has_element?(view, "input#bonus-25[checked]")
+      refute has_element?(view, "input#visibility-public[checked]")
+    end
   end
 
   describe "F.Recognitions.4 — values required" do
-    test "submitting with empty values flashes a generic validation error", %{conn: conn} do
+    test "submitting with empty values shows the field-level validation error", %{conn: conn} do
       stub_with(Foyer.RecognitionsMock, RecognitionsScenarios.Empty)
 
       scope = IsolatedHelpers.build_scope(role: :staff, on_shift?: true)
@@ -178,8 +214,6 @@ defmodule FoyerWeb.RecognitionsLiveTest do
         # the context normalizes it to [] before validation.
         assert attrs["values"] == [""]
 
-        # The context returns a changeset error. The LV's catch-all
-        # `{:error, _changeset}` clause flashes a generic copy.
         {:error,
          Recognition.changeset(%Recognition{}, attrs)
          |> Ecto.Changeset.add_error(:values, "choose at least one value")}
@@ -190,14 +224,16 @@ defmodule FoyerWeb.RecognitionsLiveTest do
       view
       |> form("#recognize-form",
         recognition: %{
-          "recipient_id" => "1",
+          "recipient_id" => "2",
           "body" => "Thanks.",
           "public" => "true"
         }
       )
       |> render_submit()
 
-      assert render(view) =~ "Couldn&#39;t send recognition."
+      html = render(view)
+      assert html =~ "Please fix the highlighted fields."
+      assert html =~ "choose at least one value"
     end
   end
 

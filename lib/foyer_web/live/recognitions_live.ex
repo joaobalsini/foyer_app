@@ -23,6 +23,7 @@ defmodule FoyerWeb.RecognitionsLive do
      |> assign(:preview_body, "")
      |> assign(:preview_values, [])
      |> assign(:preview_bonus_points, nil)
+     |> assign(:preview_public, true)
      |> assign(:page_title, "Recognitions")}
   end
 
@@ -36,16 +37,19 @@ defmodule FoyerWeb.RecognitionsLive do
   end
 
   defp apply_new(socket) do
+    scope = socket.assigns.current_scope
+
     {:noreply,
      socket
      |> assign(:recognition, nil)
-     |> assign(:people, FoyerWeb.LiveDeps.accounts().list_people([]))
+     |> assign(:people, recipient_options(scope))
      |> assign(:form, to_form(FoyerWeb.LiveDeps.recognitions().compose_changeset(%{})))
      |> assign(:preview_recipient_id, "")
      |> assign(:preview_recipient_name, "")
      |> assign(:preview_body, "")
      |> assign(:preview_values, [])
      |> assign(:preview_bonus_points, nil)
+     |> assign(:preview_public, true)
      |> assign(:page_title, "Give recognition")}
   end
 
@@ -78,7 +82,7 @@ defmodule FoyerWeb.RecognitionsLive do
       {:noreply,
        socket
        |> assign(:recognition, r)
-       |> assign(:people, FoyerWeb.LiveDeps.accounts().list_people([]))
+       |> assign(:people, recipient_options(scope))
        |> assign(:form, to_form(FoyerWeb.LiveDeps.recognitions().change_recognition(r, %{})))
        |> assign(:page_title, "Edit recognition")}
     rescue
@@ -106,6 +110,13 @@ defmodule FoyerWeb.RecognitionsLive do
 
       {:error, :invalid_point_tier} ->
         {:noreply, put_flash(socket, :error, "Choose one of the available point tiers.")}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply,
+         socket
+         |> apply_preview_attrs(attrs)
+         |> assign(:form, to_form(%{changeset | action: :insert}))
+         |> put_flash(:error, "Please fix the highlighted fields.")}
 
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "Couldn't send recognition.")}
@@ -154,6 +165,21 @@ defmodule FoyerWeb.RecognitionsLive do
   end
 
   def handle_event("preview_change", %{"recognition" => attrs}, socket) do
+    {:noreply,
+     socket
+     |> apply_preview_attrs(attrs)
+     |> assign(:form, to_form(FoyerWeb.LiveDeps.recognitions().compose_changeset(attrs)))}
+  end
+
+  def handle_event("set_bonus", %{"bonus" => "clear"}, socket) do
+    {:noreply, assign(socket, :preview_bonus_points, nil)}
+  end
+
+  def handle_event("set_bonus", %{"bonus" => bonus}, socket) do
+    {:noreply, assign(socket, :preview_bonus_points, String.to_integer(bonus))}
+  end
+
+  defp apply_preview_attrs(socket, attrs) do
     recipient_id = Map.get(attrs, "recipient_id", "")
 
     recipient_name =
@@ -174,24 +200,16 @@ defmodule FoyerWeb.RecognitionsLive do
       case Map.get(attrs, "bonus_points") do
         nil -> nil
         "" -> nil
-        v -> elem(Integer.parse(v), 0)
+        v -> parse_integer(v)
       end
 
-    {:noreply,
-     socket
-     |> assign(:preview_recipient_name, recipient_name)
-     |> assign(:preview_recipient_id, recipient_id)
-     |> assign(:preview_body, Map.get(attrs, "body", ""))
-     |> assign(:preview_values, clean_values(Map.get(attrs, "values", [])))
-     |> assign(:preview_bonus_points, bonus_points)}
-  end
-
-  def handle_event("set_bonus", %{"bonus" => "clear"}, socket) do
-    {:noreply, assign(socket, :preview_bonus_points, nil)}
-  end
-
-  def handle_event("set_bonus", %{"bonus" => bonus}, socket) do
-    {:noreply, assign(socket, :preview_bonus_points, String.to_integer(bonus))}
+    socket
+    |> assign(:preview_recipient_name, recipient_name)
+    |> assign(:preview_recipient_id, recipient_id)
+    |> assign(:preview_body, Map.get(attrs, "body", ""))
+    |> assign(:preview_values, clean_values(Map.get(attrs, "values", [])))
+    |> assign(:preview_bonus_points, bonus_points)
+    |> assign(:preview_public, Map.get(attrs, "public", "true") == "true")
   end
 
   @impl true
@@ -413,10 +431,11 @@ defmodule FoyerWeb.RecognitionsLive do
                             {p.name}
                           </option>
                         </select>
+                        <.field_errors form={@form} field={:recipient_id} />
                       </div>
 
                       <div>
-                        <FoyerComponents.section_label label="House values" class="block mb-2" />
+                        <FoyerComponents.section_label label="House values shown" class="block mb-2" />
                         <div class="flex flex-wrap gap-2" id="house-values">
                           <input type="hidden" name="recognition[values][]" value="" />
                           <label
@@ -442,6 +461,7 @@ defmodule FoyerWeb.RecognitionsLive do
                           </label>
                         </div>
                         <p class="text-xs text-stone-500 mt-1 italic">Pick one or more.</p>
+                        <.field_errors form={@form} field={:values} />
                       </div>
 
                       <div>
@@ -453,6 +473,7 @@ defmodule FoyerWeb.RecognitionsLive do
                           placeholder="Stayed past 23:00 fixing the Garden Suite shower so the Yamada family could enjoy it on arrival…"
                           class="w-full px-4 py-3 rounded-lg border border-stone-300 bg-[color:var(--foyer-cream-deep)] text-sm leading-relaxed"
                         >{@preview_body}</textarea>
+                        <.field_errors form={@form} field={:body} />
                       </div>
 
                       <fieldset class="space-y-2">
@@ -462,7 +483,7 @@ defmodule FoyerWeb.RecognitionsLive do
                             type="radio"
                             name="recognition[public]"
                             value="true"
-                            checked
+                            checked={@preview_public}
                             id="visibility-public"
                             class="mt-1"
                           />
@@ -476,6 +497,7 @@ defmodule FoyerWeb.RecognitionsLive do
                             type="radio"
                             name="recognition[public]"
                             value="false"
+                            checked={!@preview_public}
                             id="visibility-private"
                             class="mt-1"
                           />
@@ -517,6 +539,7 @@ defmodule FoyerWeb.RecognitionsLive do
                             {if tier == 0, do: "0", else: "+#{tier}"}
                           </label>
                         </div>
+                        <.field_errors form={@form} field={:bonus_points} />
                       </fieldset>
 
                       <p
@@ -599,6 +622,32 @@ defmodule FoyerWeb.RecognitionsLive do
     do: sender_id == id
 
   defp managed_by?(_, _), do: false
+
+  attr :form, Phoenix.HTML.Form, required: true
+  attr :field, :atom, required: true
+
+  defp field_errors(assigns) do
+    ~H"""
+    <div :if={@form[@field].errors != []} class="mt-1 text-sm text-[var(--foyer-claret)]">
+      <p :for={error <- @form[@field].errors}>
+        {translate_error(error)}
+      </p>
+    </div>
+    """
+  end
+
+  defp recipient_options(%Scope{user: %{id: user_id}}) do
+    []
+    |> FoyerWeb.LiveDeps.accounts().list_people()
+    |> Enum.reject(&(&1.id == user_id))
+  end
+
+  defp parse_integer(value) do
+    case Integer.parse(to_string(value)) do
+      {integer, ""} -> integer
+      _ -> nil
+    end
+  end
 
   defp clean_values(values) when is_list(values), do: Enum.reject(values, &(&1 in [nil, ""]))
   defp clean_values(_), do: []

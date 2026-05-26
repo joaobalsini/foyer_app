@@ -74,10 +74,11 @@ show page with a confirmation toast.
 
 **Given** an on-shift user composing a recognition
 
-**When** they pick themselves as the recipient and submit
+**When** the recipient picker renders
 
-**Then** the context rejects the attempt with `{:error, :self_recognition}`
-and no recognition is created.
+**Then** the current user is omitted from the recipient options. If a forged
+submission still names the sender as the recipient, the context rejects the
+attempt with `{:error, :self_recognition}` and no recognition is created.
 
 ### F.Recognitions.3 — House value vocabulary is fixed
 
@@ -97,7 +98,12 @@ is rejected by the changeset.
 cleared)
 
 **Then** the changeset adds an error on `:values` ("choose at least one
-value") and the recognition is not inserted.
+value"), the form shows that field-level error instead of only a generic
+failure message, and the recognition is not inserted.
+
+While composing, changing text, visibility, house values shown, or bonus-point
+tier preserves the other current form selections in the rendered form and
+preview.
 
 ### F.Recognitions.5 — Bonus points are manager-only
 
