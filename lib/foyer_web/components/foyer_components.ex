@@ -581,7 +581,8 @@ defmodule FoyerWeb.FoyerComponents do
             <.icon name="hero-sparkles" class="size-4 text-[var(--foyer-brass)]" />
             <span>For {recipient_name(@recognition)}</span>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center justify-end gap-2 flex-wrap" data-values>
+            <.house_value_chip :for={v <- @recognition.values || []} value={v} selected />
             <%= if @recognition.bonus_points && @recognition.bonus_points > 0 do %>
               <span class="foyer-tag claret" data-bonus>+{@recognition.bonus_points} pts</span>
             <% end %>
@@ -589,7 +590,7 @@ defmodule FoyerWeb.FoyerComponents do
           </div>
         </div>
 
-        <p class="foyer-serif text-2xl md:text-3xl leading-tight italic">
+        <p class="foyer-serif text-xl md:text-2xl leading-snug italic">
           "{@recognition.body}"
         </p>
       </div>
@@ -602,8 +603,7 @@ defmodule FoyerWeb.FoyerComponents do
             <div class="text-sm text-stone-600">{relative_day(@recognition.inserted_at)}</div>
           </div>
         </div>
-        <div class="flex items-center justify-end gap-2 flex-wrap" data-values>
-          <.house_value_chip :for={v <- @recognition.values || []} value={v} selected />
+        <div class="flex items-center justify-end gap-2">
           <.link
             :if={own_recognition?(@recognition, @current_user_id)}
             navigate={~p"/recognitions/#{@recognition.id}"}
