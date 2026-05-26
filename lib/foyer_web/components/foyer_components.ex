@@ -529,7 +529,7 @@ defmodule FoyerWeb.FoyerComponents do
         </span>
         <.link
           navigate={~p"/announcements/#{@announcement.id}"}
-          class="foyer-btn sm shrink-0"
+          class="foyer-btn sm shrink-0 ml-auto"
           id={"announcement-card-link-#{@announcement.id}"}
         >
           View

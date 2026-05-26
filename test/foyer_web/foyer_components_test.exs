@@ -204,6 +204,8 @@ defmodule FoyerWeb.FoyerComponentsTest do
       assert html =~ "Needs your ack"
       refute html =~ "0/0 acknowledged"
       refute html =~ "acknowledged"
+      assert html =~ ~s(id="announcement-card-link-100")
+      assert html =~ "ml-auto"
     end
 
     test "F.Announcements.7 — marks an acknowledgement-required announcement as acknowledged by the current user" do
