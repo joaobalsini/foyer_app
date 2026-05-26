@@ -123,6 +123,23 @@ defmodule FoyerWeb.IsolatedHelpers do
   end
 
   @doc """
+  Mount `FoyerWeb.PeopleLive` in `:index` action in isolation.
+  """
+  defmacro mount_isolated_people_index(conn, viewer, opts \\ []) do
+    quote bind_quoted: [conn: conn, viewer: viewer, opts: opts] do
+      on_shift? = Keyword.get(opts, :on_shift?, true)
+
+      session = %{
+        "foyer_isolated_user" => viewer,
+        "foyer_isolated_on_shift?" => on_shift?,
+        "foyer_isolated_live_action" => :index
+      }
+
+      Phoenix.LiveViewTest.live_isolated(conn, FoyerWeb.IsolatedPeopleLive, session: session)
+    end
+  end
+
+  @doc """
   Prepares a conn for `live_isolated/3` and produces the matching opts.
   """
   @spec prepare_isolated(Plug.Conn.t(), module(), Scope.t(), keyword()) ::

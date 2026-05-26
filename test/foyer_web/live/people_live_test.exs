@@ -3,10 +3,13 @@ defmodule FoyerWeb.PeopleLiveTest do
   Isolated tests for `FoyerWeb.PeopleLive`.
 
   Covers:
+    F.Channels.15 — People directory desktop list matches the design structure
+    F.Channels.16 — on-shift status renders in the row status slot
+    F.Channels.17 — Department filters come from channel counts; rows omit channel pills
+    F.Channels.21 — Department and On shift filters prune the stream
     F.Channels.22 — Profile.Card must not expose channel memberships
-    F.Profile.6  — private recognitions hidden on colleague profile view
-    F.Profile.8  — Given section absent on colleague's profile
-    F.Profile.19 — colleague profile reuses profile_card, rewards hidden
+    F.Profile.8  — staff cannot access another user's profile view
+    F.Profile.19 — managers can open full profiles from People
   """
   use ExUnit.Case, async: true
 
@@ -24,6 +27,102 @@ defmodule FoyerWeb.PeopleLiveTest do
 
   setup do
     {:ok, conn: build_conn()}
+  end
+
+  describe "F.Channels.15 / F.Channels.17 — desktop People directory design" do
+    setup do
+      stub_with(Foyer.AccountsMock, Foyer.AccountsScenarios.WithPeople)
+      stub_with(Foyer.ChannelsMock, Foyer.ChannelsScenarios.TwoChannels)
+      stub_with(Foyer.ShiftsMock, Foyer.ShiftsScenarios.WithOnShift)
+      :ok
+    end
+
+    test "renders the design header, filter chips, rows, and explicit row actions", %{conn: conn} do
+      viewer = ProfileScenarios.user_charlotte()
+
+      {:ok, view, _html} = mount_isolated_people_index(conn, viewer)
+
+      assert has_element?(view, "#people-count", "3 colleagues · The Linden")
+      assert has_element?(view, "#people-filters")
+      assert has_element?(view, "#filter-department-menu")
+      assert has_element?(view, "#filter-on-shift")
+      assert has_element?(view, "#people-row-1")
+      assert has_element?(view, "#people-identity-1")
+      refute has_element?(view, "#people-profile-link-1")
+      assert has_element?(view, "#view-profile-1", "View profile")
+      assert has_element?(view, "#message-colleague-1", "Message")
+    end
+
+    test "F.Channels.17 — department menu uses channel counts and rows omit channel pills",
+         %{conn: conn} do
+      viewer = ProfileScenarios.user_charlotte()
+
+      {:ok, view, _html} = mount_isolated_people_index(conn, viewer)
+
+      assert has_element?(view, "#filter-channel-101", "Housekeeping · Floor 4")
+      assert has_element?(view, "#filter-channel-102", "All Housekeeping")
+      refute has_element?(view, "#people-row-1 [id^='person-1-channel-']")
+    end
+
+    test "F.Profile.8 / F.Profile.19 — staff see View profile only for themselves",
+         %{conn: conn} do
+      viewer = Foyer.AccountsScenarios.WithPeople.people() |> Enum.find(&(&1.id == 2))
+
+      {:ok, view, _html} = mount_isolated_people_index(conn, viewer)
+
+      refute has_element?(view, "#view-profile-1")
+      assert has_element?(view, "#view-profile-2")
+      refute has_element?(view, "#view-profile-3")
+    end
+  end
+
+  describe "F.Channels.16 / F.Channels.21 — People directory filters" do
+    setup do
+      stub_with(Foyer.AccountsMock, Foyer.AccountsScenarios.WithPeople)
+      stub_with(Foyer.ChannelsMock, Foyer.ChannelsScenarios.TwoChannels)
+      stub_with(Foyer.ShiftsMock, Foyer.ShiftsScenarios.WithOnShift)
+      :ok
+    end
+
+    test "F.Channels.16 — on-shift and off-shift statuses render in row status slots",
+         %{conn: conn} do
+      viewer = ProfileScenarios.user_charlotte()
+
+      {:ok, view, _html} = mount_isolated_people_index(conn, viewer)
+
+      assert has_element?(view, "#people-status-1", "On shift")
+      assert has_element?(view, "#people-status-2", "Off shift")
+    end
+
+    test "F.Channels.21 — department filter narrows and All restores rows", %{conn: conn} do
+      viewer = ProfileScenarios.user_charlotte()
+
+      {:ok, view, _html} = mount_isolated_people_index(conn, viewer)
+
+      assert has_element?(view, "#people-row-1")
+      assert has_element?(view, "#people-row-2")
+
+      view |> element("#filter-channel-101") |> render_click()
+
+      assert has_element?(view, "#people-row-1")
+      assert has_element?(view, "#people-row-3")
+      refute has_element?(view, "#people-row-2")
+
+      view |> element("#filter-all") |> render_click()
+      assert has_element?(view, "#people-row-2")
+    end
+
+    test "F.Channels.21 — on-shift filter shows only users on shift", %{conn: conn} do
+      viewer = ProfileScenarios.user_charlotte()
+
+      {:ok, view, _html} = mount_isolated_people_index(conn, viewer)
+
+      view |> element("#filter-on-shift") |> render_click()
+
+      assert has_element?(view, "#people-row-1")
+      assert has_element?(view, "#people-row-3")
+      refute has_element?(view, "#people-row-2")
+    end
   end
 
   describe "F.Channels.22 — channel memberships are NOT sourced from Profile.Card" do
@@ -51,107 +150,52 @@ defmodule FoyerWeb.PeopleLiveTest do
     end
   end
 
-  describe "F.Profile.8 — Given section absent on colleague view" do
+  describe "F.Profile.8 — staff cannot access another user's profile view" do
     setup do
       stub(Foyer.AccountsMock, :get_user!, fn _id ->
         ProfileScenarios.user_maya()
       end)
 
-      stub(Foyer.ProfileMock, :profile_for, fn _subject, _viewer ->
-        %Foyer.Profile.Card{
-          user: ProfileScenarios.user_maya(),
-          received: [ProfileScenarios.recognition_public()],
-          given: [],
-          points: 245,
-          on_shift?: true,
-          received_this_month: 1,
-          points_earned: []
-        }
+      :ok
+    end
+
+    test "redirects staff away from a colleague profile", %{conn: conn} do
+      viewer = Foyer.AccountsScenarios.WithPeople.people() |> Enum.find(&(&1.id == 2))
+      subject_id = ProfileScenarios.user_maya().id
+
+      assert {:error, {:live_redirect, %{to: "/people"}}} =
+               mount_isolated_people_show(conn, viewer, subject_id)
+    end
+  end
+
+  describe "F.Profile.19 — managers can open full People profiles" do
+    setup do
+      stub(Foyer.AccountsMock, :get_user!, fn _id ->
+        ProfileScenarios.user_maya()
       end)
 
+      stub(Foyer.ProfileMock, :own_profile_for, fn _subject ->
+        Foyer.ProfileScenarios.LineStaff.own_profile_for(ProfileScenarios.user_maya())
+      end)
+
+      stub(Foyer.ProfileMock, :rewards_catalog, fn -> ProfileScenarios.sample_rewards() end)
       stub(Foyer.ChannelsMock, :list_for_user, fn _user -> [] end)
 
       :ok
     end
 
-    test "does not render the recognitions-given section", %{conn: conn} do
-      viewer = ProfileScenarios.user_charlotte()
-      subject_id = ProfileScenarios.user_maya().id
-
-      {:ok, view, _html} = mount_isolated_people_show(conn, viewer, subject_id)
-
-      refute has_element?(view, "#recognitions-given")
-    end
-
-    test "F.Profile.19 — rewards catalog absent on colleague view", %{conn: conn} do
-      viewer = ProfileScenarios.user_charlotte()
-      subject_id = ProfileScenarios.user_maya().id
-
-      {:ok, view, _html} = mount_isolated_people_show(conn, viewer, subject_id)
-
-      refute has_element?(view, "#rewards")
-    end
-
-    test "F.Profile.6 — only public recognitions visible in received section", %{conn: conn} do
+    test "renders the colleague's full profile card", %{conn: conn} do
       viewer = ProfileScenarios.user_charlotte()
       subject_id = ProfileScenarios.user_maya().id
 
       {:ok, view, _html} = mount_isolated_people_show(conn, viewer, subject_id)
 
       html = render(view)
-      assert html =~ "Quietly handled a 02:14 guest issue"
-      refute html =~ "Private: handled a sensitive situation"
-    end
-  end
-
-  describe "F.Profile.19 — colleague profile reuses profile_card component" do
-    setup do
-      stub(Foyer.AccountsMock, :get_user!, fn _id ->
-        ProfileScenarios.user_maya()
-      end)
-
-      stub(Foyer.ProfileMock, :profile_for, fn _subject, _viewer ->
-        %Foyer.Profile.Card{
-          user: ProfileScenarios.user_maya(),
-          received: [ProfileScenarios.recognition_public()],
-          given: [],
-          points: 245,
-          on_shift?: true,
-          received_this_month: 1,
-          points_earned: []
-        }
-      end)
-
-      stub(Foyer.ChannelsMock, :list_for_user, fn _user -> [] end)
-
-      :ok
-    end
-
-    test "renders the colleague's name in the profile card", %{conn: conn} do
-      viewer = ProfileScenarios.user_charlotte()
-      subject_id = ProfileScenarios.user_maya().id
-
-      {:ok, view, _html} = mount_isolated_people_show(conn, viewer, subject_id)
-
-      assert render(view) =~ "Maya Okafor"
-    end
-
-    test "renders the received recognitions section", %{conn: conn} do
-      viewer = ProfileScenarios.user_charlotte()
-      subject_id = ProfileScenarios.user_maya().id
-
-      {:ok, view, _html} = mount_isolated_people_show(conn, viewer, subject_id)
-
+      assert html =~ "Maya Okafor"
       assert has_element?(view, "#recognitions-received")
-    end
-
-    test "renders the on-shift tag for the colleague (on_shift? true)", %{conn: conn} do
-      viewer = ProfileScenarios.user_charlotte()
-      subject_id = ProfileScenarios.user_maya().id
-
-      {:ok, view, _html} = mount_isolated_people_show(conn, viewer, subject_id)
-
-      assert render(view) =~ "On shift"
+      assert has_element?(view, "#recognitions-given")
+      assert has_element?(view, "#rewards")
+      assert html =~ "Private: handled a sensitive situation"
     end
   end
 end

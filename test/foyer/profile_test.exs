@@ -5,6 +5,7 @@ defmodule Foyer.ProfileTest do
   Pure-struct testing with injected callables; no DB.
 
   Covers:
+    F.Profile.6  — private recognitions are hidden from non-manager colleague reads
     F.Profile.23 — private-recognition filtering enforced at the context boundary
   """
   use ExUnit.Case, async: true
@@ -55,7 +56,7 @@ defmodule Foyer.ProfileTest do
     ]
   end
 
-  describe "F.Profile.23 — profile_for/2 privacy boundary" do
+  describe "F.Profile.6 / F.Profile.23 — profile_for/2 privacy boundary" do
     test "viewer is subject: includes private recognitions and given list" do
       maya = user(%{id: 1})
       public = recognition(%{id: 1, public: true})
@@ -69,14 +70,14 @@ defmodule Foyer.ProfileTest do
       assert card.given == given
     end
 
-    test "viewer is colleague: strips private recognitions and clears given list" do
+    test "F.Profile.6 — non-manager viewer is colleague: strips private recognitions and clears given list" do
       maya = user(%{id: 1})
-      charlotte = user(%{id: 2, name: "Charlotte Voss", initials: "CV", role: :manager})
+      hugo = user(%{id: 2, name: "Hugo Lane", initials: "HL", role: :staff})
       public = recognition(%{id: 1, public: true})
       private = recognition(%{id: 2, public: false})
-      given = [recognition(%{id: 3, sender_id: maya.id, recipient_id: charlotte.id})]
+      given = [recognition(%{id: 3, sender_id: maya.id, recipient_id: hugo.id})]
 
-      card = Profile.profile_for(maya, charlotte, profile_opts([public, private], given))
+      card = Profile.profile_for(maya, hugo, profile_opts([public, private], given))
 
       assert card.received == [public]
       assert card.given == []

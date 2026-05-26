@@ -27,7 +27,7 @@ inbox, the room, and the picker, subscribes to `chat:room:<id>` while a room is 
   membership-gated.
 - Global unread count per user, used by the bottom-nav and desktop-rail unread dots.
 - Picker (`/chat/new`): people tab with off-shift tagging, channels tab listing the user's
-  memberships, click-to-open routing to `/chat/:conversation_id`.
+  memberships with real member counts, click-to-open routing to `/chat/:conversation_id`.
 - PubSub broadcasts: `:chat_message` on `chat:room:<conversation_id>` for new messages and
   `:chat_inbox_updated` on `chat:inbox:<recipient_id>` for inbox refresh.
 - Direct room header showing the other participant's shift state; channel conversations omit this
@@ -154,8 +154,11 @@ a virtual `unread?` boolean, and a virtual `unread_count`, sorted by `last_messa
 **Then** the message is appended to the room stream without a full page reload, and the sender's
 `:chat_inbox_updated` broadcast refreshes the receiver's inbox panel.
 
-**And given** the picker is open, **when** the user clicks a person or channel button, **then** the
-LiveView opens or creates the underlying conversation and redirects to `/chat/:conversation_id`.
+**And given** the picker is open, **when** the channel tab renders, **then** each channel row shows
+the real member count from `Channels.list_all_with_member_counts/0`, not a hard-coded zero.
+
+**And when** the user clicks a person or channel button, **then** the LiveView opens or creates the
+underlying conversation and redirects to `/chat/:conversation_id`.
 
 ### F.Chat.11 — Off-shift tags in picker and room header
 

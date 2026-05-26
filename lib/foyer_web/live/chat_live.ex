@@ -24,6 +24,7 @@ defmodule FoyerWeb.ChatLive do
      |> stream(:messages, [])
      |> assign(:people, [])
      |> assign(:channels, [])
+     |> assign(:channel_member_counts, %{})
      |> assign(:on_shift_user_ids, MapSet.new())
      |> assign(:conversation, nil)
      |> assign(:picker_tab, :people)
@@ -39,11 +40,12 @@ defmodule FoyerWeb.ChatLive do
     case socket.assigns.live_action do
       :inbox ->
         conversations = FoyerWeb.LiveDeps.chat().inbox_for(scope.user)
-        channels = FoyerWeb.LiveDeps.channels().list_for_user(scope.user)
+        {channels, channel_member_counts} = channels_for_picker(scope.user)
 
         {:noreply,
          socket
          |> assign(:channels, channels)
+         |> assign(:channel_member_counts, channel_member_counts)
          |> assign(:conversation, nil)
          |> assign(:page_title, "Messages")
          |> assign(:unread_count, FoyerWeb.LiveDeps.chat().unread_count(scope.user))
@@ -62,7 +64,7 @@ defmodule FoyerWeb.ChatLive do
 
     try do
       conversations = FoyerWeb.LiveDeps.chat().inbox_for(scope.user)
-      channels = FoyerWeb.LiveDeps.channels().list_for_user(scope.user)
+      {channels, channel_member_counts} = channels_for_picker(scope.user)
       on_shift_user_ids = FoyerWeb.LiveDeps.shifts().users_on_shift_ids()
 
       conversation = FoyerWeb.LiveDeps.chat().get_conversation!(id, scope.user)
@@ -78,6 +80,7 @@ defmodule FoyerWeb.ChatLive do
        socket
        |> stream(:conversations, conversations, reset: true)
        |> assign(:channels, channels)
+       |> assign(:channel_member_counts, channel_member_counts)
        |> assign(:on_shift_user_ids, on_shift_user_ids)
        |> assign(:conversation, conversation)
        |> assign(:unread_count, FoyerWeb.LiveDeps.chat().unread_count(scope.user))
@@ -277,7 +280,9 @@ defmodule FoyerWeb.ChatLive do
                         </span>
                         <span class="min-w-0">
                           <span class="chat-picker-title">{c.name}</span>
-                          <span class="chat-picker-subtitle">0 members</span>
+                          <span class="chat-picker-subtitle">
+                            {channel_member_count(@channel_member_counts, c)} members
+                          </span>
                         </span>
                       </button>
                     </li>
@@ -450,13 +455,14 @@ defmodule FoyerWeb.ChatLive do
   defp apply_new_message_params(socket, params) do
     scope = socket.assigns.current_scope
     people = FoyerWeb.LiveDeps.accounts().list_people([])
-    channels = FoyerWeb.LiveDeps.channels().list_for_user(scope.user)
+    {channels, channel_member_counts} = channels_for_picker(scope.user)
     on_shift_user_ids = FoyerWeb.LiveDeps.shifts().users_on_shift_ids()
 
     {:noreply,
      socket
      |> assign(:people, people)
      |> assign(:channels, channels)
+     |> assign(:channel_member_counts, channel_member_counts)
      |> assign(:on_shift_user_ids, on_shift_user_ids)
      |> assign(:conversation, nil)
      |> assign(:picker_tab, picker_tab(params["tab"]))
@@ -467,6 +473,25 @@ defmodule FoyerWeb.ChatLive do
   defp picker_tab("channels"), do: :channels
   defp picker_tab(:channels), do: :channels
   defp picker_tab(_), do: :people
+
+  defp channels_for_picker(user) do
+    channels = FoyerWeb.LiveDeps.channels().list_for_user(user)
+    channel_ids = MapSet.new(channels, & &1.id)
+
+    counts =
+      FoyerWeb.LiveDeps.channels().list_all_with_member_counts()
+      |> Enum.reduce(%{}, fn {channel, count}, acc ->
+        if MapSet.member?(channel_ids, channel.id) do
+          Map.put(acc, channel.id, count)
+        else
+          acc
+        end
+      end)
+
+    {channels, counts}
+  end
+
+  defp channel_member_count(counts, channel), do: Map.get(counts, channel.id, 0)
 
   defp refresh_inbox(socket) do
     scope = socket.assigns.current_scope

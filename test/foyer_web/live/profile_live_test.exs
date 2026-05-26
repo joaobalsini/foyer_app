@@ -25,6 +25,7 @@ defmodule FoyerWeb.ProfileLiveTest do
     F.Profile.21 — house value tags on recognition cards
     F.Profile.22 — bonus points badge
     F.Profile.24 — points breakdown labelled as bonus-point earnings only
+    F.Profile.26 — /me loads only the current user's own profile
   """
   use ExUnit.Case, async: true
 
@@ -76,6 +77,22 @@ defmodule FoyerWeb.ProfileLiveTest do
 
       # Maya's inserted_at is 2023-03-15 in the scenario
       assert render(view) =~ "2023"
+    end
+  end
+
+  describe "F.Profile.26 — /me owns the current user's profile boundary" do
+    test "loads own_profile_for/1 with the current scope user only", %{conn: conn} do
+      user = ProfileScenarios.user_maya()
+      card = Foyer.ProfileScenarios.LineStaff.own_profile_for(user)
+
+      Foyer.ProfileMock
+      |> expect(:own_profile_for, 2, fn ^user -> card end)
+      |> expect(:rewards_catalog, 2, fn -> [] end)
+
+      {:ok, view, _html} = mount_isolated_profile(conn, user)
+
+      assert has_element?(view, "#profile-card")
+      assert render(view) =~ "Maya Okafor"
     end
   end
 

@@ -15,7 +15,7 @@ defmodule FoyerWeb.SmokeTest do
     F.Announcements.9 — announcement detail mounts with ack control
     F.Channels.15     — people index renders all seeded users
     F.Channels.16     — on-shift pulse for on-shift users
-    F.Channels.17     — channel pills come from real membership rows
+    F.Channels.17     — Department filter comes from real channel counts
     F.Channels.18     — off-shift gate redirects /people to /today
     F.Channels.21     — channel filter narrows and clears
     F.Channels.22     — :show renders #target-channels from Channels API
@@ -27,8 +27,8 @@ defmodule FoyerWeb.SmokeTest do
     F.Chat.10         — room mount / channel deep link / picker mount
     F.Chat.11         — picker tabs
     F.Profile.1       — /me renders profile content
-    F.Profile.6       — colleague profile hides private recognitions
-    F.Profile.8       — colleague profile hides given list
+    F.Profile.8       — staff cannot open another user's profile
+    F.Profile.19      — manager can open full profiles from People
     F.Profile.11      — /me renders Foyer points section
     F.Profile.17      — desktop rail rendered on primary surfaces
     F.Profile.18      — /me gated for off-shift users
@@ -397,26 +397,31 @@ defmodule FoyerWeb.SmokeTest do
       assert has_element?(view, "#people-row-#{ctx.rafael.id}")
       assert has_element?(view, "#people-row-#{ctx.aisha.id}")
       assert has_element?(view, "#people-row-#{ctx.jamal.id}")
+      assert has_element?(view, "#view-profile-#{ctx.maya.id}", "View profile")
+      assert has_element?(view, "#message-colleague-#{ctx.maya.id}", "Message")
       assert render(view) =~ "Sebastien Roy"
     end
 
     test "F.Channels.16 — on-shift Maya has the pulse, off-shift Jamal does not", ctx do
       {:ok, view, _html} = ctx.conn |> sign_in(ctx.charlotte) |> live(~p"/people")
 
-      assert has_element?(view, "#people-row-#{ctx.maya.id} .foyer-tag.moss")
-      refute has_element?(view, "#people-row-#{ctx.jamal.id} .foyer-tag.moss")
+      assert has_element?(view, "#people-status-#{ctx.maya.id}", "On shift")
+      assert has_element?(view, "#people-status-#{ctx.jamal.id}", "Off shift")
     end
 
-    test "F.Channels.17 — channel membership pills come from real membership rows", ctx do
+    test "F.Channels.17 — Department filter comes from real channel counts and rows omit channel pills",
+         ctx do
       {:ok, view, _html} = ctx.conn |> sign_in(ctx.charlotte) |> live(~p"/people")
 
-      assert has_element?(
+      assert has_element?(view, "#filter-department-menu")
+
+      refute has_element?(
                view,
                "#people-row-#{ctx.maya.id} [id^='person-#{ctx.maya.id}-channel-']"
              )
     end
 
-    test "F.Channels.21 — channel filter shows only members, clearing restores all", ctx do
+    test "F.Channels.21 — filters show only matching people, clearing restores all", ctx do
       {:ok, view, _html} = ctx.conn |> sign_in(ctx.charlotte) |> live(~p"/people")
 
       assert has_element?(view, "#people-row-#{ctx.maya.id}")
@@ -435,6 +440,10 @@ defmodule FoyerWeb.SmokeTest do
 
       view |> element("#filter-all") |> render_click()
       assert has_element?(view, "#people-row-#{ctx.maya.id}")
+
+      view |> element("#filter-on-shift") |> render_click()
+      assert has_element?(view, "#people-row-#{ctx.maya.id}")
+      refute has_element?(view, "#people-row-#{ctx.jamal.id}")
     end
 
     test "F.Channels.22 — :show renders #target-channels (channel pills from Channels API)",
@@ -444,22 +453,20 @@ defmodule FoyerWeb.SmokeTest do
       assert has_element?(view, "#target-channels")
     end
 
-    test "people :show renders the colleague name and back button", ctx do
-      {:ok, view, _html} = ctx.conn |> sign_in(ctx.maya) |> live(~p"/people/#{ctx.hugo.id}")
+    test "F.Profile.19 — manager can open a colleague full profile", ctx do
+      {:ok, view, _html} = ctx.conn |> sign_in(ctx.charlotte) |> live(~p"/people/#{ctx.aisha.id}")
 
       assert has_element?(view, "#back-to-people")
-      assert render(view) =~ "Hugo Brandt"
+      assert render(view) =~ "Aisha Bello"
+      assert has_element?(view, "#recognitions-given")
+      assert render(view) =~ ctx.private_recognition.body
     end
 
-    test "F.Profile.6 / F.Profile.8 — colleague profile hides private recognitions and given list",
-         ctx do
-      {:ok, view, _html} =
-        ctx.conn
-        |> sign_in(ctx.maya)
-        |> live(~p"/people/#{ctx.aisha.id}")
-
-      refute has_element?(view, "#recognitions-given")
-      refute render(view) =~ ctx.private_recognition.body
+    test "F.Profile.8 — staff cannot open another user's profile", ctx do
+      assert {:error, {:live_redirect, %{to: "/people"}}} =
+               ctx.conn
+               |> sign_in(ctx.maya)
+               |> live(~p"/people/#{ctx.hugo.id}")
     end
   end
 

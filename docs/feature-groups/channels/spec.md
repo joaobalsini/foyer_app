@@ -108,12 +108,15 @@ ordered alphabetically by channel name, with each count matching the actual numb
 **When** `Foyer.Channels.member_count/1` is called with the "F&B" channel.
 **Then** the result is `2`.
 
-### F.Channels.15 — People Directory renders all staff with channel pills
+### F.Channels.15 — People Directory renders the desktop list from the design
 
 **Given** a user is authenticated and on shift and navigates to `/people`.
 **When** `PeopleLive` renders the `:index` action.
-**Then** the page displays a list row for every seeded user, each row showing the user's name,
-title, and on-shift indicator when relevant, and no row is missing.
+**Then** the page matches `designs/recognition/desktop-people-directory.html`: a "People"
+heading, a `{count} colleagues · The Linden` summary, compact filter chips, and a list row for
+every seeded user. Each row shows the user's avatar initials, name, title, status text, an
+explicit `Message` action, and a `View profile` action only when the current user is allowed by
+F.Profile.8 / F.Profile.19. The row itself is not a link, and no row is missing.
 
 ### F.Channels.16 — People Directory shows on-shift pulse for on-shift colleagues
 
@@ -122,12 +125,13 @@ title, and on-shift indicator when relevant, and no row is missing.
 **Then** user A's row shows the on-shift indicator (the `foyer-pulse` element with the "On shift"
 label) and user B's row does not show it.
 
-### F.Channels.17 — People Directory membership pills come from real membership data
+### F.Channels.17 — People Directory uses design filters, not row-level channel pills
 
 **Given** a user is a member of "Housekeeping · Floor 4" and "All Housekeeping".
-**When** `PeopleLive` renders that user's row or profile card.
-**Then** both channel names appear in the rendered HTML. A channel the user is NOT a member
-of does NOT appear.
+**When** `PeopleLive` renders the directory index.
+**Then** the directory shows channel membership as filter options in the `Department` menu, using
+real `list_all_with_member_counts/0` data, but does not render channel pills inside each person
+row. Row-level channel memberships are reserved for the colleague detail view in F.Channels.22.
 
 ### F.Channels.18 — People Directory is gated to on-shift users
 
@@ -150,13 +154,16 @@ membership in channels the manager was not explicitly added to.
 **Then** it issues at most 2 database queries regardless of the number of channels (one for
 channels, one grouped count query over memberships — or a single join query).
 
-### F.Channels.21 — People Directory channel filter shows only members of the selected channel
+### F.Channels.21 — People Directory filters by department and on-shift state
 
 **Given** a user is authenticated and on shift and navigates to `/people`.
-**When** the user selects a channel from the filter sidebar.
+**When** the user selects a channel from the `Department` filter menu.
 **Then** only rows for users who have a real `Membership` record in that channel are shown.
 All other users are removed from the list. Clearing the filter (or selecting "All") restores
 the full unfiltered people list.
+
+**And when** the user selects the `On shift` filter.
+**Then** only rows for users whose ids are present in `Shifts.users_on_shift_ids/0` are shown.
 
 ### F.Channels.22 — Colleague detail view channel memberships come from a Channels-owned API
 

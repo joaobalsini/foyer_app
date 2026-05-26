@@ -1,9 +1,9 @@
 defmodule FoyerWeb.PeopleLive do
   @moduledoc """
-  People directory — `/people` (index) and `/people/:id` (one colleague's
-  profile card). On-shift pulses on the index row come from
-  `Foyer.Shifts.users_on_shift_ids/0`. Channel membership pills come from
-  `Foyer.Channels` via `FoyerWeb.LiveDeps`.
+  People directory — `/people` (index) and `/people/:id` (full profile for
+  managers, or the current user's own profile). On-shift pulses on the index row come from
+  `Foyer.Shifts.users_on_shift_ids/0`. Department filters and profile channel sections come
+  from `Foyer.Channels` via `FoyerWeb.LiveDeps`.
 
   ## LiveView discipline
   - Expensive loads happen in `handle_params/3`, not `mount/3`.
@@ -28,7 +28,10 @@ defmodule FoyerWeb.PeopleLive do
      |> assign(:target_channels, [])
      |> assign(:channel_filter_options, [])
      |> assign(:active_channel_filter, nil)
+     |> assign(:active_people_filter, :all)
      |> assign(:people_empty?, false)
+     |> assign(:people_count, 0)
+     |> assign(:profile_rewards, [])
      |> assign(:page_title, "People")
      |> stream(:people, [])}
   end
@@ -61,12 +64,29 @@ defmodule FoyerWeb.PeopleLive do
      socket
      |> assign(:people_empty?, people == [])
      |> assign(:active_channel_filter, channel_id)
+     |> assign(:active_people_filter, :channel)
+     |> assign(:people_count, length(people))
      |> stream(:people, people, reset: true)}
   end
 
   @impl true
   def handle_event("clear_filter", _params, socket) do
     apply_index(socket)
+  end
+
+  @impl true
+  def handle_event("filter_on_shift", _params, socket) do
+    people =
+      FoyerWeb.LiveDeps.accounts().list_people([])
+      |> Enum.filter(&MapSet.member?(socket.assigns.on_shift_ids, &1.id))
+
+    {:noreply,
+     socket
+     |> assign(:people_empty?, people == [])
+     |> assign(:active_channel_filter, nil)
+     |> assign(:active_people_filter, :on_shift)
+     |> assign(:people_count, length(people))
+     |> stream(:people, people, reset: true)}
   end
 
   @impl true
@@ -95,6 +115,8 @@ defmodule FoyerWeb.PeopleLive do
        FoyerWeb.LiveDeps.channels().list_all_with_member_counts()
      )
      |> assign(:active_channel_filter, nil)
+     |> assign(:active_people_filter, :all)
+     |> assign(:people_count, length(people))
      |> assign(:card, nil)
      |> assign(:page_title, "People")
      |> stream(:people, people, reset: true)}
@@ -102,15 +124,25 @@ defmodule FoyerWeb.PeopleLive do
 
   defp apply_show(socket, %{"id" => id}) do
     target = FoyerWeb.LiveDeps.accounts().get_user!(id)
-    viewer = socket.assigns.current_scope.user
-    card = FoyerWeb.LiveDeps.profile().profile_for(target, viewer)
-    target_channels = FoyerWeb.LiveDeps.channels().list_for_user(target)
 
-    {:noreply,
-     socket
-     |> assign(:card, card)
-     |> assign(:target_channels, target_channels)
-     |> assign(:page_title, target.name)}
+    if can_view_full_profile?(socket.assigns.current_scope, target) do
+      profile = FoyerWeb.LiveDeps.profile()
+      card = profile.own_profile_for(target)
+      rewards = profile.rewards_catalog()
+      target_channels = FoyerWeb.LiveDeps.channels().list_for_user(target)
+
+      {:noreply,
+       socket
+       |> assign(:card, card)
+       |> assign(:profile_rewards, rewards)
+       |> assign(:target_channels, target_channels)
+       |> assign(:page_title, target.name)}
+    else
+      {:noreply,
+       socket
+       |> put_flash(:error, "Only managers can view another colleague's full profile.")
+       |> push_navigate(to: ~p"/people")}
+    end
   rescue
     Ecto.NoResultsError ->
       {:noreply,
@@ -118,6 +150,9 @@ defmodule FoyerWeb.PeopleLive do
        |> put_flash(:error, "Unknown user.")
        |> push_navigate(to: ~p"/people")}
   end
+
+  defp can_view_full_profile?(%Scope{user: %{id: user_id}}, %{id: user_id}), do: true
+  defp can_view_full_profile?(%Scope{} = scope, _target), do: Scope.manager?(scope)
 
   @impl true
   def render(assigns) do
@@ -141,7 +176,7 @@ defmodule FoyerWeb.PeopleLive do
                 >
                   <.icon name="hero-arrow-left" class="size-4" /> Back
                 </.link>
-                <FoyerComponents.profile_card card={@card} />
+                <FoyerComponents.profile_card card={@card} viewer={:self} rewards={@profile_rewards} />
                 <%= if @target_channels != [] do %>
                   <div class="mt-4">
                     <div class="foyer-mono mb-2">Channels</div>
@@ -157,90 +192,120 @@ defmodule FoyerWeb.PeopleLive do
                   </div>
                 <% end %>
               <% true -> %>
-                <div class="foyer-page-wide space-y-6 md:pt-8">
-                  <div>
-                    <%!-- TODO: property.name not exposed on Scope in foyer_app — hardcoded to match desktop_rail default --%>
-                    <FoyerComponents.editorial_heading>
-                      The Linden · Mayfair
-                    </FoyerComponents.editorial_heading>
-                    <p class="text-sm text-stone-600 mt-1">
-                      Browse the team, find a face, send a message.
-                    </p>
-                  </div>
+                <div class="people-directory foyer-page-people md:pt-8">
+                  <header class="people-directory__header">
+                    <div>
+                      <h1 class="foyer-serif text-4xl leading-tight">People</h1>
+                      <p class="foyer-mono mt-1" id="people-count">
+                        {@people_count} colleagues · The Linden
+                      </p>
+                    </div>
 
-                  <div class="md:flex md:gap-4">
-                    <aside
-                      class="hidden md:block md:w-48 md:flex-shrink-0 rounded-lg border p-3"
-                      style="border-color: var(--foyer-rule);"
-                      id="people-filter-sidebar"
-                    >
-                      <div class="foyer-mono">Filters</div>
-                      <ul class="mt-2 flex flex-col gap-1 text-sm">
-                        <li>
-                          <button
-                            phx-click="clear_filter"
-                            class={[
-                              "w-full text-left px-2 py-1 rounded",
-                              is_nil(@active_channel_filter) && "font-semibold"
-                            ]}
-                            id="filter-all"
-                          >
-                            All
-                          </button>
-                        </li>
-                      </ul>
-                      <%= if @channel_filter_options != [] do %>
-                        <div class="foyer-mono mt-3">Channels</div>
-                        <ul class="mt-1 flex flex-col gap-1 text-sm" id="channel-filter-list">
-                          <li :for={{ch, count} <- @channel_filter_options}>
-                            <button
-                              phx-click="filter_channel"
-                              phx-value-channel_id={ch.id}
-                              class={[
-                                "w-full text-left px-2 py-1 rounded",
-                                @active_channel_filter == to_string(ch.id) && "font-semibold"
-                              ]}
-                              id={"filter-channel-#{ch.id}"}
-                            >
-                              {ch.name}
-                              <span class="foyer-mono ml-1">({count})</span>
-                            </button>
-                          </li>
-                        </ul>
-                      <% end %>
-                    </aside>
-
-                    <ul id="people-list" class="flex flex-col gap-2 md:flex-1" phx-update="stream">
-                      <li :for={{dom_id, person} <- @streams.people} id={dom_id}>
-                        <.link
-                          navigate={~p"/people/#{person.id}"}
-                          class="flex items-center gap-3 p-3 rounded-lg border"
-                          style="border-color: var(--foyer-rule);"
-                          id={"people-row-#{person.id}"}
+                    <div class="people-directory__filters" id="people-filters">
+                      <button
+                        phx-click="clear_filter"
+                        class={[
+                          "people-filter-chip",
+                          @active_people_filter == :all && "is-active"
+                        ]}
+                        id="filter-all"
+                      >
+                        All
+                      </button>
+                      <details
+                        id="filter-department-menu"
+                        class="relative [&_summary::-webkit-details-marker]:hidden marker:hidden"
+                      >
+                        <summary class={[
+                          "people-filter-chip",
+                          @active_people_filter == :channel && "is-active"
+                        ]}>
+                          Department
+                        </summary>
+                        <div
+                          :if={@channel_filter_options != []}
+                          id="channel-filter-list"
+                          class="people-filter-menu"
                         >
+                          <button
+                            :for={{ch, count} <- @channel_filter_options}
+                            phx-click="filter_channel"
+                            phx-value-channel_id={ch.id}
+                            class={[
+                              "people-filter-menu__item",
+                              @active_channel_filter == to_string(ch.id) && "is-active"
+                            ]}
+                            id={"filter-channel-#{ch.id}"}
+                          >
+                            <span>{ch.name}</span>
+                            <span class="foyer-mono">{count}</span>
+                          </button>
+                        </div>
+                      </details>
+                      <button
+                        phx-click="filter_on_shift"
+                        class={[
+                          "people-filter-chip",
+                          @active_people_filter == :on_shift && "is-active"
+                        ]}
+                        id="filter-on-shift"
+                      >
+                        On shift
+                      </button>
+                    </div>
+                  </header>
+
+                  <ul id="people-list" class="people-directory__list" phx-update="stream">
+                    <li :for={{dom_id, person} <- @streams.people} id={dom_id}>
+                      <div class="people-directory__row" id={"people-row-#{person.id}"}>
+                        <div class="people-directory__identity" id={"people-identity-#{person.id}"}>
                           <FoyerComponents.avatar initials={person.initials} />
-                          <div class="flex-1">
-                            <div class="foyer-serif">{person.name}</div>
-                            <div class="foyer-mono">{person.title}</div>
-                            <%= if person.memberships != [] do %>
-                              <div class="flex flex-wrap gap-1 mt-1">
-                                <span
-                                  :for={m <- person.memberships}
-                                  class="foyer-tag outline"
-                                  id={"person-#{person.id}-channel-#{m.channel_id}"}
-                                >
-                                  {m.channel && m.channel.name}
-                                </span>
-                              </div>
-                            <% end %>
-                          </div>
-                          <span :if={MapSet.member?(@on_shift_ids, person.id)} class="foyer-tag moss">
-                            <span class="foyer-pulse"></span>On shift
+                          <span class="min-w-0">
+                            <span class="foyer-serif people-directory__name">{person.name}</span>
+                            <span class="people-directory__title">{person.title}</span>
                           </span>
-                        </.link>
-                      </li>
-                    </ul>
-                  </div>
+                        </div>
+
+                        <span
+                          :if={MapSet.member?(@on_shift_ids, person.id)}
+                          class="people-directory__status"
+                          id={"people-status-#{person.id}"}
+                        >
+                          <span class="foyer-pulse"></span> On shift
+                        </span>
+                        <span
+                          :if={!MapSet.member?(@on_shift_ids, person.id)}
+                          class="people-directory__status is-muted"
+                          id={"people-status-#{person.id}"}
+                        >
+                          Off shift
+                        </span>
+
+                        <div class="people-directory__actions">
+                          <.link
+                            :if={can_view_full_profile?(@current_scope, person)}
+                            navigate={~p"/people/#{person.id}"}
+                            class="people-directory__action"
+                            id={"view-profile-#{person.id}"}
+                          >
+                            View profile
+                          </.link>
+                          <button
+                            type="button"
+                            phx-click="message_colleague"
+                            phx-value-user_id={person.id}
+                            class="people-directory__action"
+                            id={"message-colleague-#{person.id}"}
+                          >
+                            Message
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                    <li :if={@people_empty?} id="people-empty" class="people-directory__empty">
+                      No colleagues match this filter.
+                    </li>
+                  </ul>
                 </div>
             <% end %>
 

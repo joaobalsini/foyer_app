@@ -228,6 +228,9 @@ defmodule FoyerWeb.ChatLiveTest do
       maya = Fixtures.maya()
       floor_4 = Fixtures.floor_4()
 
+      Foyer.ChannelsMock
+      |> expect(:list_all_with_member_counts, 2, fn -> [{floor_4, 4}] end)
+
       {:ok, view, _html} = mount_isolated_chat(conn, maya, live_action: :new_message)
       Mox.allow(Foyer.ChatMock, self(), view.pid)
       Mox.allow(Foyer.ChannelsMock, self(), view.pid)
@@ -237,6 +240,7 @@ defmodule FoyerWeb.ChatLiveTest do
       |> render_click()
 
       assert has_element?(view, "#new-message-channels")
+      assert has_element?(view, "#new-msg-channel-#{floor_4.id}", "4 members")
       refute has_element?(view, "#new-message-people")
 
       Foyer.ChatMock
