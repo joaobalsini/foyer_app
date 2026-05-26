@@ -1,8 +1,8 @@
 defmodule Foyer.HouseScenarios.WithUnacked do
   @moduledoc """
   House port scenario: one pinned, ack-required announcement that the current
-  staff user has read but not yet acknowledged. Published 5 minutes ago — the
-  author is still within the 15-minute grace window.
+  staff user has read but not yet acknowledged. Published recently — the
+  author is still within the 5-minute grace window.
 
   Used by isolated tests that exercise:
 

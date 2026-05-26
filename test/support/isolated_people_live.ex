@@ -1,8 +1,8 @@
 defmodule FoyerWeb.IsolatedPeopleLive do
   @moduledoc """
-  Test-only LiveView wrapper around `FoyerWeb.PeopleLive` for `:show` action.
-  Mounts with a pre-built `current_scope` taken from the isolated session, then
-  delegates to the real `PeopleLive`.
+  Test-only LiveView wrapper around `FoyerWeb.PeopleLive` for `:index` and
+  `:show` actions. Mounts with a pre-built `current_scope` taken from the
+  isolated session, then delegates to the real `PeopleLive`.
 
   This wrapper is required because `Phoenix.LiveViewTest.live_isolated/3`
   skips on-mount hooks, so `socket.assigns.current_scope` would otherwise be
@@ -30,18 +30,26 @@ defmodule FoyerWeb.IsolatedPeopleLive do
 
     {:ok, socket} = PeopleLive.mount(%{}, %{}, socket)
 
-    # Manually call handle_params since live_isolated skips the router
-    subject_id = Map.fetch!(session, "foyer_isolated_subject_id")
+    # Manually call handle_params since live_isolated skips the router.
+    {params, path} =
+      case live_action do
+        :show ->
+          subject_id = Map.fetch!(session, "foyer_isolated_subject_id")
+          {%{"id" => to_string(subject_id)}, "/people/#{subject_id}"}
 
-    {:noreply, socket} =
-      PeopleLive.handle_params(%{"id" => to_string(subject_id)}, "/people/#{subject_id}", socket)
+        :index ->
+          {%{}, "/people"}
+      end
+
+    {:noreply, socket} = PeopleLive.handle_params(params, path, socket)
 
     {:ok, socket}
   end
 
   # NOTE: handle_params intentionally NOT defined — we bridge it from mount.
-  # handle_event and handle_info are omitted since PeopleLive does not define
-  # them (read-only surface). If PeopleLive grows events, add them here.
+
+  @impl true
+  def handle_event(event, params, socket), do: PeopleLive.handle_event(event, params, socket)
 
   @impl true
   def render(assigns), do: PeopleLive.render(assigns)

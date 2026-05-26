@@ -1,9 +1,8 @@
 defmodule FoyerWeb.RecognitionsLive do
   @moduledoc """
-  Recognitions surface — `/recognitions` (public feed), `/recognitions/new`
-  (give form), `/recognitions/:id` (show), `/recognitions/:id/edit` (author-only
-  edit, stubbed). Manager scope unlocks the bonus-points tier picker on the
-  give and edit forms.
+  Recognitions surface — `/recognitions/new` (give form), `/recognitions/:id`
+  (show), and `/recognitions/:id/edit` (author-only edit, stubbed). The House
+  and Today feeds are the entry points for recognition cards.
   """
   use FoyerWeb, :live_view
 
@@ -24,49 +23,33 @@ defmodule FoyerWeb.RecognitionsLive do
      |> assign(:preview_body, "")
      |> assign(:preview_values, [])
      |> assign(:preview_bonus_points, nil)
-     |> assign(:sent?, false)
-     |> assign(:sent_recognition, nil)
-     |> assign(:grace_state, :open)
-     |> assign(:grace_deadline_ms, nil)
-     |> stream_configure(:recognitions, dom_id: &"recognition-#{&1.id}")
-     |> stream(:recognitions, [])
+     |> assign(:preview_public, true)
      |> assign(:page_title, "Recognitions")}
   end
 
   @impl true
   def handle_params(params, _uri, socket) do
     case socket.assigns.live_action do
-      :index -> apply_index(socket)
       :new -> apply_new(socket)
       :show -> apply_show(socket, params)
       :edit -> apply_edit(socket, params)
     end
   end
 
-  defp apply_index(socket) do
-    feed = FoyerWeb.LiveDeps.recognitions().feed_public([])
-
-    {:noreply,
-     socket
-     |> stream(:recognitions, feed, reset: true)
-     |> assign(:page_title, "Recognitions")}
-  end
-
   defp apply_new(socket) do
+    scope = socket.assigns.current_scope
+
     {:noreply,
      socket
      |> assign(:recognition, nil)
-     |> assign(:sent?, false)
-     |> assign(:sent_recognition, nil)
-     |> assign(:grace_state, :open)
-     |> assign(:grace_deadline_ms, nil)
-     |> assign(:people, FoyerWeb.LiveDeps.accounts().list_people([]))
+     |> assign(:people, recipient_options(scope))
      |> assign(:form, to_form(FoyerWeb.LiveDeps.recognitions().compose_changeset(%{})))
      |> assign(:preview_recipient_id, "")
      |> assign(:preview_recipient_name, "")
      |> assign(:preview_body, "")
      |> assign(:preview_values, [])
      |> assign(:preview_bonus_points, nil)
+     |> assign(:preview_public, true)
      |> assign(:page_title, "Give recognition")}
   end
 
@@ -79,13 +62,14 @@ defmodule FoyerWeb.RecognitionsLive do
       {:noreply,
        socket
        |> assign(:recognition, r)
+       |> assign(:within_grace?, FoyerWeb.LiveDeps.recognitions().within_grace_window?(r))
        |> assign(:page_title, "Recognition for " <> ((r.recipient && r.recipient.name) || ""))}
     rescue
       Ecto.NoResultsError ->
         {:noreply,
          socket
          |> put_flash(:error, "That recognition is not available to you.")
-         |> push_navigate(to: ~p"/recognitions")}
+         |> push_navigate(to: ~p"/house")}
     end
   end
 
@@ -98,7 +82,7 @@ defmodule FoyerWeb.RecognitionsLive do
       {:noreply,
        socket
        |> assign(:recognition, r)
-       |> assign(:people, FoyerWeb.LiveDeps.accounts().list_people([]))
+       |> assign(:people, recipient_options(scope))
        |> assign(:form, to_form(FoyerWeb.LiveDeps.recognitions().change_recognition(r, %{})))
        |> assign(:page_title, "Edit recognition")}
     rescue
@@ -106,7 +90,7 @@ defmodule FoyerWeb.RecognitionsLive do
         {:noreply,
          socket
          |> put_flash(:error, "That recognition is not available to you.")
-         |> push_navigate(to: ~p"/recognitions")}
+         |> push_navigate(to: ~p"/house")}
     end
   end
 
@@ -116,27 +100,23 @@ defmodule FoyerWeb.RecognitionsLive do
 
     case FoyerWeb.LiveDeps.recognitions().give(scope.user, attrs) do
       {:ok, recognition} ->
-        recipient_name =
-          socket.assigns.people
-          |> Enum.find(fn p -> p.id == recognition.recipient_id end)
-          |> case do
-            %{name: name} -> name
-            _ -> ""
-          end
-
         {:noreply,
          socket
-         |> assign(:sent?, true)
-         |> assign(:sent_recognition, recognition)
-         |> assign(:grace_state, :open)
-         |> assign(:grace_deadline_ms, nil)
-         |> assign(:preview_recipient_name, recipient_name)}
+         |> put_flash(:info, "Recognition sent.")
+         |> push_navigate(to: ~p"/recognitions/#{recognition.id}")}
 
       {:error, :self_recognition} ->
         {:noreply, put_flash(socket, :error, "Choose someone else to recognize.")}
 
       {:error, :invalid_point_tier} ->
         {:noreply, put_flash(socket, :error, "Choose one of the available point tiers.")}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply,
+         socket
+         |> apply_preview_attrs(attrs)
+         |> assign(:form, to_form(%{changeset | action: :insert}))
+         |> put_flash(:error, "Please fix the highlighted fields.")}
 
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "Couldn't send recognition.")}
@@ -171,7 +151,7 @@ defmodule FoyerWeb.RecognitionsLive do
         {:noreply,
          socket
          |> put_flash(:info, "Recognition removed.")
-         |> push_navigate(to: ~p"/recognitions")}
+         |> push_navigate(to: ~p"/house")}
 
       {:error, :outside_grace_window} ->
         {:noreply, put_flash(socket, :error, "That recognition can no longer be removed.")}
@@ -185,6 +165,21 @@ defmodule FoyerWeb.RecognitionsLive do
   end
 
   def handle_event("preview_change", %{"recognition" => attrs}, socket) do
+    {:noreply,
+     socket
+     |> apply_preview_attrs(attrs)
+     |> assign(:form, to_form(FoyerWeb.LiveDeps.recognitions().compose_changeset(attrs)))}
+  end
+
+  def handle_event("set_bonus", %{"bonus" => "clear"}, socket) do
+    {:noreply, assign(socket, :preview_bonus_points, nil)}
+  end
+
+  def handle_event("set_bonus", %{"bonus" => bonus}, socket) do
+    {:noreply, assign(socket, :preview_bonus_points, String.to_integer(bonus))}
+  end
+
+  defp apply_preview_attrs(socket, attrs) do
     recipient_id = Map.get(attrs, "recipient_id", "")
 
     recipient_name =
@@ -205,39 +200,16 @@ defmodule FoyerWeb.RecognitionsLive do
       case Map.get(attrs, "bonus_points") do
         nil -> nil
         "" -> nil
-        v -> elem(Integer.parse(v), 0)
+        v -> parse_integer(v)
       end
 
-    {:noreply,
-     socket
-     |> assign(:preview_recipient_name, recipient_name)
-     |> assign(:preview_recipient_id, recipient_id)
-     |> assign(:preview_body, Map.get(attrs, "body", ""))
-     |> assign(:preview_values, clean_values(Map.get(attrs, "values", [])))
-     |> assign(:preview_bonus_points, bonus_points)}
-  end
-
-  def handle_event("set_bonus", %{"bonus" => "clear"}, socket) do
-    {:noreply, assign(socket, :preview_bonus_points, nil)}
-  end
-
-  def handle_event("set_bonus", %{"bonus" => bonus}, socket) do
-    {:noreply, assign(socket, :preview_bonus_points, String.to_integer(bonus))}
-  end
-
-  def handle_event("new_recognition", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:sent?, false)
-     |> assign(:sent_recognition, nil)
-     |> assign(:grace_state, :open)
-     |> assign(:grace_deadline_ms, nil)
-     |> assign(:preview_recipient_id, "")
-     |> assign(:preview_recipient_name, "")
-     |> assign(:preview_body, "")
-     |> assign(:preview_values, [])
-     |> assign(:preview_bonus_points, nil)
-     |> assign(:form, to_form(FoyerWeb.LiveDeps.recognitions().compose_changeset(%{})))}
+    socket
+    |> assign(:preview_recipient_name, recipient_name)
+    |> assign(:preview_recipient_id, recipient_id)
+    |> assign(:preview_body, Map.get(attrs, "body", ""))
+    |> assign(:preview_values, clean_values(Map.get(attrs, "values", [])))
+    |> assign(:preview_bonus_points, bonus_points)
+    |> assign(:preview_public, Map.get(attrs, "public", "true") == "true")
   end
 
   @impl true
@@ -251,94 +223,108 @@ defmodule FoyerWeb.RecognitionsLive do
           chat_unread_count={@chat_unread_count}
         />
         <div class="foyer-content">
+          <FoyerComponents.desktop_topbar current_scope={@current_scope} page_title={@page_title} />
           <div class="foyer-scroll" id="recognitions">
-            <FoyerComponents.desktop_topbar current_scope={@current_scope} page_title={@page_title} />
             <%= cond do %>
-              <% @live_action == :index -> %>
-                <header class="flex items-start justify-between">
-                  <div>
-                    <div class="foyer-mono">Recognition</div>
-                    <FoyerComponents.editorial_heading>
-                      Recognitions
-                    </FoyerComponents.editorial_heading>
-                  </div>
-                  <.link
-                    navigate={~p"/recognitions/new"}
-                    id="recognitions-new-cta"
-                    class="foyer-btn forest sm"
-                  >
-                    <.icon name="hero-sparkles" class="size-4" /> Give recognition
-                  </.link>
-                </header>
-
-                <div
-                  id="recognitions-feed"
-                  phx-update="stream"
-                  class="flex flex-col gap-3 mt-3"
-                >
-                  <div :for={{dom_id, r} <- @streams.recognitions} id={dom_id}>
-                    <.link
-                      navigate={~p"/recognitions/#{r.id}"}
-                      id={"recognition-link-#{r.id}"}
-                      class="block"
-                    >
-                      <FoyerComponents.recognition_card recognition={r} />
-                    </.link>
-                  </div>
-                </div>
               <% @live_action == :show and @recognition -> %>
                 <.link
-                  navigate={~p"/recognitions"}
+                  navigate={~p"/house"}
                   class="foyer-btn ghost sm self-start"
                   id="back-to-recognitions"
                 >
-                  <.icon name="hero-arrow-left" class="size-4" /> Back
+                  <.icon name="hero-arrow-left" class="size-4" /> Back to The House
                 </.link>
 
-                <article id="recognition-detail" class="flex flex-col gap-3">
-                  <div class="foyer-mono">
-                    For {@recognition.recipient && @recognition.recipient.name}
-                  </div>
-                  <p class="foyer-serif text-2xl">{@recognition.body}</p>
-                  <div class="flex items-center gap-2">
-                    <FoyerComponents.avatar
-                      :if={@recognition.sender}
-                      initials={@recognition.sender.initials}
-                      size={:sm}
-                    />
-                    <span>{@recognition.sender && @recognition.sender.name}</span>
-                    <%= if managed_by?(@recognition, @current_scope) do %>
-                      <.link
-                        navigate={~p"/recognitions/#{@recognition.id}/edit"}
-                        class="foyer-btn ghost sm ml-auto"
-                        id="recognition-edit-link"
-                      >
-                        Edit
-                      </.link>
-                    <% end %>
-                  </div>
-                  <div class="flex flex-wrap gap-2">
-                    <span :for={value <- @recognition.values} class="foyer-tag outline">
-                      {String.capitalize(value)}
-                    </span>
-                    <span :if={!@recognition.public} class="foyer-tag outline">Private</span>
-                    <button
-                      :if={
-                        managed_by?(@recognition, @current_scope) and
-                          FoyerWeb.LiveDeps.recognitions().within_grace_window?(@recognition)
-                      }
-                      class="foyer-btn sm ml-auto"
-                      phx-click="remove"
-                      id="recognition-remove-btn"
-                      type="button"
+                <div class="announcement-detail">
+                  <article id="recognition-detail" class="announcement-detail__article">
+                    <div class="flex items-center gap-2">
+                      <span class="foyer-tag outline">Recognition</span>
+                      <span :if={!@recognition.public} class="foyer-tag outline">Private</span>
+                      <span class="foyer-mono ml-auto">
+                        For {@recognition.recipient && @recognition.recipient.name}
+                      </span>
+                    </div>
+
+                    <h1 class="foyer-serif text-3xl leading-tight">{@recognition.body}</h1>
+
+                    <div class="flex items-center gap-2">
+                      <FoyerComponents.avatar
+                        :if={@recognition.sender}
+                        initials={@recognition.sender.initials}
+                        size={:sm}
+                      />
+                      <div>
+                        <div>{@recognition.sender && @recognition.sender.name}</div>
+                        <div class="foyer-mono">
+                          Sent to {@recognition.recipient && @recognition.recipient.name}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2">
+                      <span :for={value <- @recognition.values} class="foyer-tag outline">
+                        {String.capitalize(value)}
+                      </span>
+                      <span :if={@recognition.bonus_points > 0} class="foyer-tag claret">
+                        +{@recognition.bonus_points} pts
+                      </span>
+                    </div>
+
+                    <div
+                      :if={managed_by?(@recognition, @current_scope)}
+                      class="flex flex-wrap gap-2"
                     >
-                      <.icon name="hero-trash" class="size-4" /> Remove
-                    </button>
-                  </div>
-                  <%= if @recognition.bonus_points > 0 do %>
-                    <span class="foyer-tag outline">+{@recognition.bonus_points} pts</span>
-                  <% end %>
-                </article>
+                      <%= if @within_grace? do %>
+                        <.link
+                          navigate={~p"/recognitions/#{@recognition.id}/edit"}
+                          class="foyer-btn sm"
+                          id="recognition-edit-link"
+                        >
+                          <.icon name="hero-pencil-square" class="size-4" /> Edit
+                        </.link>
+                      <% else %>
+                        <span
+                          class="inline-flex"
+                          title="Editing and removal are only available for 15 minutes after sending."
+                        >
+                          <button
+                            class="foyer-btn sm"
+                            id="recognition-edit-link"
+                            type="button"
+                            disabled
+                          >
+                            <.icon name="hero-pencil-square" class="size-4" /> Edit
+                          </button>
+                        </span>
+                      <% end %>
+
+                      <%= if @within_grace? do %>
+                        <button
+                          class="foyer-btn sm"
+                          phx-click="remove"
+                          id="recognition-remove-btn"
+                          type="button"
+                        >
+                          <.icon name="hero-trash" class="size-4" /> Remove
+                        </button>
+                      <% else %>
+                        <span
+                          class="inline-flex"
+                          title="Editing and removal are only available for 15 minutes after sending."
+                        >
+                          <button
+                            class="foyer-btn sm"
+                            id="recognition-remove-btn"
+                            type="button"
+                            disabled
+                          >
+                            <.icon name="hero-trash" class="size-4" /> Remove
+                          </button>
+                        </span>
+                      <% end %>
+                    </div>
+                  </article>
+                </div>
               <% @live_action == :edit and @recognition -> %>
                 <.link
                   navigate={~p"/recognitions/#{@recognition.id}"}
@@ -407,73 +393,6 @@ defmodule FoyerWeb.RecognitionsLive do
                     Save changes
                   </button>
                 </.form>
-              <% @live_action == :new and @sent? -> %>
-                <%!-- Sent / grace-window state --%>
-                <div
-                  id="post-send"
-                  class="card-parchment p-6 space-y-3 border-l-4 border-[color:var(--foyer-forest)]"
-                >
-                  <%!-- TODO: wire JS GraceCountdown hook once context exposes inserted_at --%>
-                  <FoyerComponents.editorial_heading>
-                    Recognition sent.
-                  </FoyerComponents.editorial_heading>
-                  <p class="text-sm text-stone-600">
-                    Recognition for <span class="font-medium">{@preview_recipient_name}</span>
-                    <span :if={
-                      (Scope.manager?(@current_scope) and
-                         @preview_bonus_points) && @preview_bonus_points > 0
-                    }>
-                      {" · #{@preview_bonus_points} Foyer points"}
-                    </span>
-                    — delivered.
-                  </p>
-                  <p
-                    :if={@grace_state == :open}
-                    id="grace-countdown"
-                    class="text-xs text-stone-500 italic"
-                  >
-                    60s to edit or remove.
-                  </p>
-                  <p
-                    :if={@grace_state == :expired}
-                    data-grace-expired
-                    class="text-xs text-stone-500 italic"
-                  >
-                    Edit window closed.
-                  </p>
-                  <div :if={@grace_state == :open} class="flex gap-2 pt-2">
-                    <.link
-                      :if={@sent_recognition}
-                      navigate={~p"/recognitions/#{@sent_recognition.id}/edit"}
-                      class="foyer-btn sm"
-                      id="edit-recognition"
-                    >
-                      Edit
-                    </.link>
-                    <button
-                      :if={@sent_recognition}
-                      type="button"
-                      class="foyer-btn ghost sm"
-                      id="remove-recognition"
-                      disabled
-                    >
-                      Remove
-                    </button>
-                    <.link navigate={~p"/recognitions"} class="foyer-btn ghost sm">
-                      See it in the feed
-                    </.link>
-                  </div>
-                  <div :if={@grace_state == :expired} class="flex gap-2 pt-2">
-                    <p class="text-xs text-stone-500 italic">Edit window closed.</p>
-                    <button
-                      type="button"
-                      phx-click="new_recognition"
-                      class="foyer-btn ghost sm"
-                    >
-                      + Another
-                    </button>
-                  </div>
-                </div>
               <% @live_action == :new -> %>
                 <div class="space-y-4">
                   <div>
@@ -512,10 +431,11 @@ defmodule FoyerWeb.RecognitionsLive do
                             {p.name}
                           </option>
                         </select>
+                        <.field_errors form={@form} field={:recipient_id} />
                       </div>
 
                       <div>
-                        <FoyerComponents.section_label label="House values" class="block mb-2" />
+                        <FoyerComponents.section_label label="House values shown" class="block mb-2" />
                         <div class="flex flex-wrap gap-2" id="house-values">
                           <input type="hidden" name="recognition[values][]" value="" />
                           <label
@@ -541,6 +461,7 @@ defmodule FoyerWeb.RecognitionsLive do
                           </label>
                         </div>
                         <p class="text-xs text-stone-500 mt-1 italic">Pick one or more.</p>
+                        <.field_errors form={@form} field={:values} />
                       </div>
 
                       <div>
@@ -552,6 +473,7 @@ defmodule FoyerWeb.RecognitionsLive do
                           placeholder="Stayed past 23:00 fixing the Garden Suite shower so the Yamada family could enjoy it on arrival…"
                           class="w-full px-4 py-3 rounded-lg border border-stone-300 bg-[color:var(--foyer-cream-deep)] text-sm leading-relaxed"
                         >{@preview_body}</textarea>
+                        <.field_errors form={@form} field={:body} />
                       </div>
 
                       <fieldset class="space-y-2">
@@ -561,7 +483,7 @@ defmodule FoyerWeb.RecognitionsLive do
                             type="radio"
                             name="recognition[public]"
                             value="true"
-                            checked
+                            checked={@preview_public}
                             id="visibility-public"
                             class="mt-1"
                           />
@@ -575,6 +497,7 @@ defmodule FoyerWeb.RecognitionsLive do
                             type="radio"
                             name="recognition[public]"
                             value="false"
+                            checked={!@preview_public}
                             id="visibility-private"
                             class="mt-1"
                           />
@@ -616,6 +539,7 @@ defmodule FoyerWeb.RecognitionsLive do
                             {if tier == 0, do: "0", else: "+#{tier}"}
                           </label>
                         </div>
+                        <.field_errors form={@form} field={:bonus_points} />
                       </fieldset>
 
                       <p
@@ -630,7 +554,7 @@ defmodule FoyerWeb.RecognitionsLive do
                         <button type="submit" class="foyer-btn forest" id="recognize-submit">
                           Send recognition
                         </button>
-                        <.link navigate={~p"/recognitions"} class="foyer-btn ghost sm">
+                        <.link navigate={~p"/house"} class="foyer-btn ghost sm">
                           Cancel
                         </.link>
                       </div>
@@ -639,45 +563,12 @@ defmodule FoyerWeb.RecognitionsLive do
 
                   <aside id="recognition-preview" class="lg:sticky lg:top-6 self-start space-y-3">
                     <FoyerComponents.section_label label="Preview · The House feed" />
-                    <article class="card-parchment p-5 space-y-3 max-w-[360px]">
-                      <div class="flex flex-wrap gap-1.5" data-preview-values>
-                        <FoyerComponents.house_value_chip
-                          :for={v <- @preview_values}
-                          value={v}
-                          selected
-                        />
-                        <span :if={@preview_values == []} class="text-xs text-stone-400 italic">
-                          Add values…
-                        </span>
-                      </div>
-                      <p class="foyer-serif text-base italic leading-snug">
-                        "{if @preview_body == "", do: "Tell the story…", else: @preview_body}"
-                      </p>
-                      <div class="flex items-center justify-between text-xs text-stone-500 pt-1">
-                        <div class="flex items-center gap-2">
-                          <FoyerComponents.avatar
-                            initials={@current_scope.user.initials}
-                            size={:sm}
-                          />
-                          <span>{@current_scope.user.name}</span>
-                          <span>→</span>
-                          <span class="font-medium text-stone-700">
-                            {if @preview_recipient_name == "",
-                              do: "…",
-                              else: @preview_recipient_name}
-                          </span>
-                        </div>
-                        <span
-                          :if={
-                            (Scope.manager?(@current_scope) and
-                               @preview_bonus_points) && @preview_bonus_points > 0
-                          }
-                          class="foyer-tag forest"
-                        >
-                          +{@preview_bonus_points} pts
-                        </span>
-                      </div>
-                    </article>
+                    <div class="max-w-[360px]">
+                      <FoyerComponents.recognition_card
+                        recognition={preview_recognition(assigns)}
+                        show_view_action={false}
+                      />
+                    </div>
                   </aside>
                 </div>
             <% end %>
@@ -698,6 +589,56 @@ defmodule FoyerWeb.RecognitionsLive do
     do: sender_id == id
 
   defp managed_by?(_, _), do: false
+
+  defp preview_recognition(assigns) do
+    recipient =
+      case Enum.find(assigns.people, &(to_string(&1.id) == assigns.preview_recipient_id)) do
+        nil ->
+          %Foyer.Accounts.User{name: "Add recipient...", initials: "AR"}
+
+        person ->
+          person
+      end
+
+    %Recognition{
+      id: 0,
+      sender_id: assigns.current_scope.user.id,
+      sender: assigns.current_scope.user,
+      recipient_id: recipient.id,
+      recipient: recipient,
+      body: if(assigns.preview_body == "", do: "Tell the story...", else: assigns.preview_body),
+      values: assigns.preview_values,
+      bonus_points: assigns.preview_bonus_points || 0,
+      public: assigns.preview_public,
+      inserted_at: DateTime.utc_now(:second)
+    }
+  end
+
+  attr :form, Phoenix.HTML.Form, required: true
+  attr :field, :atom, required: true
+
+  defp field_errors(assigns) do
+    ~H"""
+    <div :if={@form[@field].errors != []} class="mt-1 text-sm text-[var(--foyer-claret)]">
+      <p :for={error <- @form[@field].errors}>
+        {translate_error(error)}
+      </p>
+    </div>
+    """
+  end
+
+  defp recipient_options(%Scope{user: %{id: user_id}}) do
+    []
+    |> FoyerWeb.LiveDeps.accounts().list_people()
+    |> Enum.reject(&(&1.id == user_id))
+  end
+
+  defp parse_integer(value) do
+    case Integer.parse(to_string(value)) do
+      {integer, ""} -> integer
+      _ -> nil
+    end
+  end
 
   defp clean_values(values) when is_list(values), do: Enum.reject(values, &(&1 in [nil, ""]))
   defp clean_values(_), do: []

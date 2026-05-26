@@ -20,9 +20,12 @@ defmodule FoyerWeb.ProfileLiveTest do
     F.Profile.13 — rewards catalog items
     F.Profile.14 — no redeem button, "Coming soon" label
     F.Profile.15 — dimmed styling for unaffordable items
+    F.Profile.16 — mobile layout structure (stats row, sections, profile card)
     F.Profile.20 — empty received state
     F.Profile.21 — house value tags on recognition cards
     F.Profile.22 — bonus points badge
+    F.Profile.24 — points breakdown labelled as bonus-point earnings only
+    F.Profile.26 — /me loads only the current user's own profile
   """
   use ExUnit.Case, async: true
 
@@ -41,10 +44,6 @@ defmodule FoyerWeb.ProfileLiveTest do
   setup do
     {:ok, conn: build_conn()}
   end
-
-  # ---------------------------------------------------------------------------
-  # F.Profile.1 — Identity header renders user attributes
-  # ---------------------------------------------------------------------------
 
   describe "F.Profile.1 — identity header" do
     setup do
@@ -81,9 +80,21 @@ defmodule FoyerWeb.ProfileLiveTest do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # F.Profile.2 — On-shift indicator
-  # ---------------------------------------------------------------------------
+  describe "F.Profile.26 — /me owns the current user's profile boundary" do
+    test "loads own_profile_for/1 with the current scope user only", %{conn: conn} do
+      user = ProfileScenarios.user_maya()
+      card = Foyer.ProfileScenarios.LineStaff.own_profile_for(user)
+
+      Foyer.ProfileMock
+      |> expect(:own_profile_for, 2, fn ^user -> card end)
+      |> expect(:rewards_catalog, 2, fn -> [] end)
+
+      {:ok, view, _html} = mount_isolated_profile(conn, user)
+
+      assert has_element?(view, "#profile-card")
+      assert render(view) =~ "Maya Okafor"
+    end
+  end
 
   describe "F.Profile.2 — on-shift tag shown" do
     test "shows 'On shift' tag when on_shift? is true", %{conn: conn} do
@@ -95,10 +106,6 @@ defmodule FoyerWeb.ProfileLiveTest do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # F.Profile.3 — Off-shift state renders without pulse
-  # ---------------------------------------------------------------------------
-
   describe "F.Profile.3 — off-shift state" do
     test "does not show 'On shift' tag when on_shift? is false", %{conn: conn} do
       stub_with(Foyer.ProfileMock, ProfileScenarios.OffShift)
@@ -108,11 +115,6 @@ defmodule FoyerWeb.ProfileLiveTest do
       refute render(view) =~ "On shift"
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # F.Profile.4 — Recognitions received section on own profile
-  # F.Profile.5 — Private recognition visible to recipient
-  # ---------------------------------------------------------------------------
 
   describe "F.Profile.4, F.Profile.5 — received recognitions on own profile" do
     setup do
@@ -127,6 +129,7 @@ defmodule FoyerWeb.ProfileLiveTest do
       html = render(view)
       # LineStaff scenario includes the public recognition body
       assert html =~ "Quietly handled a 02:14 guest issue"
+      assert has_element?(view, "#recognitions-received #rec-card-101")
     end
 
     test "F.Profile.5 — private recognition appears on own profile", %{conn: conn} do
@@ -137,10 +140,6 @@ defmodule FoyerWeb.ProfileLiveTest do
       assert render(view) =~ "Private: handled a sensitive situation"
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # F.Profile.7 — Given section on own profile
-  # ---------------------------------------------------------------------------
 
   describe "F.Profile.7 — given section on own profile" do
     setup do
@@ -160,12 +159,10 @@ defmodule FoyerWeb.ProfileLiveTest do
       {:ok, view, _html} = mount_isolated_profile(conn, user)
 
       assert render(view) =~ "Rafael stayed calm under pressure"
+      assert has_element?(view, "#recognitions-given #rec-card-103")
+      assert has_element?(view, "#recognitions-given #recognition-view-103", "View")
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # F.Profile.9 — Stats row: recognitions this month
-  # ---------------------------------------------------------------------------
 
   describe "F.Profile.9 — stats row: recognitions this month" do
     setup do
@@ -183,10 +180,6 @@ defmodule FoyerWeb.ProfileLiveTest do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # F.Profile.10 — Stats row: ack on time placeholder
-  # ---------------------------------------------------------------------------
-
   describe "F.Profile.10 — ack on time placeholder" do
     setup do
       stub_with(Foyer.ProfileMock, ProfileScenarios.LineStaff)
@@ -201,10 +194,6 @@ defmodule FoyerWeb.ProfileLiveTest do
       assert render(view) =~ "—"
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # F.Profile.11 — Foyer points balance
-  # ---------------------------------------------------------------------------
 
   describe "F.Profile.11 — points balance" do
     setup do
@@ -224,18 +213,15 @@ defmodule FoyerWeb.ProfileLiveTest do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # F.Profile.12 — Points earnings breakdown
-  # ---------------------------------------------------------------------------
-
-  describe "F.Profile.12 — points breakdown" do
+  describe "F.Profile.12 / F.Profile.24 — points breakdown" do
     setup do
       stub_with(Foyer.ProfileMock, ProfileScenarios.LineStaff)
       :ok
     end
 
     # F.Profile.24 — label says "bonus points" not "full balance explanation"
-    test "renders 'How you earned bonus points' when points_earned non-empty", %{conn: conn} do
+    test "F.Profile.24 — renders 'How you earned bonus points' when points_earned non-empty",
+         %{conn: conn} do
       user = ProfileScenarios.user_maya()
       {:ok, view, _html} = mount_isolated_profile(conn, user)
 
@@ -253,10 +239,6 @@ defmodule FoyerWeb.ProfileLiveTest do
       assert render(view) =~ "+25 pts"
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # F.Profile.13 — Rewards catalog renders all items
-  # ---------------------------------------------------------------------------
 
   describe "F.Profile.13 — rewards catalog" do
     setup do
@@ -283,10 +265,6 @@ defmodule FoyerWeb.ProfileLiveTest do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # F.Profile.14 — Rewards catalog items are non-redeemable
-  # ---------------------------------------------------------------------------
-
   describe "F.Profile.14 — no redeem button" do
     setup do
       stub_with(Foyer.ProfileMock, ProfileScenarios.LineStaff)
@@ -303,10 +281,6 @@ defmodule FoyerWeb.ProfileLiveTest do
       refute html =~ "Redeem"
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # F.Profile.15 — Rewards catalog: insufficient-points affordance
-  # ---------------------------------------------------------------------------
 
   describe "F.Profile.15 — insufficient-points styling" do
     setup do
@@ -325,10 +299,6 @@ defmodule FoyerWeb.ProfileLiveTest do
       assert has_element?(view, "#rewards")
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # F.Profile.20 — Empty recognitions state
-  # ---------------------------------------------------------------------------
 
   # F.Profile.16 — mobile layout: stats row, sections, bottom nav present
   # Layout structure is tested via element presence; CSS responsive behavior
@@ -372,30 +342,22 @@ defmodule FoyerWeb.ProfileLiveTest do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # F.Profile.21 — House value tags on recognition cards
-  # ---------------------------------------------------------------------------
-
   describe "F.Profile.21 — house value tags" do
     setup do
       stub_with(Foyer.ProfileMock, ProfileScenarios.LineStaff)
       :ok
     end
 
-    test "renders house value tags (CARE, DISCRETION) on recognition cards", %{conn: conn} do
+    test "renders house value tags on recognition cards", %{conn: conn} do
       user = ProfileScenarios.user_maya()
       {:ok, view, _html} = mount_isolated_profile(conn, user)
 
       html = render(view)
       # The public recognition has values: ["care", "discretion"]
-      assert html =~ "CARE"
-      assert html =~ "DISCRETION"
+      assert html =~ "Care"
+      assert html =~ "Discretion"
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # F.Profile.22 — Bonus points badge
-  # ---------------------------------------------------------------------------
 
   describe "F.Profile.22 — bonus points badge" do
     setup do

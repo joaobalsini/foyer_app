@@ -1,4 +1,11 @@
 defmodule Foyer.Channels.MembershipTest do
+  @moduledoc """
+  Unit tests for `Foyer.Channels.Membership` changeset validation. Pure
+  changeset logic, no DB.
+
+  Covers:
+    F.Channels.5 — membership required fields
+  """
   use ExUnit.Case, async: true
 
   alias Foyer.Channels.Membership

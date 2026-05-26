@@ -13,8 +13,8 @@ Foyer puts the back-of-house under one roof.
 ## POC covers three surfaces across one product
 
 Today — a brief morning briefing on every staff member's phone. It starts with the handoff from the previous shift,
-then shows anything that needs acknowledgement and any recognition received while the user was off shift. Short by
-design — once you've read the handoff and acked what you owe, Today gets shorter and quieter through the day.
+then shows anything that needs acknowledgement and recent recognition relevant to the user. Short by design — once
+you've read the handoff and acked what you owe, Today gets shorter and quieter through the day.
 
 The House — the property feed. Announcements from managers (pinned to the top, audience-targeted, with required
 acknowledgements when it matters); recognition cards for colleagues going above and beyond. Filterable by type and
@@ -111,7 +111,7 @@ Today is the staff member’s starting point. It should answer one question: “
 
 The first item is the handoff from the previous shift. If the previous shift left notes, they appear before anything
 else, because operational continuity matters more than feed freshness. After that, Today shows required
-acknowledgements, unread priority announcements, and recognition received while the user was off shift.
+acknowledgements, unread priority announcements, and recent recognition relevant to the user.
 
 When the user is off shift, Today becomes the only available working surface. It shows that notifications are paused,
 offers a Start shift action, and summarizes what is quietly waiting.

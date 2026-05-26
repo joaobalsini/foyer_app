@@ -1,5 +1,11 @@
 # Verify — Plan 02 Desktop UI scaffold
 
+Verifies: [`02-desktop-ui-scaffold.md`](./02-desktop-ui-scaffold.md) (Codex
+review in [`02-desktop-ui-scaffold-review.md`](./02-desktop-ui-scaffold-review.md)).
+Builds on the mobile scaffold landed in
+[`01-mobile-ui-scaffold.md`](./01-mobile-ui-scaffold.md) and its
+[implementation review](./01-mobile-ui-scaffold-implementation-review.md).
+
 ## Verdict
 
 **Pass with follow-ups.**

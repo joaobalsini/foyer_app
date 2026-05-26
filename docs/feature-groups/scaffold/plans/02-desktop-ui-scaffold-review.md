@@ -1,5 +1,11 @@
 # Review — Plan 02 Desktop UI scaffold
 
+Reviews: [`02-desktop-ui-scaffold.md`](./02-desktop-ui-scaffold.md). Verification
+outcome captured in
+[`02-desktop-ui-scaffold-verify.md`](./02-desktop-ui-scaffold-verify.md). Builds
+on the mobile scaffold landed in
+[`01-mobile-ui-scaffold.md`](./01-mobile-ui-scaffold.md).
+
 ## Verdict
 
 Revise

@@ -15,10 +15,6 @@ defmodule FoyerWeb.FoyerComponents do
     router: FoyerWeb.Router,
     statics: FoyerWeb.static_paths()
 
-  # ---------------------------------------------------------------------------
-  # Bottom navigation
-  # ---------------------------------------------------------------------------
-
   attr :active, :atom, required: true, values: [:today, :house, :chat, :me, :people, :profile]
   attr :current_scope, FoyerWeb.Scope, required: true
   attr :chat_unread_count, :integer, default: 0
@@ -124,10 +120,6 @@ defmodule FoyerWeb.FoyerComponents do
     </nav>
     """
   end
-
-  # ---------------------------------------------------------------------------
-  # Desktop side-rail
-  # ---------------------------------------------------------------------------
 
   attr :active, :atom, required: true, values: [:today, :house, :chat, :me, :people, :profile]
   attr :current_scope, FoyerWeb.Scope, required: true
@@ -277,10 +269,6 @@ defmodule FoyerWeb.FoyerComponents do
     """
   end
 
-  # ---------------------------------------------------------------------------
-  # Avatar
-  # ---------------------------------------------------------------------------
-
   attr :initials, :string, required: true
   attr :size, :atom, default: :md, values: [:sm, :md, :lg]
   attr :class, :string, default: nil
@@ -298,10 +286,6 @@ defmodule FoyerWeb.FoyerComponents do
     """
   end
 
-  # ---------------------------------------------------------------------------
-  # Tag
-  # ---------------------------------------------------------------------------
-
   attr :variant, :atom, required: true, values: [:claret, :moss, :forest, :outline]
   attr :class, :string, default: nil
   slot :inner_block, required: true
@@ -314,10 +298,6 @@ defmodule FoyerWeb.FoyerComponents do
     """
   end
 
-  # ---------------------------------------------------------------------------
-  # Section label (mono eyebrow)
-  # ---------------------------------------------------------------------------
-
   attr :label, :string, default: nil
   attr :class, :string, default: nil
   slot :inner_block
@@ -328,19 +308,11 @@ defmodule FoyerWeb.FoyerComponents do
     """
   end
 
-  # ---------------------------------------------------------------------------
-  # Pulse
-  # ---------------------------------------------------------------------------
-
   def pulse(assigns) do
     ~H"""
     <span class="foyer-pulse" aria-hidden="true"></span>
     """
   end
-
-  # ---------------------------------------------------------------------------
-  # Status pill
-  # ---------------------------------------------------------------------------
 
   attr :kind, :atom,
     required: true,
@@ -372,10 +344,6 @@ defmodule FoyerWeb.FoyerComponents do
   defp status_pill_for(:ack_required), do: {"outline", "Ack required"}
   defp status_pill_for(:manager_only), do: {"forest", "Manager view only"}
 
-  # ---------------------------------------------------------------------------
-  # Editorial heading
-  # ---------------------------------------------------------------------------
-
   attr :class, :string, default: ""
   slot :inner_block, required: true
 
@@ -386,10 +354,6 @@ defmodule FoyerWeb.FoyerComponents do
     </h1>
     """
   end
-
-  # ---------------------------------------------------------------------------
-  # House value chip
-  # ---------------------------------------------------------------------------
 
   @value_labels %{
     "care" => "Care",
@@ -421,10 +385,6 @@ defmodule FoyerWeb.FoyerComponents do
     """
   end
 
-  # ---------------------------------------------------------------------------
-  # Desktop topbar
-  # ---------------------------------------------------------------------------
-
   attr :current_scope, FoyerWeb.Scope, required: true
   attr :page_title, :string, default: nil
 
@@ -439,13 +399,14 @@ defmodule FoyerWeb.FoyerComponents do
     ~H"""
     <header
       id="desktop-topbar"
-      class="hidden md:flex items-center justify-between gap-4 px-6 py-3 border-b foyer-rail__header sticky top-0 z-20"
+      class="hidden md:flex items-center justify-between gap-4 px-6 py-3 border-b foyer-rail__header sticky top-0 z-20 bg-[var(--foyer-cream)]"
     >
       <div class="foyer-serif text-lg truncate">
         {@page_title || ""}
       </div>
 
       <details
+        :if={@current_scope.on_shift?}
         id="new-menu"
         class="relative [&_summary::-webkit-details-marker]:hidden marker:hidden group"
       >
@@ -510,12 +471,9 @@ defmodule FoyerWeb.FoyerComponents do
     """
   end
 
-  # ---------------------------------------------------------------------------
-  # Announcement card
-  # ---------------------------------------------------------------------------
-
   attr :announcement, Foyer.House.Announcement, required: true
   attr :current_user_id, :integer, default: nil
+  attr :show_view_action, :boolean, default: true
 
   def announcement_card(assigns) do
     assigns =
@@ -571,8 +529,9 @@ defmodule FoyerWeb.FoyerComponents do
           {@ack_count}/{@ack_denominator} acknowledged
         </span>
         <.link
+          :if={@show_view_action}
           navigate={~p"/announcements/#{@announcement.id}"}
-          class="foyer-btn sm shrink-0"
+          class="foyer-btn sm shrink-0 ml-auto"
           id={"announcement-card-link-#{@announcement.id}"}
         >
           View
@@ -607,48 +566,67 @@ defmodule FoyerWeb.FoyerComponents do
     if String.length(text) > 200, do: String.slice(text, 0, 200) <> "...", else: text
   end
 
-  # ---------------------------------------------------------------------------
-  # Recognition card
-  # ---------------------------------------------------------------------------
-
   attr :recognition, Foyer.Recognitions.Recognition, required: true
+  attr :current_user_id, :integer, default: nil
+  attr :show_view_action, :boolean, default: true
 
   def recognition_card(assigns) do
     ~H"""
     <article
-      class="rounded-lg border p-5 flex flex-col gap-3 bg-[color-mix(in_srgb,var(--foyer-cream)_90%,white)]"
-      style="border-color: var(--foyer-rule);"
+      class="rounded-lg border p-5 md:p-6 min-h-52 flex flex-col justify-between gap-8"
+      style="background: color-mix(in srgb, var(--foyer-brass-soft) 42%, var(--foyer-cream) 58%); border-color: color-mix(in srgb, var(--foyer-rule) 72%, var(--foyer-brass) 28%);"
       id={"rec-card-#{@recognition.id}"}
       data-rec-id={@recognition.id}
     >
-      <div class="flex items-center gap-2 flex-wrap" data-values>
-        <.house_value_chip :for={v <- @recognition.values || []} value={v} selected />
-        <span :if={@recognition.public == false} class="foyer-mono">Private</span>
+      <div class="flex flex-col gap-5">
+        <div class="flex items-center justify-between gap-3">
+          <div class="foyer-mono flex items-center gap-2">
+            <.icon name="hero-sparkles" class="size-4 text-[var(--foyer-brass)]" />
+            <span>For {recipient_name(@recognition)}</span>
+          </div>
+          <div class="flex items-center justify-end gap-2 flex-wrap" data-values>
+            <.house_value_chip :for={v <- @recognition.values || []} value={v} selected />
+            <%= if @recognition.bonus_points && @recognition.bonus_points > 0 do %>
+              <span class="foyer-tag claret" data-bonus>+{@recognition.bonus_points} pts</span>
+            <% end %>
+            <span :if={@recognition.public == false} class="foyer-tag outline">Private</span>
+          </div>
+        </div>
+
+        <p class="foyer-serif text-xl md:text-2xl leading-snug italic">
+          "{@recognition.body}"
+        </p>
       </div>
 
-      <p class="foyer-serif text-lg leading-snug italic">"{@recognition.body}"</p>
-
-      <div class="flex items-center justify-between text-sm gap-2">
+      <div class="flex items-end justify-between gap-4">
         <div class="flex items-center gap-2">
-          <.avatar :if={@recognition.sender} initials={@recognition.sender.initials} size={:sm} />
-          <span>{@recognition.sender && @recognition.sender.name}</span>
-          <span aria-hidden="true">→</span>
-          <span class="foyer-serif">{@recognition.recipient && @recognition.recipient.name}</span>
+          <.avatar :if={@recognition.sender} initials={@recognition.sender.initials} />
+          <div>
+            <div class="font-semibold">{@recognition.sender && @recognition.sender.name}</div>
+            <div class="text-sm text-stone-600">{relative_day(@recognition.inserted_at)}</div>
+          </div>
         </div>
-        <div class="flex items-center gap-2">
-          <%= if @recognition.bonus_points && @recognition.bonus_points > 0 do %>
-            <span class="foyer-tag claret" data-bonus>+{@recognition.bonus_points} pts</span>
-          <% end %>
-          <span class="text-xs text-stone-500">{relative_day(@recognition.inserted_at)}</span>
+        <div class="flex items-center justify-end gap-2">
+          <.link
+            :if={@show_view_action and own_recognition?(@recognition, @current_user_id)}
+            navigate={~p"/recognitions/#{@recognition.id}"}
+            class="foyer-btn sm"
+            id={"recognition-view-#{@recognition.id}"}
+          >
+            View
+          </.link>
         </div>
       </div>
     </article>
     """
   end
 
-  # ---------------------------------------------------------------------------
-  # Conversation row
-  # ---------------------------------------------------------------------------
+  defp own_recognition?(_recognition, nil), do: false
+  defp own_recognition?(%{sender_id: user_id}, user_id), do: true
+  defp own_recognition?(_recognition, _user_id), do: false
+
+  defp recipient_name(%{recipient: %{name: name}}) when is_binary(name), do: String.upcase(name)
+  defp recipient_name(_recognition), do: "COLLEAGUE"
 
   attr :conversation, Foyer.Chat.Conversation, required: true
   attr :current_user_id, :integer, required: true
@@ -714,10 +692,6 @@ defmodule FoyerWeb.FoyerComponents do
   defp conversation_preview(%{messages: [%{body: body} | _]}), do: truncate(body)
   defp conversation_preview(_), do: ""
 
-  # ---------------------------------------------------------------------------
-  # Message bubble
-  # ---------------------------------------------------------------------------
-
   attr :message, Foyer.Chat.Message, required: true
   attr :current_user_id, :integer, required: true
 
@@ -746,27 +720,18 @@ defmodule FoyerWeb.FoyerComponents do
     """
   end
 
-  # ---------------------------------------------------------------------------
-  # Profile card — shared between `ProfileLive :me` and `PeopleLive :show`.
-  #
-  # `viewer` controls what sections render:
-  #   :self  — own profile (/me): shows Given section, points breakdown, rewards
-  #            catalog, and settings links.
-  #   :other — colleague profile (/people/:id): shows only Received (public) and
-  #            points balance. Given section, breakdown, rewards, and settings
-  #            are suppressed. Data filtering is already enforced by
-  #            `Foyer.Profile.profile_for/2` at the context boundary.
-  # ---------------------------------------------------------------------------
-
   attr :card, Foyer.Profile.Card, required: true
   attr :viewer, :atom, default: :other, values: [:self, :other]
   attr :rewards, :list, default: []
+  attr :self_service, :boolean, default: nil
 
   def profile_card(assigns) do
     # F.Profile.25 — property code from application config. All v1 users share
     # one property; per-user property codes are a v2 concern.
     assigns =
-      assign(assigns, :property_code, Application.get_env(:foyer, :property_code, "LDN·MAY"))
+      assigns
+      |> assign(:property_code, Application.get_env(:foyer, :property_code, "LDN·MAY"))
+      |> assign(:self_service, self_service?(assigns))
 
     ~H"""
     <div class="flex flex-col gap-4" id="profile-card">
@@ -825,10 +790,10 @@ defmodule FoyerWeb.FoyerComponents do
           </p>
         <% else %>
           <div class="flex flex-col gap-2">
-            <.profile_recognition_card
+            <.recognition_card
               :for={r <- @card.received}
               recognition={r}
-              show_recipient={false}
+              current_user_id={profile_current_user_id(assigns)}
             />
           </div>
         <% end %>
@@ -849,10 +814,10 @@ defmodule FoyerWeb.FoyerComponents do
             </p>
           <% else %>
             <div class="flex flex-col gap-2">
-              <.profile_recognition_card
+              <.recognition_card
                 :for={r <- @card.given}
                 recognition={r}
-                show_recipient={true}
+                current_user_id={profile_current_user_id(assigns)}
               />
             </div>
           <% end %>
@@ -891,7 +856,7 @@ defmodule FoyerWeb.FoyerComponents do
       </section>
 
       <%!-- Rewards catalog — own profile only (F.Profile.13, F.Profile.14, F.Profile.15) --%>
-      <%= if @viewer == :self and @rewards != [] do %>
+      <%= if @self_service and @rewards != [] do %>
         <section id="rewards">
           <div class="foyer-mono mb-2">Trade your points</div>
           <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -918,7 +883,7 @@ defmodule FoyerWeb.FoyerComponents do
       <% end %>
 
       <%!-- Settings links — own profile only, inert (F.Profile.14, v2 nit) --%>
-      <%= if @viewer == :self do %>
+      <%= if @self_service do %>
         <section id="profile-settings">
           <div class="foyer-mono mb-2">Settings</div>
           <div class="flex flex-col gap-1">
@@ -938,58 +903,11 @@ defmodule FoyerWeb.FoyerComponents do
     """
   end
 
-  # ---------------------------------------------------------------------------
-  # Profile recognition card — used inside profile_card only. Renders a single
-  # recognition with house value tags, bonus points badge, and relative timestamp.
-  # (F.Profile.21, F.Profile.22)
-  # ---------------------------------------------------------------------------
+  defp self_service?(%{self_service: nil, viewer: viewer}), do: viewer == :self
+  defp self_service?(%{self_service: self_service}), do: self_service
 
-  attr :recognition, Foyer.Recognitions.Recognition, required: true
-  attr :show_recipient, :boolean, default: false
-
-  defp profile_recognition_card(assigns) do
-    ~H"""
-    <article
-      class="rounded-lg border p-3 flex flex-col gap-2"
-      style="border-color: var(--foyer-rule);"
-      id={"recognition-#{@recognition.id}"}
-    >
-      <%= if @show_recipient and @recognition.recipient do %>
-        <div class="foyer-mono">
-          For {@recognition.recipient.name}
-        </div>
-      <% end %>
-      <p class="foyer-serif text-lg">{@recognition.body}</p>
-      <%!-- House value tags (F.Profile.21) --%>
-      <%= if @recognition.values && @recognition.values != [] do %>
-        <div class="flex flex-wrap gap-1">
-          <span :for={v <- @recognition.values} class="foyer-tag outline">
-            {String.upcase(v)}
-          </span>
-        </div>
-      <% end %>
-      <div class="flex items-center gap-2">
-        <.avatar :if={@recognition.sender} initials={@recognition.sender.initials} size={:sm} />
-        <span class="text-sm">{@recognition.sender && @recognition.sender.name}</span>
-        <%!-- Bonus points badge (F.Profile.22) --%>
-        <%= if @recognition.bonus_points && @recognition.bonus_points > 0 do %>
-          <span class="foyer-tag forest ml-auto">+{@recognition.bonus_points} pts</span>
-        <% end %>
-        <span class={[
-          "foyer-mono",
-          @recognition.bonus_points && @recognition.bonus_points > 0 && "ml-0",
-          (@recognition.bonus_points == nil or @recognition.bonus_points == 0) && "ml-auto"
-        ]}>
-          {relative_date(@recognition.inserted_at)}
-        </span>
-      </div>
-    </article>
-    """
-  end
-
-  # ---------------------------------------------------------------------------
-  # Colleague row
-  # ---------------------------------------------------------------------------
+  defp profile_current_user_id(%{viewer: :self, card: %{user: %{id: id}}}), do: id
+  defp profile_current_user_id(_assigns), do: nil
 
   attr :user, Foyer.Accounts.User, required: true
   attr :subtitle, :string, default: nil
@@ -1042,10 +960,6 @@ defmodule FoyerWeb.FoyerComponents do
     """
   end
 
-  # ---------------------------------------------------------------------------
-  # Format helpers
-  # ---------------------------------------------------------------------------
-
   @spec member_since(Foyer.Accounts.User.t()) :: integer() | String.t()
   defp member_since(%{inserted_at: %DateTime{year: year}}), do: year
   defp member_since(_), do: "—"
@@ -1072,27 +986,6 @@ defmodule FoyerWeb.FoyerComponents do
       _ -> Calendar.strftime(date, "%a %-d %b")
     end
   end
-
-  @spec relative_date(DateTime.t() | nil) :: String.t()
-  defp relative_date(nil), do: ""
-
-  defp relative_date(%DateTime{} = dt) do
-    today = Date.utc_today()
-    date = DateTime.to_date(dt)
-    diff = Date.diff(today, date)
-
-    cond do
-      diff == 0 -> "Today"
-      diff == 1 -> "Yesterday"
-      diff < 7 -> Calendar.strftime(date, "%a %-d %b")
-      true -> Calendar.strftime(date, "%-d %b %Y")
-    end
-  end
-
-  # ---------------------------------------------------------------------------
-  # Manager guard helper — re-exported here so LiveView templates can use
-  # `manager?/1` without aliasing Scope. (Convenience only.)
-  # ---------------------------------------------------------------------------
 
   @spec manager?(Scope.t()) :: boolean()
   defdelegate manager?(scope), to: Scope

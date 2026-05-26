@@ -198,6 +198,11 @@ html, body {
     width: min(100%, 48rem);
     margin-inline: auto;
   }
+
+  .foyer-page-people {
+    width: min(100%, 58rem);
+    margin-inline: auto;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -305,16 +310,29 @@ html, body {
     flex-shrink: 0;
     background: var(--foyer-cream);
     border-right: 1px solid var(--foyer-rule);
-    padding: 1.25rem 0;
+    padding-top: 0;
+    padding-bottom: 0;
     gap: 0;
     overflow-y: auto;
   }
 }
 
-/* Rail wordmark / header block */
+/* Rail wordmark / header block (also used on the desktop topbar for the
+   shared border colour). */
 .foyer-rail__header {
-  padding: 0 1rem 1rem;
   border-bottom: 1px solid var(--foyer-rule);
+}
+
+/* Wordmark inside the side rail: forced to 5rem so its bottom border
+   aligns with the desktop topbar (`min-h-20` on `#desktop-topbar`).
+   The topbar is NOT a child of `.foyer-rail`, so it keeps its own
+   Tailwind row layout. */
+.foyer-rail > .foyer-rail__header {
+  min-height: 5rem;
+  padding: 0 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   margin-bottom: 0.75rem;
 }
 
@@ -516,6 +534,223 @@ html, body {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--foyer-ink-soft);
+}
+
+/* ---------------------------------------------------------------------------
+   People directory.
+   --------------------------------------------------------------------------- */
+.people-directory {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.people-directory__header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.people-directory__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.people-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--foyer-rule);
+  background: rgba(255, 255, 255, 0.35);
+  color: var(--foyer-ink-soft);
+  font-size: 0.78rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.people-filter-chip:hover,
+.people-filter-chip.is-active {
+  background: var(--foyer-ink);
+  color: var(--foyer-cream);
+  border-color: var(--foyer-ink);
+}
+
+.people-filter-menu {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  min-width: 15rem;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.4rem;
+  border: 1px solid var(--foyer-rule);
+  border-radius: 0.5rem;
+  background: var(--foyer-cream);
+  box-shadow: 0 12px 32px rgba(31, 35, 31, 0.12);
+}
+
+.people-filter-menu__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.35rem;
+  color: var(--foyer-ink);
+  text-align: left;
+  font-size: 0.85rem;
+}
+
+.people-filter-menu__item:hover,
+.people-filter-menu__item.is-active {
+  background: var(--foyer-cream-deep);
+}
+
+.people-directory__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.people-directory__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.9rem;
+  border: 1px solid var(--foyer-rule);
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.3);
+  transition: border-color 120ms ease, background 120ms ease, transform 80ms ease;
+}
+
+.people-directory__row:hover {
+  border-color: rgba(46, 68, 52, 0.45);
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.people-directory__row.is-self {
+  border-color: rgba(46, 68, 52, 0.55);
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.people-directory__identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.8rem;
+  color: var(--foyer-ink);
+  text-decoration: none;
+}
+
+.people-directory__name,
+.people-directory__title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.people-directory__name {
+  font-size: 1.15rem;
+}
+
+.people-directory__name-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.people-directory__self-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.35rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(46, 68, 52, 0.25);
+  color: var(--foyer-forest-deep);
+  background: rgba(233, 238, 227, 0.9);
+  font-family: var(--foyer-font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.people-directory__title {
+  color: var(--foyer-ink-soft);
+  font-size: 0.85rem;
+}
+
+.people-directory__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--foyer-forest-deep);
+  font-size: 0.85rem;
+}
+
+.people-directory__status.is-muted {
+  color: var(--foyer-ink-soft);
+}
+
+.people-directory__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-self: start;
+}
+
+.people-directory__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--foyer-rule);
+  color: var(--foyer-ink);
+  background: rgba(255, 255, 255, 0.35);
+  font-size: 0.78rem;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.people-directory__action:hover {
+  background: var(--foyer-cream-deep);
+  border-color: rgba(46, 68, 52, 0.35);
+}
+
+.people-directory__empty {
+  padding: 1rem;
+  border: 1px dashed var(--foyer-rule);
+  border-radius: 0.5rem;
+  color: var(--foyer-ink-soft);
+}
+
+@media (min-width: 768px) {
+  .people-directory__header {
+    flex-direction: row;
+    align-items: end;
+    justify-content: space-between;
+  }
+
+  .people-directory__row {
+    grid-template-columns: minmax(18rem, 1fr) 10rem 17rem;
+    padding: 0.85rem 1rem;
+  }
+
+  .people-directory__actions {
+    justify-self: end;
+  }
 }
 
 /* ---------------------------------------------------------------------------

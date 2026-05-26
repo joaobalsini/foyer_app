@@ -52,16 +52,19 @@ defmodule FoyerWeb.TodayLive do
     channels = FoyerWeb.LiveDeps.channels().list_for_user(scope.user)
     channel_options = Enum.map(channels, &{&1.name, &1.id})
 
+    default_channel_id =
+      channel_options |> List.first() |> then(fn option -> option && elem(option, 1) end)
+
     socket
-    |> assign(:end_shift_form, build_end_shift_form())
+    |> assign(:end_shift_form, build_end_shift_form(default_channel_id))
     |> assign(:channel_options, channel_options)
   end
 
   defp maybe_assign_end_shift_form(socket, _scope), do: socket
 
-  defp build_end_shift_form do
+  defp build_end_shift_form(default_channel_id) do
     %Shift{}
-    |> Shift.changeset(%{handoff_note: ""})
+    |> Shift.changeset(%{handoff_note: "", handoff_channel_id: default_channel_id})
     |> to_form(as: :shift)
   end
 
@@ -135,55 +138,45 @@ defmodule FoyerWeb.TodayLive do
         />
         <div class="foyer-content">
           <FoyerComponents.desktop_topbar current_scope={@current_scope} page_title={@page_title} />
-          <div class="foyer-scroll md:max-w-2xl md:mx-auto" id="today">
-            <header class="flex items-start justify-between">
-              <div>
-                <div class="foyer-mono">{header_eyebrow(@current_scope)}</div>
-                <h1 class="foyer-serif text-3xl">{greeting(@current_scope)}</h1>
-              </div>
-              <div class="flex gap-2">
-                <button aria-label="Search" class="foyer-btn ghost sm" id="today-search">
-                  <.icon name="hero-magnifying-glass" class="size-5" />
-                </button>
-                <button aria-label="Notifications" class="foyer-btn ghost sm" id="today-bell">
-                  <.icon name="hero-bell" class="size-5" />
-                </button>
-              </div>
+          <div class="foyer-scroll foyer-page-wide" id="today">
+            <header>
+              <div class="foyer-mono">{header_eyebrow(@current_scope)}</div>
+              <h1 class="foyer-serif text-3xl">{greeting(@current_scope)}</h1>
             </header>
 
             <%= cond do %>
               <% not @current_scope.on_shift? -> %>
                 <section
                   id="off-shift"
-                  class="rounded-lg p-4 flex flex-col gap-3"
+                  class="rounded-lg p-6 flex flex-col gap-5"
                   style="background: var(--foyer-cream-deep);"
                 >
                   <%= if @just_clocked_out do %>
-                    <div id="shift-complete-banner">
-                      <div class="flex items-center gap-2">
-                        <span class="foyer-tag moss">Shift complete</span>
-                      </div>
-                      <h2 class="foyer-serif text-2xl mt-2">Eight hours well held.</h2>
-                      <p class="foyer-mono mt-1">Notifications will quiet down.</p>
-                      <div class="foyer-mono text-sm mt-2">
+                    <div id="shift-complete-banner" class="flex flex-col gap-4">
+                      <span class="foyer-tag moss self-start">Shift complete</span>
+                      <h2 class="foyer-serif text-2xl">Eight hours well held.</h2>
+                      <p class="foyer-mono">Notifications will quiet down.</p>
+                      <div class="foyer-mono text-sm flex flex-col gap-1">
                         <div>Announcements acked</div>
                         <div>What happens next: start your next shift when you're ready.</div>
                       </div>
                     </div>
                   <% else %>
-                    <div id="off-shift-banner">
-                      <div class="flex items-center gap-2">
-                        <span class="foyer-tag outline">Off shift · notifications paused</span>
-                      </div>
-                      <p class="foyer-serif text-xl">
+                    <div id="off-shift-banner" class="flex flex-col gap-4">
+                      <span class="foyer-tag outline self-start">
+                        Off shift · notifications paused
+                      </span>
+                      <p class="foyer-serif text-xl leading-snug">
                         You're off the clock.<br /><em>Rest is part of the work.</em>
                       </p>
                       <p>You won't receive notifications until you start your next shift.</p>
-                      <div class="foyer-mono">
-                        While you were off · {Briefing.waiting_total(@briefing)} waiting
-                      </div>
-                      <div :if={Briefing.waiting_total(@briefing) > 0} class="foyer-mono text-sm">
-                        {waiting_breakdown(@briefing)}
+                      <div class="flex flex-col gap-1">
+                        <div class="foyer-mono">
+                          While you were off · {Briefing.waiting_total(@briefing)} waiting
+                        </div>
+                        <div :if={Briefing.waiting_total(@briefing) > 0} class="foyer-mono text-sm">
+                          {waiting_breakdown(@briefing)}
+                        </div>
                       </div>
                     </div>
                   <% end %>
@@ -236,30 +229,26 @@ defmodule FoyerWeb.TodayLive do
 
                   <div :if={@briefing.needs_ack != []} id="manager-needs-ack">
                     <div class="foyer-mono">Needs your acknowledgement</div>
-                    <.link
-                      :for={a <- @briefing.needs_ack}
-                      navigate={~p"/announcements/#{a.id}"}
-                      id={"needs-ack-#{a.id}"}
-                      class="block rounded-lg border p-3 mt-2 min-h-[44px]"
-                      style="border-color: var(--foyer-rule);"
-                    >
-                      <span class="foyer-tag claret">Pinned · Action</span>
-                      <div class="foyer-serif mt-2">{a.title}</div>
-                    </.link>
+                    <div :for={a <- @briefing.needs_ack} id={"needs-ack-#{a.id}"} class="mt-2">
+                      <FoyerComponents.announcement_card
+                        announcement={a}
+                        current_user_id={@current_scope.user.id}
+                      />
+                    </div>
                   </div>
 
                   <div :if={@briefing.own_announcements != []} id="manager-live-posts">
                     <div class="foyer-mono">Your live posts</div>
-                    <.link
+                    <div
                       :for={a <- @briefing.own_announcements}
-                      navigate={~p"/announcements/#{a.id}"}
                       id={"live-post-#{a.id}"}
-                      class="block rounded-lg border p-3 mt-2 min-h-[44px]"
-                      style="border-color: var(--foyer-rule);"
+                      class="mt-2"
                     >
-                      <span :if={a.pinned_at} class="foyer-tag claret">Pinned</span>
-                      <div class="foyer-serif mt-1">{a.title}</div>
-                    </.link>
+                      <FoyerComponents.announcement_card
+                        announcement={a}
+                        current_user_id={@current_scope.user.id}
+                      />
+                    </div>
                   </div>
 
                   <div :if={@briefing.recent_recognitions != []} id="recent-recognition">
@@ -267,17 +256,12 @@ defmodule FoyerWeb.TodayLive do
                     <div
                       :for={r <- @briefing.recent_recognitions}
                       id={"recognition-#{r.id}"}
-                      class="rounded-lg border p-3 mt-2"
-                      style="border-color: var(--foyer-rule);"
+                      class="mt-2"
                     >
-                      <div class="flex items-center gap-2">
-                        <FoyerComponents.avatar initials={r.sender.initials} size={:sm} />
-                        <span class="foyer-mono">{r.sender.name}</span>
-                      </div>
-                      <p class="foyer-serif mt-2">{r.body}</p>
-                      <div class="flex gap-1 mt-2">
-                        <span :for={v <- r.values} class="foyer-tag outline">{v}</span>
-                      </div>
+                      <FoyerComponents.recognition_card
+                        recognition={r}
+                        current_user_id={@current_scope.user.id}
+                      />
                     </div>
                   </div>
                 </section>
@@ -318,24 +302,12 @@ defmodule FoyerWeb.TodayLive do
 
                   <div :if={@briefing.needs_ack != []} id="needs-ack">
                     <div class="foyer-mono">Needs your acknowledgement</div>
-                    <.link
-                      :for={a <- @briefing.needs_ack}
-                      navigate={~p"/announcements/#{a.id}"}
-                      id={"needs-ack-#{a.id}"}
-                      class="block rounded-lg border p-3 mt-2 min-h-[44px]"
-                      style="border-color: var(--foyer-rule);"
-                    >
-                      <span class="foyer-tag claret">Pinned · Action</span>
-                      <div class="foyer-serif mt-2">{a.title}</div>
-                      <div class="flex items-center gap-2 mt-2 text-sm">
-                        <FoyerComponents.avatar
-                          :if={a.author}
-                          initials={a.author.initials}
-                          size={:sm}
-                        />
-                        <span>{a.author && a.author.name} · {a.channel && a.channel.name}</span>
-                      </div>
-                    </.link>
+                    <div :for={a <- @briefing.needs_ack} id={"needs-ack-#{a.id}"} class="mt-2">
+                      <FoyerComponents.announcement_card
+                        announcement={a}
+                        current_user_id={@current_scope.user.id}
+                      />
+                    </div>
                   </div>
 
                   <div :if={@briefing.recent_recognitions != []} id="recent-recognition">
@@ -343,17 +315,12 @@ defmodule FoyerWeb.TodayLive do
                     <div
                       :for={r <- @briefing.recent_recognitions}
                       id={"recognition-#{r.id}"}
-                      class="rounded-lg border p-3 mt-2"
-                      style="border-color: var(--foyer-rule);"
+                      class="mt-2"
                     >
-                      <div class="flex items-center gap-2">
-                        <FoyerComponents.avatar initials={r.sender.initials} size={:sm} />
-                        <span class="foyer-mono">{r.sender.name}</span>
-                      </div>
-                      <p class="foyer-serif mt-2">{r.body}</p>
-                      <div class="flex gap-1 mt-2">
-                        <span :for={v <- r.values} class="foyer-tag outline">{v}</span>
-                      </div>
+                      <FoyerComponents.recognition_card
+                        recognition={r}
+                        current_user_id={@current_scope.user.id}
+                      />
                     </div>
                   </div>
                 </section>
@@ -381,7 +348,7 @@ defmodule FoyerWeb.TodayLive do
                     field={@end_shift_form[:handoff_channel_id]}
                     type="select"
                     label="Send to channel"
-                    options={[{"— no channel —", nil} | @channel_options]}
+                    options={@channel_options}
                     id="handoff-channel-select"
                   />
                   <button class="foyer-btn forest sm" type="submit">Clock out</button>
@@ -389,7 +356,7 @@ defmodule FoyerWeb.TodayLive do
                     type="button"
                     phx-click="skip_clock_out"
                     id="skip-clock-out"
-                    class="foyer-mono text-sm text-center"
+                    class="foyer-mono text-sm text-center cursor-pointer"
                   >
                     Skip · clock out
                   </button>

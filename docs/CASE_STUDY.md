@@ -119,9 +119,34 @@ feature/announcements was just merged to main. rebase feature/recognitions with 
 
 feature/recognitions was just merged to main. rebase feature/chat with main, check if docs/feature-groups/chat/plans/01-chat-verify.mdd was implemented, do a second verification pass, remove docs/feature-groups/chat/plans/01-chat-verify.md, commit and push
 
-### Session 7 
+### Session 7  (codex)
 
 Reviewed UI and functionality for the whole app, made sure tests were as expected. Had a lot of back and forth with codex.
 
 This resulted on branch ui_refactor.
+
+### Session 8 (codex)
+
+Go to feature/channels, rebase main, and do a final pass based on docs/workflow.md. Make sure only tests on smoke_test.exs touch the db.
+
+### Session 9 (codex)
+
+Go to feature/today, rebase main, and do a final pass based on docs/workflow.md. Make sure only tests on smoke_test.exs touch the db.
+
+### Session 10 (codex)
+
+Go to feature/profile, rebase main, and do a final pass based on docs/workflow.md. Make sure only tests on smoke_test.exs touch the db.
+
+### Session 11 (claude opus)
+
+#### Prompt
+
+Do a final pass in the app, following our verify step on our workflow.md. Trigger several opus agents (one per feature-group) to ensure we have specs and proper documentation ON THE SAME FORMAT AND STYLE. Ensure files match the same style. Ensure only tests on smoke_test touch the DB, others are unit tests. Ensure all specs are properly tested.
+
+Also, why recognitions test is tagged as integration?
+
+we still have plenty of tests that touch the DB on the test/foyer folder. Can't we make most of it unit tests that rely on dependency injection as well? We made for the liveview tests, which are a lot harder. Those should be very easy to fix by, first, 
+moving some of the tests that are actual unit tests to not use DB, while the ones that
+need to use the db should rely on ecto sandbox, since no other tests shall depend on
+its DB state.
 

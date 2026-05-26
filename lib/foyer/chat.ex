@@ -12,20 +12,16 @@ defmodule Foyer.Chat do
   alias Foyer.Chat.Message
   alias Foyer.Chat.MessageRead
   alias Foyer.Chat.Participant
+  alias Foyer.Chat.Validate
   alias Foyer.Repo
 
   @impl true
   @spec open_direct(User.t(), User.t()) ::
           {:ok, Conversation.t()} | {:error, Ecto.Changeset.t() | :invalid_direct}
-  def open_direct(%User{id: user_id}, %User{id: user_id}), do: {:error, :invalid_direct}
-
   def open_direct(%User{id: a_id}, %User{id: b_id}) do
-    participant_ids = Enum.sort([a_id, b_id])
-    direct_key = Conversation.direct_key(participant_ids)
-
-    case Repo.transaction(fn -> upsert_direct(direct_key, participant_ids) end) do
-      {:ok, conversation} -> {:ok, conversation}
-      {:error, reason} -> {:error, reason}
+    with {:ok, participant_ids} <- Validate.direct_pair(a_id, b_id) do
+      direct_key = Conversation.direct_key(participant_ids)
+      Repo.transaction(fn -> upsert_direct(direct_key, participant_ids) end)
     end
   end
 
@@ -381,7 +377,7 @@ defmodule Foyer.Chat do
 
   defp conversation_member?(%Conversation{kind: :direct, participants: participants}, user_id)
        when is_list(participants) do
-    Enum.any?(participants, &(&1.user_id == user_id))
+    Validate.direct_member?(participants, user_id)
   end
 
   defp conversation_member?(%Conversation{kind: :channel, channel_id: channel_id}, user_id) do
@@ -396,14 +392,8 @@ defmodule Foyer.Chat do
     Repo.preload(conversation, [:channel, participants: :user], force: true)
   end
 
-  defp message_changeset(%Conversation{} = conversation, %User{} = author, attrs) do
-    %Message{}
-    |> Message.changeset(
-      attrs
-      |> Map.take(["body", :body])
-      |> Map.put("conversation_id", conversation.id)
-      |> Map.put("author_id", author.id)
-    )
+  defp message_changeset(%Conversation{} = conversation, %User{id: author_id}, attrs) do
+    Validate.message_changeset(conversation, author_id, attrs)
   end
 
   defp broadcast_message(%Conversation{} = conversation, %Message{} = message) do
@@ -434,7 +424,7 @@ defmodule Foyer.Chat do
   end
 
   defp recipient_user_ids(%Conversation{kind: :direct, participants: participants}) do
-    Enum.map(participants, & &1.user_id)
+    Validate.direct_recipient_ids(participants)
   end
 
   defp recipient_user_ids(%Conversation{kind: :channel, channel_id: channel_id}) do

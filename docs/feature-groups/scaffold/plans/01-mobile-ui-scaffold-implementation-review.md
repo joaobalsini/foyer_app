@@ -1,5 +1,8 @@
 # Implementation Review — Plan 01 Mobile-first UI scaffold
 
+Reviews: [`01-mobile-ui-scaffold.md`](./01-mobile-ui-scaffold.md) (plan reviewed by
+Codex in [`01-mobile-ui-scaffold-review.md`](./01-mobile-ui-scaffold-review.md)).
+
 ## Verdict
 
 **Approve with changes (now resolved).**

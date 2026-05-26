@@ -14,12 +14,12 @@ Profile is accessible at `/me` for the current user; `/people/:id` surfaces the 
 **In scope (v1)**
 - Identity header: avatar initials, name, title (job title), property code, on-shift
   indicator, languages.
-- Recognition received: all recognitions where the viewer is the recipient, ordered
-  newest-first. Private recognitions are visible to the recipient on their own profile
-  but never visible on a colleague's profile view.
-- Recognition given: all recognitions where the viewer is the sender, ordered
-  newest-first. On a colleague's profile (PeopleLive :show), given recognitions are
-  not shown (own-profile-only surface).
+- Recognition received: all recognitions where the profile subject is the recipient, ordered
+  newest-first. Private recognitions are visible on the recipient's own profile and on the
+  manager-only full colleague profile view; they are hidden from non-manager colleague reads.
+- Recognition given: all recognitions where the profile subject is the sender, ordered
+  newest-first. The Given section renders on `/me` and on the manager-only full colleague profile
+  view; non-manager colleague reads do not expose it.
 - Stats row: "Recognitions this month" count (received) and "Ack on time" placeholder
   (renders `—` until acknowledgement analytics land in a later group).
 - Foyer points balance with an "How you earned them" earnings breakdown list.
@@ -29,15 +29,15 @@ Profile is accessible at `/me` for the current user; `/people/:id` surfaces the 
   and `designs/profile/mobile-recognitions-received.html`.
 - Desktop layout matching the side-rail shell from `designs/profile/desktop-charlotte-voss.html`;
   the profile content column follows the same card/section structure as mobile.
-- Role-aware rendering: on a manager's own profile, the "Given" section shows
-  recognitions they sent; a manager viewing a colleague's profile does not see that
-  colleague's "Given" list.
+- Role-aware rendering: on a user's own profile, the "Given" section shows recognitions they sent;
+  on the manager-only colleague profile view, the same full profile treatment is rendered without
+  rewards or settings affordances.
 - The `profile_card` component is reused by `PeopleLive :show`.
 
 **Out of scope (v1)**
 - Rewards redemption — catalog is visible only; actions render "Coming soon".
 - Profile editing (name, languages, notification preferences, shift availability).
-- Viewing private recognitions on a colleague's profile (recipient only).
+- Viewing private recognitions on a colleague's profile as a non-manager.
 - Acknowledgement analytics (the "Ack on time" stat is a placeholder).
 - Points ledger write path (points accumulate only through Recognition events, handled
   by the Recognitions group).
@@ -78,11 +78,13 @@ timestamp (e.g. "Yesterday", "Wed 22 Apr").
 **When** the viewer loads `/me`
 **Then** the private recognition appears in the "Received" section.
 
-### F.Profile.6 — Private recognitions hidden on a colleague's profile
+### F.Profile.6 — Private recognitions hidden from non-manager colleague reads
 **Given** a recognition exists with `public: false`
-**When** any user other than the recipient views that recipient's profile at
-`/people/:id`
-**Then** the private recognition does not appear in the recognition list.
+**When** profile data is loaded for a viewer who is neither the recipient nor an authorized
+manager
+**Then** the private recognition does not appear in the returned recognition list. Staff users
+cannot reach another user's profile UI at `/people/:id`; this context rule protects non-manager
+read paths and any future reduced colleague surfaces.
 
 ### F.Profile.7 — Recognitions given section: own profile
 **Given** a staff member navigates to their own profile at `/me`
@@ -91,11 +93,12 @@ timestamp (e.g. "Yesterday", "Wed 22 Apr").
 ordered newest-first, each showing the recipient's name, the recognition body, house
 value tags, and any bonus points badge.
 
-### F.Profile.8 — Given section absent on colleague's profile view
-**Given** a user navigates to a colleague's profile at `/people/:id`
-**When** the page renders
-**Then** the "Given" section is not shown; only the "Received" section is rendered for
-that colleague (respecting the private-visibility rule in F.Profile.6).
+### F.Profile.8 — Staff cannot access another user's profile view
+**Given** a staff user navigates to a colleague's profile at `/people/:id`
+**When** `PeopleLive` handles the `:show` action
+**Then** the user is redirected back to `/people` and the colleague's profile card is not
+rendered. Staff users may only open their own profile (`/me`, or their own row's `Your profile`
+action in People).
 
 ### F.Profile.9 — Stats row: recognitions this month
 **Given** the profile page renders
@@ -167,13 +170,15 @@ responsible for including it.
 **Then** they are redirected to `/today` with a flash message, because `/me` is gated
 by the `:ensure_on_shift` on_mount hook.
 
-### F.Profile.19 — Colleague profile via PeopleLive reuses profile_card
-**Given** a user is on-shift and navigates to `/people/:id`
+### F.Profile.19 — Managers can open full profiles from People
+**Given** a manager is on-shift and navigates to `/people/:id`, or clicks a row's
+`View profile` action
 **When** the page loads for a valid colleague id
-**Then** the same `profile_card` component renders for the colleague, showing their
-identity header, on-shift state, received recognitions (public only), and points
-balance. The "Given" section, private recognitions, and rewards catalog are not
-shown.
+**Then** `PeopleLive` renders the same full `profile_card` treatment used by `/me`,
+including received recognitions, private recognitions, given recognitions, and points. The
+"Trade your points" rewards catalog and inert Settings controls remain hidden for other users'
+profiles, even though redemptions/settings are not active. Non-manager staff do not see
+`View profile` actions for other users.
 
 ### F.Profile.20 — Empty recognitions state
 **Given** a user has received no recognitions
@@ -215,3 +220,10 @@ disclosure is hidden or shows an empty state.
 (`Application.get_env(:foyer, :property_code, "LDN·MAY")`), not from a user schema
 field. In the v1 POC, all users share the same single-property code. Adding a per-user
 or per-channel property code is a v2 concern.
+
+### F.Profile.26 — `/me` is only the current user's own profile
+**Given** an authenticated on-shift user navigates to `/me`
+**When** `ProfileLive` loads the profile card
+**Then** the profile is loaded from the current scope's user only; no route parameter can
+select another user's full self-profile. Managers access other users' full profiles through
+`/people/:id`; staff users can only access their own full profile.

@@ -46,7 +46,6 @@ defmodule FoyerWeb.Router do
       live "/chat/new", ChatLive, :new_message
       live "/chat/:conversation_id", ChatLive, :show
 
-      live "/recognitions", RecognitionsLive, :index
       live "/recognitions/new", RecognitionsLive, :new
       live "/recognitions/:id", RecognitionsLive, :show
       live "/recognitions/:id/edit", RecognitionsLive, :edit

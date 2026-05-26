@@ -1,5 +1,9 @@
 # Review — Plan 01 Mobile-first UI scaffold
 
+Reviews: [`01-mobile-ui-scaffold.md`](./01-mobile-ui-scaffold.md). Implementation
+outcome captured in
+[`01-mobile-ui-scaffold-implementation-review.md`](./01-mobile-ui-scaffold-implementation-review.md).
+
 ## Verdict
 
 Revise

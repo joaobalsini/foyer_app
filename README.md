@@ -26,9 +26,12 @@ Start here:
 Feature specs live under [docs/feature-groups](docs/feature-groups):
 
 - [Announcements](docs/feature-groups/announcements/spec.md)
+- [Channels](docs/feature-groups/channels/spec.md)
 - [Chat](docs/feature-groups/chat/spec.md)
+- [Profile](docs/feature-groups/profile/spec.md)
 - [Recognitions](docs/feature-groups/recognitions/spec.md)
 - [Scaffold](docs/feature-groups/scaffold/spec.md)
+- [Today](docs/feature-groups/today/spec.md)
 
 Static visual references live in [designs](designs).
 
@@ -161,5 +164,3 @@ Use `mix precommit` before considering a change complete.
 |-- priv/repo/               # migrations and seeds
 `-- test/                    # ExUnit, LiveView, and support modules
 ```
-
-Key architectural rule: keep business logic in contexts such as `Foyer.House`, `Foyer.Chat`, `Foyer.Recognitions`, `Foyer.Shifts`, and `Foyer.Today`; keep LiveViews thin. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before adding new behaviour.

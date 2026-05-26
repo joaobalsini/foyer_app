@@ -27,7 +27,7 @@ defmodule FoyerWeb.HouseLive do
 
     scope = socket.assigns.current_scope
     feed = FoyerWeb.LiveDeps.house().feed_for(scope.user, [])
-    recognitions = FoyerWeb.LiveDeps.recognitions().feed_public([])
+    recognitions = house_recognitions(scope.user)
 
     {:noreply,
      socket
@@ -202,6 +202,22 @@ defmodule FoyerWeb.HouseLive do
 
   defp feed_entry(:recognition, item), do: %{kind: :recognition, item: item, ts: item.inserted_at}
 
+  defp house_recognitions(user) do
+    recognitions = FoyerWeb.LiveDeps.recognitions()
+    public = recognitions.feed_public([])
+
+    authored_private =
+      recognitions.given_by(user, user)
+      |> Enum.reject(& &1.public)
+
+    received_private =
+      recognitions.received_by(user, user)
+      |> Enum.reject(& &1.public)
+
+    (public ++ authored_private ++ received_private)
+    |> Enum.uniq_by(& &1.id)
+  end
+
   attr :entry, :map, required: true
   attr :current_user_id, :integer, required: true
 
@@ -216,7 +232,10 @@ defmodule FoyerWeb.HouseLive do
 
   defp feed_card(%{entry: %{kind: :recognition}} = assigns) do
     ~H"""
-    <FoyerComponents.recognition_card recognition={@entry.item} />
+    <FoyerComponents.recognition_card
+      recognition={@entry.item}
+      current_user_id={@current_user_id}
+    />
     """
   end
 

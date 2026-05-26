@@ -1,6 +1,26 @@
 defmodule FoyerWeb.TodayLiveTest do
-  use FoyerWeb.ConnCase, async: true
+  @moduledoc """
+  Isolated LiveView tests for `FoyerWeb.TodayLive` (`/today` and
+  `/today/end-shift`).
 
+  Uses `live_isolated/3` with `FoyerWeb.IsolatedHelpers.prepare_isolated/4`
+  to mount the LiveView without the router or `on_mount` hooks. The
+  `Foyer.TodayPort` collaborator is swapped per test via `Mox.stub_with/2`
+  with named scenario modules. No DB access — the tests run in plain
+  `ExUnit.Case` to avoid the `ConnCase` sandbox cost.
+
+  Covers:
+    F.Today.1, F.Today.3 — F.Today.19, F.Today.21
+  (F.Today.2 lives in the route smoke test, F.Today.20 in the isolated
+  context test.)
+  """
+  use ExUnit.Case, async: true
+
+  @endpoint FoyerWeb.Endpoint
+
+  use FoyerWeb, :verified_routes
+
+  import Phoenix.ConnTest
   import Phoenix.LiveViewTest
   import Mox
 
@@ -19,13 +39,19 @@ defmodule FoyerWeb.TodayLiveTest do
       {:ok, %{shift | ended_at: ended_at}}
     end)
 
-    stub(Foyer.ChannelsMock, :list_for_user, fn _user -> [] end)
-    :ok
-  end
+    stub(Foyer.ChannelsMock, :list_for_user, fn _user ->
+      [
+        %Foyer.Channels.Channel{
+          id: 1,
+          name: "All Housekeeping",
+          slug: "all-housekeeping",
+          kind: :department
+        }
+      ]
+    end)
 
-  # ──────────────────────────────────────────────────────────
-  # F.Today.1 — Off-shift paused state banner
-  # ──────────────────────────────────────────────────────────
+    {:ok, conn: build_conn()}
+  end
 
   describe "F.Today.1 — off-shift paused state banner" do
     test "renders off-shift tag, copy, Start shift button, and waiting line", %{conn: conn} do
@@ -46,10 +72,6 @@ defmodule FoyerWeb.TodayLiveTest do
     end
   end
 
-  # ──────────────────────────────────────────────────────────
-  # F.Today.1 + F.Today.16 — Off-shift with waiting counts
-  # ──────────────────────────────────────────────────────────
-
   describe "F.Today.16 — waiting counts reflect work since last shift" do
     test "shows total waiting count and breakdown for announcements, messages, recognitions", %{
       conn: conn
@@ -66,10 +88,6 @@ defmodule FoyerWeb.TodayLiveTest do
     end
   end
 
-  # ──────────────────────────────────────────────────────────
-  # F.Today.3 — Start shift transition
-  # ──────────────────────────────────────────────────────────
-
   describe "F.Today.3 — start shift transition" do
     test "clicking Start shift fires start_shift event and redirects to /today", %{conn: conn} do
       {:ok, view, _html} =
@@ -81,10 +99,6 @@ defmodule FoyerWeb.TodayLiveTest do
       assert_redirected(view, ~p"/today")
     end
   end
-
-  # ──────────────────────────────────────────────────────────
-  # F.Today.4 — On-shift staff: priority content order
-  # ──────────────────────────────────────────────────────────
 
   describe "F.Today.4 — on-shift staff content order" do
     test "handoff card precedes needs-ack section which precedes recognition section", %{
@@ -101,21 +115,25 @@ defmodule FoyerWeb.TodayLiveTest do
     end
   end
 
-  # ──────────────────────────────────────────────────────────
-  # F.Today.6 / F.Today.7 — Needs-ack: empty means section absent
-  # ──────────────────────────────────────────────────────────
-
-  describe "F.Today.7 — all acknowledged: needs-ack section absent" do
+  describe "F.Today.6 / F.Today.7 — acknowledged items disappear; Today gets quieter" do
     test "needs-ack section absent when all announcements are acknowledged", %{conn: conn} do
       {:ok, view, _html} = mount_today(conn, Today.Scenarios.OnShiftAllAcked)
 
       refute has_element?(view, "#needs-ack")
     end
-  end
 
-  # ──────────────────────────────────────────────────────────
-  # F.Today.8 — Handoff card content
-  # ──────────────────────────────────────────────────────────
+    test "F.Today.6 — re-mount after acknowledgement drops the ack'd item", %{conn: conn} do
+      {:ok, view_before, _html} = mount_today(conn, Today.Scenarios.OnShiftStaff)
+      assert has_element?(view_before, "#needs-ack-10")
+
+      # After the user acknowledges on the detail page and returns, the
+      # briefing reloads from a context that no longer surfaces that item.
+      # Simulate the next surface load by stubbing the AllAcked scenario.
+      {:ok, view_after, _html} = mount_today(conn, Today.Scenarios.OnShiftAllAcked)
+      refute has_element?(view_after, "#needs-ack-10")
+      refute has_element?(view_after, "#needs-ack")
+    end
+  end
 
   describe "F.Today.8 — handoff card content" do
     test "handoff card shows sender name, ended-at time, and handoff note", %{conn: conn} do
@@ -128,10 +146,6 @@ defmodule FoyerWeb.TodayLiveTest do
     end
   end
 
-  # ──────────────────────────────────────────────────────────
-  # F.Today.9 — No handoff card when no relevant handoff
-  # ──────────────────────────────────────────────────────────
-
   describe "F.Today.9 — no handoff card when no relevant handoff" do
     test "handoff-card element absent when handoff is nil", %{conn: conn} do
       {:ok, view, _html} = mount_today(conn, Today.Scenarios.OnShiftNoHandoff)
@@ -140,13 +154,9 @@ defmodule FoyerWeb.TodayLiveTest do
     end
   end
 
-  # ──────────────────────────────────────────────────────────
-  # F.Today.10 / F.Today.11 — End shift form
-  # ──────────────────────────────────────────────────────────
-
   describe "F.Today.10 / F.Today.11 — end-shift form" do
     test "end-shift form has textarea, channel picker, and skip link", %{conn: conn} do
-      {:ok, view, _html} =
+      {:ok, view, html} =
         mount_today(conn, Today.Scenarios.OnShiftStaff,
           action: :end_shift,
           path: "/today/end-shift"
@@ -154,6 +164,8 @@ defmodule FoyerWeb.TodayLiveTest do
 
       assert has_element?(view, "#end-shift-form")
       assert has_element?(view, "#handoff-channel-select")
+      assert has_element?(view, "#handoff-channel-select option[value='1'][selected]")
+      refute html =~ "— no channel —"
       assert has_element?(view, "#skip-clock-out")
     end
 
@@ -169,10 +181,6 @@ defmodule FoyerWeb.TodayLiveTest do
     end
   end
 
-  # ──────────────────────────────────────────────────────────
-  # F.Today.5 — Needs-ack items link to announcement detail
-  # ──────────────────────────────────────────────────────────
-
   describe "F.Today.5 — needs-ack item links to announcement detail" do
     test "needs-ack link navigates to /announcements/:id", %{conn: conn} do
       {:ok, view, html} = mount_today(conn, Today.Scenarios.OnShiftStaff)
@@ -183,10 +191,6 @@ defmodule FoyerWeb.TodayLiveTest do
     end
   end
 
-  # ──────────────────────────────────────────────────────────
-  # F.Today.13 — On-shift manager: New announcement CTA
-  # ──────────────────────────────────────────────────────────
-
   describe "F.Today.13 — manager sees New announcement CTA" do
     test "compose-cta present for on-shift manager", %{conn: conn} do
       {:ok, view, _html} =
@@ -195,10 +199,6 @@ defmodule FoyerWeb.TodayLiveTest do
       assert has_element?(view, "#compose-cta")
     end
   end
-
-  # ──────────────────────────────────────────────────────────
-  # F.Today.14 — On-shift manager: live posts section
-  # ──────────────────────────────────────────────────────────
 
   describe "F.Today.14 — manager live posts section" do
     test "manager-live-posts section present when manager has published announcements", %{
@@ -211,12 +211,10 @@ defmodule FoyerWeb.TodayLiveTest do
       # Scenario has 2 live posts (IDs 11 and 12)
       assert has_element?(view, "#live-post-11")
       assert has_element?(view, "#live-post-12")
+      assert has_element?(view, "#live-post-11 #announcement-card-11")
+      assert has_element?(view, "#live-post-12 #announcement-card-12")
     end
   end
-
-  # ──────────────────────────────────────────────────────────
-  # F.Today.17 — Mobile-first rendering
-  # ──────────────────────────────────────────────────────────
 
   describe "F.Today.17 — mobile-first rendering" do
     test "rendered HTML has no explicit fixed width exceeding 390px", %{conn: conn} do
@@ -229,26 +227,26 @@ defmodule FoyerWeb.TodayLiveTest do
     end
   end
 
-  # ──────────────────────────────────────────────────────────
-  # F.Today.18 — Recent recognition cards
-  # ──────────────────────────────────────────────────────────
-
   describe "F.Today.18 — recent recognition cards" do
-    test "recognition section shows sender name, body, and values", %{conn: conn} do
+    test "recognition section shows sender name, body, values, and author-only View links", %{
+      conn: conn
+    } do
       {:ok, view, html} = mount_today(conn, Today.Scenarios.OnShiftStaff)
 
       assert has_element?(view, "#recent-recognition")
       assert has_element?(view, "#recognition-1")
+      assert has_element?(view, "#recognition-1 #rec-card-1")
+      refute has_element?(view, "#recognition-view-1")
+      refute has_element?(view, "#recognition-view-2")
+      assert has_element?(view, "#recognition-view-3", "View")
+      assert html =~ ~p"/recognitions/3"
       assert html =~ "Rafael Mendes"
       assert html =~ "Quietly handled a 02:14 guest issue with grace."
+      assert html =~ "Private note I sent and may need to edit."
       assert html =~ "care"
       assert html =~ "discretion"
     end
   end
-
-  # ──────────────────────────────────────────────────────────
-  # F.Today.19 — No recognition section when none received
-  # ──────────────────────────────────────────────────────────
 
   describe "F.Today.19 — no recognition section when none received" do
     test "recent-recognition section absent when recognitions list is empty", %{conn: conn} do
@@ -257,10 +255,6 @@ defmodule FoyerWeb.TodayLiveTest do
       refute has_element?(view, "#recent-recognition")
     end
   end
-
-  # ──────────────────────────────────────────────────────────
-  # Shift-complete variant (just_clocked_out)
-  # ──────────────────────────────────────────────────────────
 
   describe "shift-complete transient state (F.Today.10 / F.Today.12 redirect)" do
     test "renders shift-complete banner when state=shift_complete param is present", %{conn: conn} do
@@ -286,9 +280,26 @@ defmodule FoyerWeb.TodayLiveTest do
     end
   end
 
-  # ──────────────────────────────────────────────────────────
-  # F.Today.21 — Handoff card de-emphasis on re-load (UI-only flag)
-  # ──────────────────────────────────────────────────────────
+  describe "F.Today.15 — Today does not auto-refresh in v1" do
+    test "rendered content does not change without an explicit reload", %{conn: conn} do
+      {:ok, view, _html} = mount_today(conn, Today.Scenarios.OnShiftStaff)
+      first_render = render(view)
+      assert first_render =~ "Suite 412 - Allergy protocol in effect"
+
+      # Simulate an external acknowledgement: a new "world" where the
+      # needs-ack item is gone. Without PubSub, the live view must not
+      # observe this change until the user reloads.
+      stub_with(Foyer.TodayMock, Today.Scenarios.OnShiftAllAcked)
+
+      # No PubSub message is dispatched; the view still shows the old briefing.
+      assert render(view) == first_render
+      assert has_element?(view, "#needs-ack-10")
+
+      # An explicit re-mount picks up the new world.
+      {:ok, reloaded, _html} = mount_today(conn, Today.Scenarios.OnShiftAllAcked)
+      refute has_element?(reloaded, "#needs-ack-10")
+    end
+  end
 
   describe "F.Today.21 — handoff card gets quieter on subsequent load" do
     test "handoff card has opacity class after push_navigate re-renders same session", %{

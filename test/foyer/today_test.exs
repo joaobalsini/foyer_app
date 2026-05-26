@@ -1,4 +1,12 @@
 defmodule Foyer.TodayTest do
+  @moduledoc """
+  Unit tests for `Foyer.Today` — the briefing assembler that turns shift
+  state, announcements, recognitions, and chat unread counts into a
+  `Today.Briefing` DTO. Pure-struct testing with injected callables; no DB.
+
+  Covers:
+    F.Today.20 — unread_since anchors waiting counts on last_shift_ended_at
+  """
   use ExUnit.Case, async: true
 
   alias Foyer.Accounts.User
@@ -86,6 +94,24 @@ defmodule Foyer.TodayTest do
       assert briefing.waiting_announcements == 0
       assert briefing.waiting_messages == 0
       assert briefing.waiting_recognitions == 0
+    end
+
+    test "on_shift? true: recent recognitions include authored private recognitions" do
+      briefing = Today.brief_for(user(), on_shift_deps())
+
+      assert Enum.any?(briefing.recent_recognitions, &(&1.id == 42))
+    end
+
+    test "F.Today.20 — unread_since anchors waiting counts on last_shift_ended_at" do
+      briefing = Today.brief_for(user(), off_shift_deps())
+
+      # The OffShiftWaitingDepsShifts scenario pins last_shift_ended_at so the
+      # Chat/House/Recognitions stubs can return their since-anchored counts.
+      assert briefing.on_shift? == false
+      assert briefing.last_shift_ended_at == ~U[2026-05-25 13:00:00Z]
+      assert briefing.waiting_announcements == 3
+      assert briefing.waiting_messages == 2
+      assert briefing.waiting_recognitions == 1
     end
   end
 

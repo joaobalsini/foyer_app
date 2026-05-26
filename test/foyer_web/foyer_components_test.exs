@@ -1,5 +1,17 @@
 defmodule FoyerWeb.FoyerComponentsTest do
-  use FoyerWeb.ConnCase, async: true
+  @moduledoc """
+  Unit tests for `FoyerWeb.FoyerComponents`. Pure component rendering with
+  hand-built structs — no router, no on_mount, no DB.
+
+  Covers:
+    F.Announcements.7  — author hidden from required-ack badges
+    F.Chat.8           — unread dot driven by chat_unread_count
+    F.Chat.9           — inbox preview renders latest message and unread state
+    F.Chat.10          — bottom nav unread indicator
+    F.Recognitions.5   — bonus points badge only when present
+    F.Recognitions.10  — private recognition body hidden for third parties
+  """
+  use ExUnit.Case, async: true
 
   import Phoenix.Component
   import Phoenix.LiveViewTest
@@ -150,6 +162,23 @@ defmodule FoyerWeb.FoyerComponentsTest do
       assert html =~ ~s(data-new-action="recognition")
       refute html =~ ~s(data-new-action="announcement")
     end
+
+    test "F.Today.22 — hides the entire +New menu when the user is off shift" do
+      html =
+        render_component(&FoyerComponents.desktop_topbar/1,
+          current_scope: scope(user(1, role: :staff), false),
+          page_title: "Today"
+        )
+
+      # The page title still renders, but the +New menu and all its items are
+      # gone — off-shift users have nothing they can compose, so the affordance
+      # would only lead to ensure_on_shift route gates.
+      assert html =~ "Today"
+      refute html =~ ~s(id="new-menu")
+      refute html =~ ~s(data-new-action="chat")
+      refute html =~ ~s(data-new-action="recognition")
+      refute html =~ ~s(data-new-action="announcement")
+    end
   end
 
   describe "announcement_card/1" do
@@ -175,6 +204,8 @@ defmodule FoyerWeb.FoyerComponentsTest do
       assert html =~ "Needs your ack"
       refute html =~ "0/0 acknowledged"
       refute html =~ "acknowledged"
+      assert html =~ ~s(id="announcement-card-link-100")
+      assert html =~ "ml-auto"
     end
 
     test "F.Announcements.7 — marks an acknowledgement-required announcement as acknowledged by the current user" do
@@ -207,7 +238,9 @@ defmodule FoyerWeb.FoyerComponentsTest do
         render_component(&FoyerComponents.recognition_card/1,
           recognition: %Recognition{
             id: 200,
+            sender_id: 1,
             sender: user(1, name: "Maya Okafor", initials: "MO"),
+            recipient_id: 2,
             recipient: user(2, name: "Aisha Bello", initials: "AB"),
             body: "Stayed late for 412.",
             values: ["care"],
@@ -222,7 +255,45 @@ defmodule FoyerWeb.FoyerComponentsTest do
       assert html =~ "Private"
       assert html =~ "+25 pts"
       assert html =~ "Maya Okafor"
-      assert html =~ "Aisha Bello"
+      assert html =~ "For AISHA BELLO"
+    end
+
+    test "F.Recognitions.10 — renders View only for sender or recipient" do
+      recognition = %Recognition{
+        id: 201,
+        sender_id: 1,
+        sender: user(1, name: "Maya Okafor", initials: "MO"),
+        recipient_id: 2,
+        recipient: user(2, name: "Aisha Bello", initials: "AB"),
+        body: "Stayed late for 412.",
+        values: ["care"],
+        public: true,
+        inserted_at: DateTime.utc_now(:second)
+      }
+
+      sender_html =
+        render_component(&FoyerComponents.recognition_card/1,
+          recognition: recognition,
+          current_user_id: 1
+        )
+
+      third_party_html =
+        render_component(&FoyerComponents.recognition_card/1,
+          recognition: recognition,
+          current_user_id: 3
+        )
+
+      assert sender_html =~ ~s(id="recognition-view-201")
+      assert sender_html =~ ~s(href="/recognitions/201")
+
+      recipient_html =
+        render_component(&FoyerComponents.recognition_card/1,
+          recognition: recognition,
+          current_user_id: 2
+        )
+
+      refute recipient_html =~ ~s(id="recognition-view-201")
+      refute third_party_html =~ ~s(id="recognition-view-201")
     end
   end
 

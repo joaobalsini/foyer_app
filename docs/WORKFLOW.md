@@ -63,6 +63,8 @@ A **Sonnet agent** runs the execute loop, working through the plan step by step.
 - Stay within the plan's scope — no drive-by refactors or speculative features.
 - Review changes incrementally as they land, not batched at the end.
 - After the last step, do a final pass across the feature to catch anything that fell through the cracks.
+- Keep the working tree clean except for intentional source, test, and documentation changes. Do not leave
+  generated files, local metadata, screenshots, coverage output, or other machine-local artifacts in the diff.
 
 ## Verify
 
@@ -75,9 +77,16 @@ phase — it's what stops drift, regressions, and silent shortcuts from compound
 - **Guidelines followed.** Tests follow [TESTING_GUIDE.md](TESTING_GUIDE.md) (isolated by default, scenario
   modules for variations, `async: true` unless documented). Each spec feature has at least one e2e test
   mentioning its `F.<FirstWord>.<N>` number; related unit tests reference the same number.
+- **Database boundary.** LiveView behaviour tests use `live_isolated/3`, dependency injection, and scenario
+  modules rather than touching the Repo. Database access is reserved for route smoke tests and explicit context
+  persistence/constraint/query-contract tests that need the Ecto sandbox. Any DB-backed test outside
+  `test/foyer_web/smoke_test.exs` must explain the persistence boundary it is proving.
 - **Static checks clean.** `mix format`, `mix credo --strict`, and `mix dialyzer` all pass.
+- **Precommit clean.** `mix precommit` passes after all fixes. This is the final local gate before handoff.
 - **Test suite health.** Full suite runs in under 10 seconds on a laptop. A single logic change fails one unit
   test and at most one or two integration tests.
+- **Coverage signal.** `mix test --cover` should exercise changed application code. Any intentionally ignored
+  modules belong in the `test_coverage[:ignore_modules]` list with a short reason.
 - **Database indexes.** Every query introduced by the feature relies on an existing or newly added index. No
   accidental table scans on hot paths.
 - **No N+1 queries.** Preloads or explicit joins on any list endpoint that loads associations.

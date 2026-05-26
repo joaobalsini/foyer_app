@@ -86,13 +86,24 @@ defmodule Today.Scenarios.OnShiftStaff do
       public: false
     }
 
+    rec3 = %Recognition{
+      id: 3,
+      sender_id: user.id,
+      sender: user,
+      recipient_id: 100,
+      recipient: sender,
+      body: "Private note I sent and may need to edit.",
+      values: ["initiative"],
+      public: false
+    }
+
     %Briefing{
       user: user,
       shift: shift,
       on_shift?: true,
       handoff: handoff_shift,
       needs_ack: [announcement],
-      recent_recognitions: [rec1, rec2],
+      recent_recognitions: [rec1, rec2, rec3],
       own_announcements: [],
       waiting_announcements: 0,
       waiting_messages: 0,

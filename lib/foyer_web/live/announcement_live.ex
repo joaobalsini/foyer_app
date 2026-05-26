@@ -12,7 +12,7 @@ defmodule FoyerWeb.AnnouncementLive do
   (`F.Announcements.2`). The "I've read & understood" CTA writes an
   `AnnouncementAck` row (`F.Announcements.7`, `F.Announcements.8`). Pin /
   unpin / remove buttons render only for the author or a channel manager
-  within the 15-minute grace window (`F.Announcements.3` – .5).
+  within the 5-minute grace window (`F.Announcements.3` – .5).
   """
   use FoyerWeb, :live_view
 
@@ -32,6 +32,9 @@ defmodule FoyerWeb.AnnouncementLive do
      |> assign(:receipts, nil)
      |> assign(:preview_title, "")
      |> assign(:preview_body, "")
+     |> assign(:preview_channel_id, nil)
+     |> assign(:preview_requires_ack, false)
+     |> assign(:preview_pinned, false)
      |> assign(:page_title, "Announcement")}
   end
 
@@ -77,6 +80,7 @@ defmodule FoyerWeb.AnnouncementLive do
        |> assign(:acked?, acked_by?(a, scope.user.id))
        |> assign(:can_ack?, can_ack?(a, scope.user))
        |> assign(:can_pin?, can_pin?(a, scope.user))
+       |> assign(:within_grace?, FoyerWeb.LiveDeps.house().within_grace_window?(a))
        |> assign(:receipts, load_receipts(a, scope))
        |> assign(:page_title, a.title)}
     rescue
@@ -103,6 +107,9 @@ defmodule FoyerWeb.AnnouncementLive do
          |> assign(:channel_options, Enum.map(channels, &{&1.name, &1.id}))
          |> assign(:preview_title, a.title || "")
          |> assign(:preview_body, a.body || "")
+         |> assign(:preview_channel_id, a.channel_id)
+         |> assign(:preview_requires_ack, a.requires_ack)
+         |> assign(:preview_pinned, not is_nil(a.pinned_at))
          |> assign(:page_title, "Edit · " <> a.title)}
       else
         {:noreply,
@@ -124,8 +131,11 @@ defmodule FoyerWeb.AnnouncementLive do
     scope = socket.assigns.current_scope
 
     case FoyerWeb.LiveDeps.house().create_announcement(scope.user, attrs) do
-      {:ok, _announcement} ->
-        {:noreply, push_navigate(socket, to: ~p"/house")}
+      {:ok, announcement} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Announcement published.")
+         |> push_navigate(to: ~p"/announcements/#{announcement.id}")}
 
       {:error, :unauthorized} ->
         {:noreply, put_flash(socket, :error, "Only managers can publish announcements.")}
@@ -221,7 +231,10 @@ defmodule FoyerWeb.AnnouncementLive do
     {:noreply,
      socket
      |> assign(:preview_title, Map.get(attrs, "title", ""))
-     |> assign(:preview_body, Map.get(attrs, "body", ""))}
+     |> assign(:preview_body, Map.get(attrs, "body", ""))
+     |> assign(:preview_channel_id, Map.get(attrs, "channel_id"))
+     |> assign(:preview_requires_ack, truthy?(Map.get(attrs, "requires_ack")))
+     |> assign(:preview_pinned, truthy?(Map.get(attrs, "pinned")))}
   end
 
   defp update_pin_state(socket, fun, message) do
@@ -288,9 +301,10 @@ defmodule FoyerWeb.AnnouncementLive do
           chat_unread_count={@chat_unread_count}
         />
         <div class="foyer-content">
+          <FoyerComponents.desktop_topbar current_scope={@current_scope} page_title={@page_title} />
           <div class="foyer-scroll" id="announcement">
             <.link navigate={~p"/house"} class="foyer-btn ghost sm self-start" id="back-to-house">
-              <.icon name="hero-arrow-left" class="size-4" /> Back
+              <.icon name="hero-arrow-left" class="size-4" /> Back to The House
             </.link>
 
             <%= cond do %>
@@ -322,6 +336,13 @@ defmodule FoyerWeb.AnnouncementLive do
                           label="Requires acknowledgement"
                         />
                         <.input
+                          name="announcement[pinned]"
+                          id="announcement-pinned"
+                          type="checkbox"
+                          label="Pin this announcement"
+                          value={@preview_pinned}
+                        />
+                        <.input
                           field={@form[:channel_id]}
                           type="select"
                           label="To · audience"
@@ -332,17 +353,11 @@ defmodule FoyerWeb.AnnouncementLive do
                     </div>
                     <div class="hidden lg:block" id="announcement-preview-col">
                       <div class="foyer-mono mb-2">Preview</div>
-                      <article
-                        class="rounded-lg border p-3 flex flex-col gap-2"
-                        style="border-color: var(--foyer-rule);"
-                      >
-                        <h3 class="foyer-serif text-xl">
-                          {if @preview_title != "", do: @preview_title, else: "Untitled"}
-                        </h3>
-                        <p class="text-sm">
-                          {if @preview_body != "", do: @preview_body, else: "Body will appear here…"}
-                        </p>
-                      </article>
+                      <FoyerComponents.announcement_card
+                        announcement={preview_announcement(assigns)}
+                        current_user_id={@current_scope.user.id}
+                        show_view_action={false}
+                      />
                     </div>
                   </div>
                 <% end %>
@@ -415,16 +430,9 @@ defmodule FoyerWeb.AnnouncementLive do
                           Audience · {@announcement.channel && @announcement.channel.name}
                         </div>
                       </div>
-                      <%= if managed_by?(@announcement, @current_scope) do %>
-                        <.link
-                          navigate={~p"/announcements/#{@announcement.id}/edit"}
-                          class="foyer-btn ghost sm ml-auto"
-                          id="announcement-edit-link"
-                        >
-                          Edit
-                        </.link>
-                      <% end %>
                     </div>
+
+                    <p class="foyer-serif">{@announcement.body}</p>
 
                     <div class="flex flex-wrap gap-2">
                       <%= if @can_pin? do %>
@@ -447,19 +455,57 @@ defmodule FoyerWeb.AnnouncementLive do
                           <.icon name="hero-bookmark-slash" class="size-4" /> Unpin
                         </button>
                       <% end %>
-                      <%= if managed_by?(@announcement, @current_scope) and FoyerWeb.LiveDeps.house().within_grace_window?(@announcement) do %>
-                        <button
+                      <%= if managed_by?(@announcement, @current_scope) and @within_grace? do %>
+                        <.link
+                          navigate={~p"/announcements/#{@announcement.id}/edit"}
                           class="foyer-btn sm"
-                          phx-click="remove"
-                          id="announcement-remove-btn"
-                          type="button"
+                          id="announcement-edit-link"
                         >
-                          <.icon name="hero-trash" class="size-4" /> Remove
-                        </button>
+                          <.icon name="hero-pencil-square" class="size-4" /> Edit
+                        </.link>
+                      <% end %>
+                      <%= if managed_by?(@announcement, @current_scope) and not @within_grace? do %>
+                        <span
+                          class="inline-flex"
+                          title="Editing and removal are only available for 5 minutes after publishing."
+                        >
+                          <button
+                            class="foyer-btn sm"
+                            id="announcement-edit-link"
+                            type="button"
+                            disabled
+                          >
+                            <.icon name="hero-pencil-square" class="size-4" /> Edit
+                          </button>
+                        </span>
+                      <% end %>
+                      <%= if managed_by?(@announcement, @current_scope) do %>
+                        <%= if @within_grace? do %>
+                          <button
+                            class="foyer-btn sm"
+                            phx-click="remove"
+                            id="announcement-remove-btn"
+                            type="button"
+                          >
+                            <.icon name="hero-trash" class="size-4" /> Remove
+                          </button>
+                        <% else %>
+                          <span
+                            class="inline-flex"
+                            title="Editing and removal are only available for 5 minutes after publishing."
+                          >
+                            <button
+                              class="foyer-btn sm"
+                              id="announcement-remove-btn"
+                              type="button"
+                              disabled
+                            >
+                              <.icon name="hero-trash" class="size-4" /> Remove
+                            </button>
+                          </span>
+                        <% end %>
                       <% end %>
                     </div>
-
-                    <p class="foyer-serif">{@announcement.body}</p>
 
                     <%= if @announcement.requires_ack do %>
                       <div class="foyer-mono">
@@ -541,6 +587,43 @@ defmodule FoyerWeb.AnnouncementLive do
     do: author_id == id
 
   defp managed_by?(_, _), do: false
+
+  defp preview_announcement(assigns) do
+    channel = preview_channel(assigns)
+
+    %Announcement{
+      id: 0,
+      author_id: assigns.current_scope.user.id,
+      author: assigns.current_scope.user,
+      channel_id: channel && channel.id,
+      channel: channel,
+      title: if(assigns.preview_title == "", do: "Untitled", else: assigns.preview_title),
+      body:
+        if(assigns.preview_body == "", do: "Body will appear here...", else: assigns.preview_body),
+      requires_ack: assigns.preview_requires_ack,
+      pinned_at: if(assigns.preview_pinned, do: DateTime.utc_now(:second)),
+      published_at: DateTime.utc_now(:second),
+      reads: [],
+      acks: []
+    }
+  end
+
+  defp preview_channel(assigns) do
+    case Integer.parse(to_string(assigns.preview_channel_id || "")) do
+      {id, ""} ->
+        assigns.channel_options
+        |> Enum.find(fn {_name, channel_id} -> channel_id == id end)
+        |> case do
+          {name, ^id} -> %Foyer.Channels.Channel{id: id, name: name}
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp truthy?(value), do: value in [true, "true", "on", "1"]
 
   defp ack_initials(%{user: %{initials: initials}}), do: initials
   defp ack_initials(_), do: "??"

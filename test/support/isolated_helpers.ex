@@ -72,15 +72,15 @@ defmodule FoyerWeb.IsolatedHelpers do
         |> Map.put(:params, params)
         |> FoyerWeb.IsolatedHelpers.prepare_conn(
           FoyerWeb.RecognitionsLive,
-          :authenticated_on_shift,
+          :isolated_test,
           path,
-          [{FoyerWeb.UserAuth, :ensure_on_shift}]
+          [{FoyerWeb.IsolatedHelpers.OnMount, :default}]
         )
 
       Phoenix.LiveViewTest.live_isolated(conn, FoyerWeb.RecognitionsLive,
         session: FoyerWeb.IsolatedHelpers.session_for(scope),
         action: action,
-        router: FoyerWeb.Router
+        router: FoyerWeb.IsolatedRouter
       )
     end
   end
@@ -123,6 +123,23 @@ defmodule FoyerWeb.IsolatedHelpers do
   end
 
   @doc """
+  Mount `FoyerWeb.PeopleLive` in `:index` action in isolation.
+  """
+  defmacro mount_isolated_people_index(conn, viewer, opts \\ []) do
+    quote bind_quoted: [conn: conn, viewer: viewer, opts: opts] do
+      on_shift? = Keyword.get(opts, :on_shift?, true)
+
+      session = %{
+        "foyer_isolated_user" => viewer,
+        "foyer_isolated_on_shift?" => on_shift?,
+        "foyer_isolated_live_action" => :index
+      }
+
+      Phoenix.LiveViewTest.live_isolated(conn, FoyerWeb.IsolatedPeopleLive, session: session)
+    end
+  end
+
+  @doc """
   Prepares a conn for `live_isolated/3` and produces the matching opts.
   """
   @spec prepare_isolated(Plug.Conn.t(), module(), Scope.t(), keyword()) ::
@@ -156,7 +173,6 @@ defmodule FoyerWeb.IsolatedHelpers do
 
   @doc false
   @spec recognitions_path_for(atom()) :: String.t()
-  def recognitions_path_for(:index), do: "/recognitions"
   def recognitions_path_for(:new), do: "/recognitions/new"
   def recognitions_path_for(:show), do: "/recognitions/1"
   def recognitions_path_for(:edit), do: "/recognitions/1/edit"
