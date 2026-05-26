@@ -637,6 +637,11 @@ html, body {
   background: rgba(255, 255, 255, 0.48);
 }
 
+.people-directory__row.is-self {
+  border-color: rgba(46, 68, 52, 0.55);
+  background: rgba(255, 255, 255, 0.58);
+}
+
 .people-directory__identity {
   display: flex;
   min-width: 0;
@@ -656,6 +661,29 @@ html, body {
 
 .people-directory__name {
   font-size: 1.15rem;
+}
+
+.people-directory__name-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.people-directory__self-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.35rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(46, 68, 52, 0.25);
+  color: var(--foyer-forest-deep);
+  background: rgba(233, 238, 227, 0.9);
+  font-family: var(--foyer-font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .people-directory__title {

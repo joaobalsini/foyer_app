@@ -53,6 +53,12 @@ defmodule Foyer.HouseTest do
       refute Enum.any?(House.feed_for(ctx.maya), &(&1.id == ctx.suite_412.id))
     end
 
+    test "F.Announcements.6 / F.Today.14 removed announcements leave manager-authored posts",
+         ctx do
+      assert {:ok, removed} = House.remove_announcement(ctx.suite_412, ctx.charlotte)
+      refute Enum.any?(House.authored_by(ctx.charlotte), &(&1.id == removed.id))
+    end
+
     test "F.Announcements.6 removed announcements keep manager receipts auditable", ctx do
       assert {:ok, removed} = House.remove_announcement(ctx.suite_412, ctx.charlotte)
       assert {:ok, receipts} = House.receipts_for(removed, ctx.charlotte)

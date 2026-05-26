@@ -49,6 +49,9 @@ defmodule FoyerWeb.PeopleLiveTest do
       assert has_element?(view, "#people-row-1")
       assert has_element?(view, "#people-identity-1")
       refute has_element?(view, "#people-profile-link-1")
+      assert has_element?(view, "#people-self-2", "You")
+      assert has_element?(view, "#view-profile-2", "Your profile")
+      refute has_element?(view, "#message-colleague-2")
       assert has_element?(view, "#view-profile-1", "View profile")
       assert has_element?(view, "#message-colleague-1", "Message")
     end
@@ -71,8 +74,10 @@ defmodule FoyerWeb.PeopleLiveTest do
       {:ok, view, _html} = mount_isolated_people_index(conn, viewer)
 
       refute has_element?(view, "#view-profile-1")
-      assert has_element?(view, "#view-profile-2")
+      assert has_element?(view, "#view-profile-2", "Your profile")
       refute has_element?(view, "#view-profile-3")
+      assert has_element?(view, "#people-self-2", "You")
+      refute has_element?(view, "#message-colleague-2")
     end
   end
 

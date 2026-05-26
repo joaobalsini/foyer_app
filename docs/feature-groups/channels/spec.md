@@ -116,7 +116,9 @@ ordered alphabetically by channel name, with each count matching the actual numb
 heading, a `{count} colleagues · The Linden` summary, compact filter chips, and a list row for
 every seeded user. Each row shows the user's avatar initials, name, title, status text, an
 explicit `Message` action, and a `View profile` action only when the current user is allowed by
-F.Profile.8 / F.Profile.19. The row itself is not a link, and no row is missing.
+F.Profile.8 / F.Profile.19. The current user's own row is visually marked with `You`, uses a
+`Your profile` action, and does not render a `Message` action. The row itself is not a link, and no
+row is missing.
 
 ### F.Channels.16 — People Directory shows on-shift pulse for on-shift colleagues
 

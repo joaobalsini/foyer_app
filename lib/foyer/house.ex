@@ -240,6 +240,7 @@ defmodule Foyer.House do
   def authored_by(%User{id: user_id}) do
     from(a in Announcement,
       where: a.author_id == ^user_id and not is_nil(a.published_at),
+      where: is_nil(a.removed_at),
       order_by: [desc: a.published_at],
       preload: [:author, :channel, :reads, :acks]
     )

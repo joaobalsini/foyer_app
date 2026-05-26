@@ -199,6 +199,15 @@ defmodule FoyerWeb.SmokeTest do
       assert render(view) =~ "Charlotte"
     end
 
+    test "F.Today.14 — manager live posts omit removed announcements", ctx do
+      assert {:ok, _removed} = Foyer.House.remove_announcement(ctx.suite_412, ctx.charlotte)
+
+      {:ok, view, _html} = ctx.conn |> sign_in(ctx.charlotte) |> live(~p"/today")
+
+      refute has_element?(view, "#announcement-card-#{ctx.suite_412.id}")
+      refute render(view) =~ ctx.suite_412.title
+    end
+
     test "off-shift today mounts and starts a shift", ctx do
       {:ok, view, _html} = ctx.conn |> sign_in(ctx.jamal) |> live(~p"/today")
 
@@ -397,8 +406,12 @@ defmodule FoyerWeb.SmokeTest do
       assert has_element?(view, "#people-row-#{ctx.rafael.id}")
       assert has_element?(view, "#people-row-#{ctx.aisha.id}")
       assert has_element?(view, "#people-row-#{ctx.jamal.id}")
+      assert has_element?(view, "#people-self-#{ctx.charlotte.id}", "You")
+      assert has_element?(view, "#view-profile-#{ctx.charlotte.id}", "Your profile")
+      refute has_element?(view, "#message-colleague-#{ctx.charlotte.id}")
       assert has_element?(view, "#view-profile-#{ctx.maya.id}", "View profile")
       assert has_element?(view, "#message-colleague-#{ctx.maya.id}", "Message")
+      assert has_element?(view, "#message-colleague-#{ctx.hugo.id}", "Message")
       assert render(view) =~ "Sebastien Roy"
     end
 

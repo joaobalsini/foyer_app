@@ -272,11 +272,26 @@ defmodule FoyerWeb.PeopleLive do
 
                   <ul id="people-list" class="people-directory__list" phx-update="stream">
                     <li :for={{dom_id, person} <- @streams.people} id={dom_id}>
-                      <div class="people-directory__row" id={"people-row-#{person.id}"}>
+                      <div
+                        class={[
+                          "people-directory__row",
+                          own_profile?(@current_scope, person) && "is-self"
+                        ]}
+                        id={"people-row-#{person.id}"}
+                      >
                         <div class="people-directory__identity" id={"people-identity-#{person.id}"}>
                           <FoyerComponents.avatar initials={person.initials} />
                           <span class="min-w-0">
-                            <span class="foyer-serif people-directory__name">{person.name}</span>
+                            <span class="people-directory__name-line">
+                              <span class="foyer-serif people-directory__name">{person.name}</span>
+                              <span
+                                :if={own_profile?(@current_scope, person)}
+                                class="people-directory__self-badge"
+                                id={"people-self-#{person.id}"}
+                              >
+                                You
+                              </span>
+                            </span>
                             <span class="people-directory__title">{person.title}</span>
                           </span>
                         </div>
@@ -303,9 +318,12 @@ defmodule FoyerWeb.PeopleLive do
                             class="people-directory__action"
                             id={"view-profile-#{person.id}"}
                           >
-                            View profile
+                            {if own_profile?(@current_scope, person),
+                              do: "Your profile",
+                              else: "View profile"}
                           </.link>
                           <button
+                            :if={!own_profile?(@current_scope, person)}
                             type="button"
                             phx-click="message_colleague"
                             phx-value-user_id={person.id}

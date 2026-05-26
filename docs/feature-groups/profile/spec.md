@@ -97,7 +97,7 @@ value tags, and any bonus points badge.
 **Given** a staff user navigates to a colleague's profile at `/people/:id`
 **When** `PeopleLive` handles the `:show` action
 **Then** the user is redirected back to `/people` and the colleague's profile card is not
-rendered. Staff users may only open their own profile (`/me`, or their own row's `View profile`
+rendered. Staff users may only open their own profile (`/me`, or their own row's `Your profile`
 action in People).
 
 ### F.Profile.9 — Stats row: recognitions this month
